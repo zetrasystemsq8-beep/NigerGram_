@@ -1,11 +1,11 @@
-import 'package:flutter_video_feed/core/constants/enums/router_enum.dart';
-import 'package:flutter_video_feed/core/init/router/custom_page_builder_widget.dart';
-import 'package:flutter_video_feed/presentation/design_system/colors.dart';
-import 'package:flutter_video_feed/presentation/views/dashboard/dashboard_view.dart';
-import 'package:flutter_video_feed/presentation/design_system/widgets/bottom_navigation_widget.dart';
-import 'package:flutter_video_feed/presentation/views/profile/profile_view.dart';
-import 'package:flutter_video_feed/presentation/views/video_feed/video_feed_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_video_feed/core/design_system/colors.dart';
+import 'package:flutter_video_feed/core/design_system/widgets/bottom_navigation_widget.dart';
+import 'package:flutter_video_feed/core/init/router/custom_page_builder_widget.dart';
+import 'package:flutter_video_feed/core/utils/constants/enums/router_enum.dart';
+import 'package:flutter_video_feed/features/dashboard/presentation/view/dashboard_view.dart';
+import 'package:flutter_video_feed/features/profile/presentation/view/profile_view.dart';
+import 'package:flutter_video_feed/features/video_feed/presentation/view/video_feed_view.dart';
 import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -24,8 +24,8 @@ class AppRouter {
               state,
               BottomNavigationWidget(
                 location: state.uri.toString(),
-                child: child,
                 backgroundColor: state.uri.toString() == RouterEnum.videoFeedView.routeName ? black : null,
+                child: child,
               ),
             ),
         routes: [

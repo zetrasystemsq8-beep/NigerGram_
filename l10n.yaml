@@ -1,5 +1,5 @@
 synthetic-package: false
 
-arb-dir: lib/presentation/l10n
+arb-dir: lib/core/config/localization
 template-arb-file: en.arb
 output-localization-file: app_localizations.dart
