@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_video_feed/core/design_system/colors.dart';
 import 'package:flutter_video_feed/core/utils/constants/enums/router_enum.dart';
+import 'package:flutter_video_feed/core/utils/extensions/context_size_extensions.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -28,21 +29,21 @@ class BottomNavigationWidget extends StatelessWidget {
           showUnselectedLabels: false,
           selectedFontSize: 0,
           unselectedFontSize: 0,
-          items: const [
+          items: [
             BottomNavigationBarItem(
               label: '',
-              icon: Icon(LucideIcons.house, size: 28),
-              activeIcon: Icon(LucideIcons.house, size: 28),
+              icon: Icon(LucideIcons.house, size: context.sq(28)),
+              activeIcon: Icon(LucideIcons.house, size: context.sq(28)),
             ),
             BottomNavigationBarItem(
               label: '',
-              icon: Icon(LucideIcons.tvMinimalPlay, size: 28),
-              activeIcon: Icon(LucideIcons.tvMinimalPlay, size: 28),
+              icon: Icon(LucideIcons.tvMinimalPlay, size: context.sq(28)),
+              activeIcon: Icon(LucideIcons.tvMinimalPlay, size: context.sq(28)),
             ),
             BottomNavigationBarItem(
               label: '',
-              icon: Icon(LucideIcons.circleUser, size: 28),
-              activeIcon: Icon(LucideIcons.circleUser, size: 28),
+              icon: Icon(LucideIcons.circleUser, size: context.sq(28)),
+              activeIcon: Icon(LucideIcons.circleUser, size: context.sq(28)),
             ),
           ],
         ),

@@ -85,38 +85,76 @@ class InteractiveElement {
 
 ## 🎨 Responsive Design System
 
-**Reference:** iPhone 16 Pro Max (430×932)
-**File:** `lib/core/utils/extensions/build_context_responsive_extensions.dart`
+**MANDATORY FOR ALL WIDGETS** - Zero hardcoded values allowed
 
-### Methods
+**Reference Design:** iPhone 16 Pro Max (430×932)
+**Core Class:** `lib/core/utils/helpers/adaptive_helper.dart`
+**Extension:** `lib/core/utils/extensions/context_size_extensions.dart`
+
+### AdaptiveHelper (Core)
 ```dart
-// Sizing
-context.w(200)          // Responsive width
-context.h(100)          // Responsive height
-context.fontSize(18)    // Responsive font
-context.square(24)      // Perfect square
+class AdaptiveHelper {
+  static const double designWidth = 430;
+  static const double designHeight = 932;
+  static const double fontScaleMin = 0.7;
+  static const double fontScaleMax = 1.5;
 
-// Spacing
-context.hSpace(16)      // Vertical SizedBox
-context.wSpace(20)      // Horizontal SizedBox
-
-// Padding
-context.padAll(16)
-context.padHorizontal(12)
-context.padVertical(8)
-
-// Radius
-context.radiusAll(12)
-context.radiusTop(8)
+  static double height(BuildContext context, double pixels);
+  static double width(BuildContext context, double pixels);
+  static double spacing(BuildContext context, double pixels);
+  static double corner(BuildContext context, double pixels);
+  static double text(BuildContext context, double pixels);
+}
 ```
 
-### Usage
+### Context Extension Methods (Use These)
 ```dart
-// ✅ CORRECT
+// Dimensions
+context.h(100)           // Responsive height
+context.w(200)           // Responsive width
+context.sq(24)           // Square dimension
+context.fontSize(18)     // Responsive font (with min/max bounds)
+
+// Spacing Widgets
+context.hSpace(16)       // Vertical SizedBox
+context.wSpace(20)       // Horizontal SizedBox
+context.empty()          // SizedBox.shrink()
+
+// Padding
+context.paddingAll(16)
+context.paddingHorizontal(12)
+context.paddingVertical(8)
+context.paddingTop(8)
+context.paddingBottom(8)
+context.paddingLeft(12)
+context.paddingRight(12)
+context.paddingNone       // EdgeInsets.zero
+
+// Border Radius
+context.radiusAll(12)
+context.radiusTop(8)
+context.radiusBottom(8)
+context.radiusLeft(8)
+context.radiusRight(8)
+context.radiusTopLeft(8)
+context.radiusTopRight(8)
+context.radiusBottomLeft(8)
+context.radiusBottomRight(8)
+
+// Device Info
+context.safeTop          // Safe area top
+context.safeBottom       // Safe area bottom
+context.screenWidth      // Total screen width
+context.screenHeight     // Total screen height
+```
+
+### Usage Examples
+```dart
+// ✅ CORRECT - ALWAYS use responsive methods
 Container(
   width: context.w(200),
   height: context.h(100),
-  padding: context.padAll(16),
+  padding: context.paddingAll(16),
   decoration: BoxDecoration(
     borderRadius: context.radiusAll(12),
   ),
@@ -126,10 +164,26 @@ Container(
   ),
 )
 
-// ❌ FORBIDDEN
+Icon(LucideIcons.heart, size: context.sq(24))
+
+Column(
+  spacing: context.h(8),
+  children: [
+    Text('A'),
+    context.hSpace(16),
+    Text('B'),
+  ],
+)
+
+// ❌ FORBIDDEN - NO hardcoded values
 Container(width: 200, height: 100)
 SizedBox(height: 24)
+SizedBox(width: 16)
 Text('Text', style: TextStyle(fontSize: 16))
+Icon(Icons.home, size: 28)
+EdgeInsets.all(16)
+BorderRadius.circular(12)
+Padding(padding: EdgeInsets.symmetric(horizontal: 20))
 ```
 
 ---
@@ -426,15 +480,62 @@ lib/features/video_feed/
 
 ## 🚫 STRICT RULES
 
-### 1. NO Hardcoded Values
-```dart
-❌ SizedBox(height: 24)
-❌ Container(width: 200)
-❌ TextStyle(fontSize: 16)
+### ⚠️ RULE #0: MANDATORY RESPONSIVE SYSTEM (HIGHEST PRIORITY)
 
-✅ context.hSpace(24)
-✅ Container(width: context.w(200))
-✅ TextStyle(fontSize: context.fontSize(16))
+**YOU MUST USE `ContextSizeExtensions` FOR ALL DIMENSIONS, SPACING, PADDING, RADIUS, AND FONTS**
+
+This is the **MOST IMPORTANT** rule. Every single pixel value MUST use the responsive system.
+
+```dart
+// ❌ FORBIDDEN - These will be REJECTED
+SizedBox(height: 24)
+SizedBox(width: 16)
+Container(width: 200, height: 100)
+Icon(Icons.home, size: 28)
+Text('Hi', style: TextStyle(fontSize: 16))
+Padding(padding: EdgeInsets.all(16))
+EdgeInsets.symmetric(horizontal: 20, vertical: 12)
+EdgeInsets.only(top: 8, left: 12)
+BorderRadius.circular(12)
+BorderRadius.only(topLeft: Radius.circular(8))
+CircleAvatar(radius: 20)
+
+// ✅ MANDATORY - ALWAYS use these
+context.hSpace(24)
+context.wSpace(16)
+Container(width: context.w(200), height: context.h(100))
+Icon(Icons.home, size: context.sq(28))
+Text('Hi', style: TextStyle(fontSize: context.fontSize(16)))
+Padding(padding: context.paddingAll(16))
+context.paddingHorizontal(20)
+context.paddingVertical(12)
+EdgeInsets.only(top: context.h(8), left: context.w(12))
+context.radiusAll(12)
+context.radiusTopLeft(8)
+CircleAvatar(radius: context.sq(20))
+```
+
+**Exceptions (ONLY these are allowed):**
+- `const Duration(...)` - Time values
+- `const EdgeInsets.zero` - Zero padding (or use `context.paddingNone`)
+- `const SizedBox.shrink()` - Empty widget (or use `context.empty()`)
+- Dynamic values from API/controller (e.g., `controller.value.size.width`)
+- Opacity values (0.0 to 1.0)
+- FontWeight values (FontWeight.w500, etc.)
+- Flex values in Row/Column (flex: 1, 2, etc.)
+
+**Before committing ANY widget:**
+1. Search for hardcoded numbers in dimensions
+2. Search for `SizedBox(height:` or `SizedBox(width:`
+3. Search for `EdgeInsets.all(`, `.symmetric(`, `.only(`
+4. Search for `BorderRadius.circular(`
+5. Search for `size:` in Icon/CircleAvatar
+6. Replace ALL with responsive methods
+
+### 1. ALWAYS Import ContextSizeExtensions
+```dart
+// ✅ Required import for ALL widget files
+import 'package:flutter_video_feed/core/utils/extensions/context_size_extensions.dart';
 ```
 
 ### 2. NO Build Methods
@@ -479,6 +580,20 @@ lib/features/video_feed/
 
 ✅ Dispose oldest when creating new
 ✅ Keep current + 2 preloaded max
+```
+
+### 7. VERIFY Before Every Commit
+```bash
+# Search for violations (should return ZERO results)
+grep -r "SizedBox(height: [0-9]" lib/
+grep -r "SizedBox(width: [0-9]" lib/
+grep -r "fontSize: [0-9]" lib/
+grep -r "size: [0-9]" lib/
+grep -r "EdgeInsets\." lib/ | grep -v "EdgeInsets.zero"
+grep -r "BorderRadius\." lib/
+
+# Run analyzer (should be 0 issues)
+fvm flutter analyze
 ```
 
 ---
