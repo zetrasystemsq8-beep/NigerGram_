@@ -29,6 +29,10 @@ jobs:
         run: |
           echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
+      - name: Fix package name in all dart files
+        run: |
+          find lib -name "*.dart" -exec sed -i 's/package:flutter_video_feed/package:nigergram/g' {} +
+
       - name: Fix package folder structure
         run: |
           mkdir -p android/app/src/main/kotlin/com/nigergram/app
@@ -37,7 +41,7 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build APK (split by ABI - smaller size)
+      - name: Build APK
         run: flutter build apk --debug --split-per-abi --no-tree-shake-icons
 
       - name: Upload APK
