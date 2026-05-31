@@ -1,5 +1,5 @@
-package com.example.flutter_video_feed
+package com.nigergram.app
 
 import io.flutter.embedding.android.FlutterActivity
 
-class MainActivity : FlutterActivity()
+class MainActivity: FlutterActivity()
