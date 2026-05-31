@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:flutter_video_feed/core/config/localization/app_localizations.dart';
-import 'package:flutter_video_feed/core/di/dependency_injector.dart';
-import 'package:flutter_video_feed/core/init/router/app_router.dart';
-import 'package:flutter_video_feed/features/video_feed/presentation/bloc/video_feed_cubit.dart';
+import 'package:nigergram/core/config/localization/app_localizations.dart';
+import 'package:nigergram/core/di/dependency_injector.dart';
+import 'package:nigergram/core/init/router/app_router.dart';
+import 'package:nigergram/features/video_feed/presentation/bloc/video_feed_cubit.dart';
 
 class AppWidget extends StatelessWidget {
   const AppWidget({super.key});
