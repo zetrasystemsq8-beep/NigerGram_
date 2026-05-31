@@ -15,7 +15,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCLcQqsHrq9O0sMKAs5g1hdv7KqzvEb4zo',
-    appId: '1:378525386177:android:e05705ba99d82c88c5db40',
+    appId: '1:378525386177:android:487545170906c572c5db40',
     messagingSenderId: '378525386177',
     projectId: 'nigergram',
     storageBucket: 'nigergram.firebasestorage.app',
