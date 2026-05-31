@@ -37,6 +37,7 @@ jobs:
         run: |
           mkdir -p android/app/src/main/kotlin/com/nigergram/app
           cp android/app/src/main/kotlin/com/example/flutter_video_feed/MainActivity.kt android/app/src/main/kotlin/com/nigergram/app/MainActivity.kt
+          rm android/app/src/main/kotlin/com/example/flutter_video_feed/MainActivity.kt
 
       - name: Get dependencies
         run: flutter pub get
