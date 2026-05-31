@@ -1,6 +1,8 @@
 name: Build NigerGram APK
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -27,15 +29,20 @@ jobs:
         run: |
           echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
+      - name: Fix package folder structure
+        run: |
+          mkdir -p android/app/src/main/kotlin/com/nigergram/app
+          cp android/app/src/main/kotlin/com/example/flutter_video_feed/MainActivity.kt android/app/src/main/kotlin/com/nigergram/app/MainActivity.kt
+
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build debug APK
-        run: flutter build apk --debug --no-tree-shake-icons
+      - name: Build APK (split by ABI - smaller size)
+        run: flutter build apk --debug --split-per-abi --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NigerGram-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
           retention-days: 7
