@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import 'package:nigergram/core/config/localization/app_localizations.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/core/init/router/app_router.dart';
+import 'package:nigergram/features/auth/presentation/bloc/auth_cubit.dart';
+import 'package:nigergram/features/auth/presentation/view/login_page.dart';
 import 'package:nigergram/features/video_feed/presentation/bloc/video_feed_cubit.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AppWidget extends StatelessWidget {
   const AppWidget({super.key});
@@ -12,14 +14,37 @@ class AppWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appRouter = getIt<AppRouter>();
-    return BlocProvider(
-      lazy: false,
-      create: (context) => getIt<VideoFeedCubit>(),
-      child: MaterialApp.router(
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          lazy: false,
+          create: (context) => getIt<VideoFeedCubit>(),
+        ),
+        BlocProvider(
+          create: (context) => AuthCubit(),
+        ),
+      ],
+      child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        routerConfig: appRouter.router,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
+        home: StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                backgroundColor: Colors.black,
+                body: Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              );
+            }
+            if (snapshot.hasData) {
+              return appRouter.router.routerDelegate.build(context) as Widget;
+            }
+            return const LoginPage();
+          },
+        ),
       ),
     );
   }
