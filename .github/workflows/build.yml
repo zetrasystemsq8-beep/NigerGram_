@@ -42,23 +42,12 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Generate Keystore
-        run: |
-          keytool -genkey -v -keystore android/app/nigergram.jks \
-            -alias nigergram \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=NigerGram, OU=NigerGram, O=NigerGram, L=Lagos, S=Lagos, C=NG" \
-            -storepass nigergram123 \
-            -keypass nigergram123
-
-      - name: Build Debug APK split
-        run: flutter build apk --debug --split-per-abi --no-tree-shake-icons
+      - name: Build APK
+        run: flutter build apk --debug --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NigerGram-arm64
-          path: build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
+          name: NigerGram-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 7
