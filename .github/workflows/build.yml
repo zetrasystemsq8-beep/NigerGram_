@@ -53,17 +53,12 @@ jobs:
             -storepass nigergram123 \
             -keypass nigergram123
 
-      - name: Build Release APK
-        run: |
-          flutter build apk --release --split-per-abi --no-tree-shake-icons \
-            --dart-define=STORE_FILE=nigergram.jks \
-            --dart-define=STORE_PASSWORD=nigergram123 \
-            --dart-define=KEY_ALIAS=nigergram \
-            --dart-define=KEY_PASSWORD=nigergram123
+      - name: Build Debug APK split
+        run: flutter build apk --debug --split-per-abi --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NigerGram-release
-          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          name: NigerGram-arm64
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
           retention-days: 7
