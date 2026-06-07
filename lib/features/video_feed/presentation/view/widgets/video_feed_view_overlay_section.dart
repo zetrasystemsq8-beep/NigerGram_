@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_video_feed/features/video_feed/presentation/view/widgets/video_feed_view_interaction_buttons.dart';
-import 'package:flutter_video_feed/features/video_feed/presentation/view/widgets/video_feed_view_user_info_section.dart';
+import 'package:nigergram/features/video_feed/presentation/view/widgets/video_feed_view_interaction_buttons.dart';
+import 'package:nigergram/features/video_feed/presentation/view/widgets/video_feed_view_user_info_section.dart';
 
 class VideoFeedViewOverlaySection extends StatelessWidget {
   const VideoFeedViewOverlaySection({
@@ -12,6 +12,7 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
     required this.likeCount,
     required this.commentCount,
     required this.shareCount,
+    required this.onLikeTapped,
     super.key,
   });
 
@@ -23,6 +24,7 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
   final int likeCount;
   final int commentCount;
   final int shareCount;
+  final VoidCallback onLikeTapped;
 
   @override
   Widget build(BuildContext context) {
@@ -31,13 +33,18 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          VideoFeedViewUserInfoSection(profileImageUrl: profileImageUrl, username: username, description: description),
+          VideoFeedViewUserInfoSection(
+            profileImageUrl: profileImageUrl,
+            username: username,
+            description: description,
+          ),
           VideoFeedViewInteractionButtons(
             isLiked: isLiked,
             isBookmarked: isBookmarked,
             likeCount: likeCount,
             commentCount: commentCount,
             shareCount: shareCount,
+            onLikeTapped: onLikeTapped,
           ),
         ],
       ),
