@@ -1,7 +1,8 @@
 enum RouterEnum {
   dashboardView('/dashboard_view'),
   videoFeedView('/video_feed_view'),
-  profileView('/profile_view');
+  profileView('/profile_view'),
+  uploadView('/upload_view');
 
   final String routeName;
 
