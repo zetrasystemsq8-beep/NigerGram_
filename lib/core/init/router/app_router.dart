@@ -7,6 +7,7 @@ import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
 import 'package:nigergram/features/auth/presentation/view/login_page.dart';
 import 'package:nigergram/features/dashboard/presentation/view/dashboard_view.dart';
 import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
+import 'package:nigergram/features/upload/presentation/view/upload_page.dart';
 import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.dart';
 import 'package:go_router/go_router.dart';
 
@@ -29,6 +30,12 @@ class AppRouter {
         path: '/login',
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const LoginPage()),
+      ),
+      GoRoute(
+        path: RouterEnum.uploadView.routeName,
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const UploadPage()),
       ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
