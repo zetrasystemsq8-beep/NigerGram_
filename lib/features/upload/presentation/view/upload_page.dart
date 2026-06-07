@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,7 +16,6 @@ class _UploadPageState extends State<UploadPage> {
   final _descriptionController = TextEditingController();
   File? _videoFile;
   bool _isUploading = false;
-  double _uploadProgress = 0;
 
   @override
   void dispose() {
@@ -44,34 +43,41 @@ class _UploadPageState extends State<UploadPage> {
       return;
     }
 
-    setState(() {
-      _isUploading = true;
-      _uploadProgress = 0;
-    });
+    setState(() => _isUploading = true);
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      final fileName = '${user.uid}_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final fileName =
+          '${user.uid}_${DateTime.now().millisecondsSinceEpoch}.mp4';
 
       final supabase = Supabase.instance.client;
       await supabase.storage.from('videos').upload(
-        fileName,
-        _videoFile!,
-        fileOptions: const FileOptions(contentType: 'video/mp4'),
-      );
+            fileName,
+            _videoFile!,
+            fileOptions: const FileOptions(contentType: 'video/mp4'),
+          );
 
-      final videoUrl = supabase.storage.from('videos').getPublicUrl(fileName);
+      final videoUrl =
+          supabase.storage.from('videos').getPublicUrl(fileName);
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final username = userDoc.data()?['username'] ?? 'unknown';
 
       await FirebaseFirestore.instance.collection('videos').add({
         'videoUrl': videoUrl,
         'description': _descriptionController.text.trim(),
         'userId': user.uid,
-        'userEmail': user.email,
-        'likes': 0,
-        'comments': 0,
-        'createdAt': FieldValue.serverTimestamp(),
+        'username': username,
+        'profileImageUrl': '',
+        'likeCount': 0,
+        'commentCount': 0,
+        'shareCount': 0,
+        'timestamp': FieldValue.serverTimestamp(),
       });
 
       setState(() => _isUploading = false);
@@ -98,7 +104,10 @@ class _UploadPageState extends State<UploadPage> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        title: const Text('Post Video', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Post Video',
+          style: TextStyle(color: Colors.white),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SafeArea(
@@ -127,9 +136,11 @@ class _UploadPageState extends State<UploadPage> {
                           child: const Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.video_library, color: Colors.white, size: 40),
+                              Icon(Icons.video_library,
+                                  color: Colors.white, size: 40),
                               SizedBox(height: 8),
-                              Text('Gallery', style: TextStyle(color: Colors.white)),
+                              Text('Gallery',
+                                  style: TextStyle(color: Colors.white)),
                             ],
                           ),
                         ),
@@ -148,9 +159,11 @@ class _UploadPageState extends State<UploadPage> {
                           child: const Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.videocam, color: Colors.red, size: 40),
+                              Icon(Icons.videocam,
+                                  color: Colors.red, size: 40),
                               SizedBox(height: 8),
-                              Text('Record', style: TextStyle(color: Colors.white)),
+                              Text('Record',
+                                  style: TextStyle(color: Colors.white)),
                             ],
                           ),
                         ),
@@ -169,16 +182,20 @@ class _UploadPageState extends State<UploadPage> {
                   child: const Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green, size: 60),
+                      Icon(Icons.check_circle,
+                          color: Colors.green, size: 60),
                       SizedBox(height: 8),
-                      Text('Video selected', style: TextStyle(color: Colors.white, fontSize: 16)),
+                      Text('Video selected',
+                          style: TextStyle(
+                              color: Colors.white, fontSize: 16)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () => setState(() => _videoFile = null),
-                  child: const Text('Change video', style: TextStyle(color: Colors.grey)),
+                  child: const Text('Change video',
+                      style: TextStyle(color: Colors.grey)),
                 ),
               ],
               const SizedBox(height: 24),
@@ -199,7 +216,8 @@ class _UploadPageState extends State<UploadPage> {
               ),
               const SizedBox(height: 32),
               if (_isUploading) ...[
-                const Text('Uploading...', style: TextStyle(color: Colors.white)),
+                const Text('Uploading...',
+                    style: TextStyle(color: Colors.white)),
                 const SizedBox(height: 8),
                 const LinearProgressIndicator(color: Colors.red),
               ] else
@@ -213,7 +231,8 @@ class _UploadPageState extends State<UploadPage> {
                     ),
                     child: const Text(
                       'Post Video',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style:
+                          TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
                 ),
