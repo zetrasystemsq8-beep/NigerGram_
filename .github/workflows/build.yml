@@ -39,6 +39,19 @@ jobs:
           cp android/app/src/main/kotlin/com/example/flutter_video_feed/MainActivity.kt android/app/src/main/kotlin/com/nigergram/app/MainActivity.kt
           rm android/app/src/main/kotlin/com/example/flutter_video_feed/MainActivity.kt
 
+      - name: Fix app icon
+        run: |
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
       - name: Get dependencies
         run: flutter pub get
 
