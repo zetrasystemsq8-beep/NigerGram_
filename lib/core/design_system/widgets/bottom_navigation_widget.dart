@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_video_feed/core/design_system/colors.dart';
-import 'package:flutter_video_feed/core/utils/constants/enums/router_enum.dart';
-import 'package:flutter_video_feed/core/utils/extensions/context_size_extensions.dart';
+import 'package:nigergram/core/design_system/colors.dart';
+import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
+import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -42,6 +42,25 @@ class BottomNavigationWidget extends StatelessWidget {
             ),
             BottomNavigationBarItem(
               label: '',
+              icon: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(LucideIcons.plus, size: context.sq(24), color: Colors.white),
+              ),
+              activeIcon: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(LucideIcons.plus, size: context.sq(24), color: Colors.white),
+              ),
+            ),
+            BottomNavigationBarItem(
+              label: '',
               icon: Icon(LucideIcons.circleUser, size: context.sq(28)),
               activeIcon: Icon(LucideIcons.circleUser, size: context.sq(28)),
             ),
@@ -54,16 +73,9 @@ class BottomNavigationWidget extends StatelessWidget {
 
 int _calculateSelectedIndex(BuildContext context) {
   final String location = GoRouterState.of(context).uri.toString();
-
-  if (location == RouterEnum.dashboardView.routeName) {
-    return 0;
-  }
-  if (location == RouterEnum.videoFeedView.routeName) {
-    return 1;
-  }
-  if (location == RouterEnum.profileView.routeName) {
-    return 2;
-  }
+  if (location == RouterEnum.dashboardView.routeName) return 0;
+  if (location == RouterEnum.videoFeedView.routeName) return 1;
+  if (location == RouterEnum.profileView.routeName) return 3;
   return 0;
 }
 
@@ -74,6 +86,8 @@ void _onItemTapped(int index, BuildContext context) {
     case 1:
       GoRouter.of(context).go(RouterEnum.videoFeedView.routeName);
     case 2:
+      GoRouter.of(context).push(RouterEnum.uploadView.routeName);
+    case 3:
       GoRouter.of(context).go(RouterEnum.profileView.routeName);
   }
 }
