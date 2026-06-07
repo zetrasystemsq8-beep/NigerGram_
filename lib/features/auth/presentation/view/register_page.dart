@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nigergram/features/auth/presentation/bloc/auth_cubit.dart';
@@ -10,16 +12,38 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
   @override
   void dispose() {
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _register(BuildContext context) async {
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+    if (_usernameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a username')),
+      );
+      return;
+    }
+
+    context.read<AuthCubit>().register(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+        );
   }
 
   @override
@@ -27,9 +51,22 @@ class _RegisterPageState extends State<RegisterPage> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: BlocConsumer<AuthCubit, AuthState>(
-        listener: (context, state) {
+        listener: (context, state) async {
           if (state is AuthSuccess) {
-            Navigator.pushReplacementNamed(context, '/feed');
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .set({
+                'uid': user.uid,
+                'username': _usernameController.text.trim(),
+                'email': user.email,
+                'followers': 0,
+                'following': 0,
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+            }
           }
           if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -58,6 +95,25 @@ class _RegisterPageState extends State<RegisterPage> {
                     style: TextStyle(color: Colors.grey, fontSize: 16),
                   ),
                   const SizedBox(height: 48),
+                  TextField(
+                    controller: _usernameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      hintText: '@naija_creator',
+                      hintStyle: TextStyle(color: Colors.grey),
+                      labelStyle: TextStyle(color: Colors.grey),
+                      prefixText: '@',
+                      prefixStyle: TextStyle(color: Colors.red),
+                      enabledBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(color: Colors.grey),
+                      ),
+                      focusedBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   TextField(
                     controller: _emailController,
                     style: const TextStyle(color: Colors.white),
@@ -111,21 +167,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     child: ElevatedButton(
                       onPressed: state is AuthLoading
                           ? null
-                          : () {
-                              if (_passwordController.text !=
-                                  _confirmPasswordController.text) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Passwords do not match'),
-                                  ),
-                                );
-                                return;
-                              }
-                              context.read<AuthCubit>().register(
-                                    _emailController.text.trim(),
-                                    _passwordController.text.trim(),
-                                  );
-                            },
+                          : () => _register(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
                         padding: const EdgeInsets.symmetric(vertical: 16),
