@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
 import 'package:nigergram/features/auth/presentation/bloc/auth_cubit.dart';
 import 'package:nigergram/features/auth/presentation/view/register_page.dart';
 
@@ -28,7 +30,7 @@ class _LoginPageState extends State<LoginPage> {
       body: BlocConsumer<AuthCubit, AuthState>(
         listener: (context, state) {
           if (state is AuthSuccess) {
-            Navigator.pushReplacementNamed(context, '/feed');
+            context.go(RouterEnum.dashboardView.routeName);
           }
           if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -103,7 +105,8 @@ class _LoginPageState extends State<LoginPage> {
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text(
                               'Login',
-                              style: TextStyle(color: Colors.white, fontSize: 16),
+                              style: TextStyle(
+                                  color: Colors.white, fontSize: 16),
                             ),
                     ),
                   ),
