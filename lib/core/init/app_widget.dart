@@ -1,33 +1,69 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:nigergram/core/config/localization/app_localizations.dart';
-import 'package:nigergram/core/di/dependency_injector.dart';
-import 'package:nigergram/core/init/router/app_router.dart';
-import 'package:nigergram/features/auth/presentation/bloc/auth_cubit.dart';
-import 'package:nigergram/features/video_feed/presentation/bloc/video_feed_cubit.dart';
+import 'package:nigergram/core/design_system/colors.dart';
+import 'package:nigergram/core/design_system/widgets/bottom_navigation_widget.dart';
+import 'package:nigergram/core/init/router/custom_page_builder_widget.dart';
+import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
+import 'package:nigergram/features/auth/presentation/view/login_page.dart';
+import 'package:nigergram/features/dashboard/presentation/view/dashboard_view.dart';
+import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
+import 'package:nigergram/features/upload/presentation/view/upload_page.dart';
+import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.dart';
+import 'package:go_router/go_router.dart';
 
-class AppWidget extends StatelessWidget {
-  const AppWidget({super.key});
+final GlobalKey<NavigatorState> _rootNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'root');
+final GlobalKey<NavigatorState> _shellNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shell');
 
-  @override
-  Widget build(BuildContext context) {
-    final appRouter = getIt<AppRouter>();
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          lazy: false,
-          create: (context) => getIt<VideoFeedCubit>(),
-        ),
-        BlocProvider(
-          create: (context) => AuthCubit(),
-        ),
-      ],
-      child: MaterialApp.router(
-        debugShowCheckedModeBanner: false,
-        routerConfig: appRouter.router,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
+class AppRouter {
+  final router = GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: '/login',
+    routes: [
+      GoRoute(
+        path: '/login',
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const LoginPage()),
       ),
-    );
-  }
+      GoRoute(
+        path: RouterEnum.uploadView.routeName,
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const UploadPage()),
+      ),
+      ShellRoute(
+        navigatorKey: _shellNavigatorKey,
+        pageBuilder: (context, state, child) => customPageBuilderWidget(
+          context,
+          state,
+          BottomNavigationWidget(
+            location: state.uri.toString(),
+            backgroundColor:
+                state.uri.toString() == RouterEnum.videoFeedView.routeName
+                    ? black
+                    : null,
+            child: child,
+          ),
+        ),
+        routes: [
+          GoRoute(
+            path: RouterEnum.dashboardView.routeName,
+            pageBuilder: (context, state) => customPageBuilderWidget(
+                context, state, const DashboardView()),
+          ),
+          GoRoute(
+            path: RouterEnum.videoFeedView.routeName,
+            pageBuilder: (context, state) => customPageBuilderWidget(
+                context, state, const VideoFeedView()),
+          ),
+          GoRoute(
+            path: RouterEnum.profileView.routeName,
+            pageBuilder: (context, state) => customPageBuilderWidget(
+                context, state, const ProfileView()),
+          ),
+        ],
+      ),
+    ],
+  );
 }
