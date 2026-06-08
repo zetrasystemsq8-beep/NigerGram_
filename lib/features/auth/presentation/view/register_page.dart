@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
 import 'package:nigergram/features/auth/presentation/bloc/auth_cubit.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -39,7 +41,6 @@ class _RegisterPageState extends State<RegisterPage> {
       );
       return;
     }
-
     context.read<AuthCubit>().register(
           _emailController.text.trim(),
           _passwordController.text.trim(),
@@ -67,6 +68,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 'createdAt': FieldValue.serverTimestamp(),
               });
             }
+            if (context.mounted) {
+              context.go(RouterEnum.dashboardView.routeName);
+            }
           }
           if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -76,11 +80,12 @@ class _RegisterPageState extends State<RegisterPage> {
         },
         builder: (context, state) {
           return SafeArea(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  const SizedBox(height: 60),
                   const Text(
                     'Create Account',
                     style: TextStyle(
@@ -176,7 +181,8 @@ class _RegisterPageState extends State<RegisterPage> {
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text(
                               'Create Account',
-                              style: TextStyle(color: Colors.white, fontSize: 16),
+                              style: TextStyle(
+                                  color: Colors.white, fontSize: 16),
                             ),
                     ),
                   ),
