@@ -23,11 +23,11 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # Setting the exact Flutter engine specified by the dependency solver
+      # Matching the exact engine version required by the pubspec
       - name: Set Up Flutter SDK Core
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.7'
+          flutter-version: '3.35.4'
           channel: 'stable'
           cache: true
 
