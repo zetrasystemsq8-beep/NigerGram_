@@ -28,25 +28,46 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          VideoFeedViewUserInfoSection(
-            profileImageUrl: profileImageUrl,
-            username: username,
-            description: description,
+    // Force alignment constraints directly within the Stack container space
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        top: false, // Allow layout to bypass upper notch boundaries
+        child: Padding(
+          padding: const EdgeInsets.only(left: 16.0, right: 12.0, bottom: 16.0),
+          child: RepaintBoundary(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Wrap in Expanded to guarantee long descriptions truncate or wrap cleanly 
+                // without displacing right-side button layouts
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 24.0),
+                    child: VideoFeedViewUserInfoSection(
+                      profileImageUrl: profileImageUrl,
+                      username: username,
+                      description: description,
+                    ),
+                  ),
+                ),
+                
+                // Static column layout holding your interaction buttons
+                VideoFeedViewInteractionButtons(
+                  isLiked: isLiked,
+                  isBookmarked: isBookmarked,
+                  likeCount: likeCount,
+                  commentCount: commentCount,
+                  shareCount: shareCount,
+                  onLikeTapped: onLikeTapped,
+                ),
+              ],
+            ),
           ),
-          VideoFeedViewInteractionButtons(
-            isLiked: isLiked,
-            isBookmarked: isBookmarked,
-            likeCount: likeCount,
-            commentCount: commentCount,
-            shareCount: shareCount,
-            onLikeTapped: onLikeTapped,
-          ),
-        ],
+        ),
       ),
     );
   }
