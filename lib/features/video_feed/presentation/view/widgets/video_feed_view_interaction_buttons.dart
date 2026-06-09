@@ -12,6 +12,9 @@ class VideoFeedViewInteractionButtons extends StatelessWidget {
     required this.commentCount,
     required this.shareCount,
     required this.onLikeTapped,
+    this.onCommentTapped,
+    this.onShareTapped,
+    this.onBookmarkTapped,
     super.key,
   });
 
@@ -21,38 +24,71 @@ class VideoFeedViewInteractionButtons extends StatelessWidget {
   final int commentCount;
   final int shareCount;
   final VoidCallback onLikeTapped;
+  
+  // Optional callbacks prevent compilation failures while keeping components non-MVP
+  final VoidCallback? onCommentTapped;
+  final VoidCallback? onShareTapped;
+  final VoidCallback? onBookmarkTapped;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
+      // Cleared duplicate horizontal margins to let the parent overlay constraints manage placement
       padding: EdgeInsets.only(
-        bottom: context.h(16),
-        right: context.w(12),
+        bottom: context.h(4),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         spacing: context.h(20),
         children: [
+          // Like Interactive Node
           GestureDetector(
             onTap: onLikeTapped,
+            behavior: HitTestBehavior.opaque, // Expands hit response to encompass whitespace gaps
             child: VideoFeedViewInteractionButton(
               icon: isLiked ? Icons.favorite : Icons.favorite_border,
               count: likeCount,
               color: isLiked ? red : white,
+          	),
+          ),
+          
+          // Comment Interactive Node
+          GestureDetector(
+            onTap: onCommentTapped,
+            behavior: HitTestBehavior.opaque,
+            child: VideoFeedViewInteractionButton(
+              icon: LucideIcons.messageCircle,
+              count: commentCount,
             ),
           ),
-          VideoFeedViewInteractionButton(
-            icon: LucideIcons.messageCircle,
-            count: commentCount,
+          
+          // Share Interactive Node
+          GestureDetector(
+            onTap: onShareTapped,
+            behavior: HitTestBehavior.opaque,
+            child: VideoFeedViewInteractionButton(
+              icon: LucideIcons.send,
+              count: shareCount,
+            ),
           ),
-          VideoFeedViewInteractionButton(
-            icon: LucideIcons.send,
-            count: shareCount,
-          ),
-          Icon(
-            isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-            color: white,
-            size: context.sq(36),
+          
+          // Bookmark Interactive Node 
+          // Wrapped cleanly inside an opaque responder to keep hit areas matching the buttons above
+          GestureDetector(
+            onTap: onBookmarkTapped,
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              spacing: context.h(4),
+              children: [
+                Icon(
+                  isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                  color: white,
+                  size: context.sq(36),
+                ),
+                // Maintains vertical layout symmetry matching the spacing of the counters above
+                SizedBox(height: context.fontSize(16)),
+              ],
+            ),
           ),
         ],
       ),
