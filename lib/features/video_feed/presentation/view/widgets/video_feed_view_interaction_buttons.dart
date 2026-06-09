@@ -227,7 +227,8 @@ class _AnimatedProfileAvatarNodeState extends State<_AnimatedProfileAvatarNode> 
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _badgeScaleAnimation = CurveTween(curve: Curves.backIn).animate(_badgeHideController);
+    // FIX: Swapped out non-existent Curves.backIn for a clean Curves.easeIn pipeline
+    _badgeScaleAnimation = CurveTween(curve: Curves.easeIn).animate(_badgeHideController);
   }
 
   @override
@@ -258,11 +259,12 @@ class _AnimatedProfileAvatarNodeState extends State<_AnimatedProfileAvatarNode> 
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: white, width: 1.5),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: Colors.black25,
+                  // FIX: Changed non-existent Colors.black25 to explicit opacity definition
+                  color: Colors.black.withOpacity(0.25),
                   blurRadius: 6,
-                  offset: Offset(0, 2),
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
