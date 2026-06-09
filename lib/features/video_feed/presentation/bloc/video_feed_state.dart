@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:flutter_video_feed/features/video_feed/domain/entities/video_entity.dart';
+import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 
 class VideoFeedState extends Equatable {
   const VideoFeedState({
