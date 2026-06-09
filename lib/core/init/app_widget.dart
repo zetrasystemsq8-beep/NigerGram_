@@ -1,24 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:nigergram/core/init/router/app_router.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:nigergram/core/config/localization/app_localizations.dart';
 import 'package:nigergram/core/design_system/colors.dart';
+import 'package:nigergram/core/di/dependency_injector.dart';
+import 'package:nigergram/core/init/router/app_router.dart';
+import 'package:nigergram/features/auth/presentation/bloc/auth_cubit.dart';
+import 'package:nigergram/features/video_feed/presentation/bloc/video_feed_cubit.dart';
 
 class AppWidget extends StatelessWidget {
   const AppWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // We initialize the AppRouter here to manage the global state of navigation
-    final appRouter = AppRouter();
-
-    return MaterialApp.router(
-      title: 'NigerGram',
-      debugShowCheckedModeBanner: false,
-      // Using the industrial-grade router configuration you provided
-      routerConfig: appRouter.router,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: black,
-        primaryColor: red, // Assuming red is defined in your colors.dart for Nigeria's flag theme
+    final appRouter = getIt<AppRouter>();
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          lazy: false,
+          create: (context) => getIt<VideoFeedCubit>(),
+        ),
+        BlocProvider(
+          create: (context) => AuthCubit(),
+        ),
+      ],
+      child: MaterialApp.router(
+        debugShowCheckedModeBanner: false,
+        routerConfig: appRouter.router,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        theme: ThemeData(
+          brightness: Brightness.dark,
+          scaffoldBackgroundColor: black,
+          primaryColor: red,
+        ),
       ),
     );
   }
