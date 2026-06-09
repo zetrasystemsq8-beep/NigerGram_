@@ -1,93 +1,100 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
-import 'package:nigergram/features/video_feed/presentation/view/widgets/video_feed_view_interaction_button.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-class VideoFeedViewInteractionButtons extends StatelessWidget {
-  const VideoFeedViewInteractionButtons({
-    required this.isLiked,
-    required this.isBookmarked,
-    required this.likeCount,
-    required this.commentCount,
-    required this.shareCount,
-    required this.onLikeTapped,
-    this.onCommentTapped,
-    this.onShareTapped,
-    this.onBookmarkTapped,
+class VideoFeedViewInteractionButton extends StatefulWidget {
+  const VideoFeedViewInteractionButton({
+    required this.icon,
+    required this.count,
+    required this.onTap,
+    this.iconColor = white,
     super.key,
   });
 
-  final bool isLiked;
-  final bool isBookmarked;
-  final int likeCount;
-  final int commentCount;
-  final int shareCount;
-  final VoidCallback onLikeTapped;
-  
-  // Optional callbacks prevent compilation failures while keeping components non-MVP
-  final VoidCallback? onCommentTapped;
-  final VoidCallback? onShareTapped;
-  final VoidCallback? onBookmarkTapped;
+  final IconData icon;
+  final int count;
+  final Color iconColor;
+  final VoidCallback onTap;
+
+  @override
+  State<VideoFeedViewInteractionButton> createState() =>
+      _VideoFeedViewInteractionButtonState();
+}
+
+class _VideoFeedViewInteractionButtonState
+    extends State<VideoFeedViewInteractionButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _scaleAnimationController;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+          tween: Tween<double>(begin: 1.0, end: 1.3)
+              .chain(CurveTween(curve: Curves.easeOut)),
+          weight: 50),
+      TweenSequenceItem(
+          tween: Tween<double>(begin: 1.3, end: 1.0)
+              .chain(CurveTween(curve: Curves.elasticIn)),
+          weight: 50),
+    ]).animate(_scaleAnimationController);
+  }
+
+  @override
+  void dispose() {
+    _scaleAnimationController.dispose();
+    super.dispose();
+  }
+
+  String _formatCount(int count) {
+    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
+    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
+    return count.toString();
+  }
+
+  void _onTap() {
+    HapticFeedback.lightImpact();
+    _scaleAnimationController.forward(from: 0.0);
+    widget.onTap();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      // Cleared duplicate horizontal margins to let the parent overlay constraints manage placement
-      padding: EdgeInsets.only(
-        bottom: context.h(4),
-      ),
+    return GestureDetector(
+      onTap: _onTap,
+      behavior: HitTestBehavior.opaque,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        spacing: context.h(20),
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Like Interactive Node
-          GestureDetector(
-            onTap: onLikeTapped,
-            behavior: HitTestBehavior.opaque, // Expands hit response to encompass whitespace gaps
-            child: VideoFeedViewInteractionButton(
-              icon: isLiked ? Icons.favorite : Icons.favorite_border,
-              count: likeCount,
-              color: isLiked ? red : white,
-          	),
-          ),
-          
-          // Comment Interactive Node
-          GestureDetector(
-            onTap: onCommentTapped,
-            behavior: HitTestBehavior.opaque,
-            child: VideoFeedViewInteractionButton(
-              icon: LucideIcons.messageCircle,
-              count: commentCount,
-            ),
-          ),
-          
-          // Share Interactive Node
-          GestureDetector(
-            onTap: onShareTapped,
-            behavior: HitTestBehavior.opaque,
-            child: VideoFeedViewInteractionButton(
-              icon: LucideIcons.send,
-              count: shareCount,
-            ),
-          ),
-          
-          // Bookmark Interactive Node 
-          // Wrapped cleanly inside an opaque responder to keep hit areas matching the buttons above
-          GestureDetector(
-            onTap: onBookmarkTapped,
-            behavior: HitTestBehavior.opaque,
-            child: Column(
-              spacing: context.h(4),
-              children: [
-                Icon(
-                  isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                  color: white,
-                  size: context.sq(36),
+          ScaleTransition(
+            scale: _scaleAnimation,
+            child: Icon(
+              widget.icon,
+              color: widget.iconColor,
+              size: context.sq(38),
+              shadows: const [
+                Shadow(
+                  color: Colors.black38,
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
                 ),
-                // Maintains vertical layout symmetry matching the spacing of the counters above
-                SizedBox(height: context.fontSize(16)),
               ],
+            ),
+          ),
+          SizedBox(height: context.h(3)),
+          Text(
+            _formatCount(widget.count),
+            style: TextStyle(
+              color: white,
+              fontSize: context.fontSize(12.5),
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
