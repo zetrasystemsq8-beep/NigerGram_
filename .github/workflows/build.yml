@@ -23,11 +23,11 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # We are pinning this to an exact compatible version to satisfy your SDK constraints
+      # Setting the exact Flutter engine specified by the dependency solver
       - name: Set Up Flutter SDK Core
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0' # Adjust this to the version you used locally
+          flutter-version: '3.35.7'
           channel: 'stable'
           cache: true
 
