@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_video_feed/core/design_system/colors.dart';
-import 'package:flutter_video_feed/core/utils/extensions/context_size_extensions.dart';
+import 'package:nigergram/core/design_system/colors.dart';
+import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 
 class VideoFeedViewInteractionButton extends StatelessWidget {
   const VideoFeedViewInteractionButton({
@@ -19,7 +19,11 @@ class VideoFeedViewInteractionButton extends StatelessWidget {
     return Column(
       spacing: context.h(4),
       children: [
-        Icon(icon, color: color, size: context.sq(36)),
+        Icon(
+          icon, 
+          color: color, 
+          size: context.sq(36),
+        ),
         Text(
           count.toString(),
           style: TextStyle(
