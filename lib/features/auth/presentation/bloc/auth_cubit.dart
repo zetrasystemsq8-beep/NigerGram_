@@ -30,7 +30,7 @@ class AuthCubit extends Cubit<AuthState> {
         email: email,
         password: password,
       );
-      await _signInToSupabase(email, password);
+      _signInToSupabase(email, password);
       emit(AuthSuccess());
     } catch (e) {
       emit(AuthError(e.toString()));
@@ -44,10 +44,12 @@ class AuthCubit extends Cubit<AuthState> {
         password: password,
       );
     } catch (e) {
-      await Supabase.instance.client.auth.signUp(
-        email: email,
-        password: password,
-      );
+      try {
+        await Supabase.instance.client.auth.signUp(
+          email: email,
+          password: password,
+        );
+      } catch (_) {}
     }
   }
 
