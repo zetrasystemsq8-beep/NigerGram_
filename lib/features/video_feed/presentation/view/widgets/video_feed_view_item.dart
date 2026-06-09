@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:nigergram/features/video_feed/presentation/view/widgets/video_feed_view_optimized_video_player.dart';
 import 'package:nigergram/features/video_feed/presentation/view/widgets/video_feed_view_overlay_section.dart';
@@ -62,7 +63,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     final videoRef = FirebaseFirestore.instance.collection('videos').doc(widget.videoItem.id);
     final likeRef = videoRef.collection('likes').doc(user.uid);
 
-    // Cache current state for emergency rollbacks if network pipeline drops out
     final bool previousLikedState = _isLiked;
     final int previousLikeCount = _likeCount;
 
@@ -85,13 +85,25 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
       }
     } catch (error) {
       debugPrint('NigerGram Log: Network write failed. Initiating state rollback protection. $error');
-      // Rollback to secure data synchronization bounds
       if (mounted) {
         setState(() {
           _isLiked = previousLikedState;
           _likeCount = previousLikeCount;
         });
       }
+    }
+  }
+
+  /// Master Gesture Router to resolve conflicts between Single and Double tap actions
+  void _handleSingleTapCanvas() {
+    final controller = widget.controller;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    HapticFeedback.lightImpact();
+    if (controller.value.isPlaying) {
+      controller.pause();
+    } else {
+      controller.play();
     }
   }
 
@@ -103,9 +115,16 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     
     final int dynamicParticleId = DateTime.now().microsecondsSinceEpoch;
     final Offset tapLocation = details.localPosition;
+    
+    // Generates a brilliant fluid mathematical tilt angle between -15 and +15 degrees
+    final double dynamicTiltAngle = ((dynamicParticleId % 30) - 15) * 3.141592653589793 / 180;
 
     setState(() {
-      _heartParticles.add(_HeartParticle(id: dynamicParticleId, position: tapLocation));
+      _heartParticles.add(_HeartParticle(
+        id: dynamicParticleId, 
+        position: tapLocation,
+        angle: dynamicTiltAngle,
+      ));
     });
 
     // Automatically purge particle assets from memory structure post-animation lifecycle loop
@@ -122,17 +141,18 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Full Canvas Primary Gesture Capture Matrix
+        // Full Canvas Master Unified Gesture Core Shield
         GestureDetector(
-          onTapDown: (details) {
-            // Internal hooks can capture single tap play/pause controls cleanly here
-          },
+          onTap: _handleSingleTapCanvas,
           onDoubleTapDown: _handleDoubleTapCanvas,
-          onDoubleTap: () {}, // Handled explicitly via high-fidelity positional coordinates above
+          onDoubleTap: () {}, // Handled directly via high-fidelity positional coordinates above
           behavior: HitTestBehavior.opaque,
-          child: VideoFeedViewOptimizedVideoPlayer(
-            controller: widget.controller,
-            videoId: widget.videoItem.id,
+          child: IgnorePointer(
+            // Prevents underlying video player from intercepting and breaking the gesture arena
+            child: VideoFeedViewOptimizedVideoPlayer(
+              controller: widget.controller,
+              videoId: widget.videoItem.id,
+            ),
           ),
         ),
 
@@ -141,6 +161,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
           return _FloatingHeartOverlay(
             key: ValueKey(particle.id),
             position: particle.position,
+            angle: particle.angle,
           );
         }),
 
@@ -163,15 +184,17 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
 
 /// Helper model parsing schema for real-time item tracking
 class _HeartParticle {
-  _HeartParticle({required this.id, required this.position});
+  _HeartParticle({required this.id, required this.position, required this.angle});
   final int id;
   final Offset position;
+  final double angle;
 }
 
-/// High-Fidelity Animated Heart Element that scales and floats upward cleanly
+/// High-Fidelity Animated Heart Element that scales, tilts, and floats upward cleanly
 class _FloatingHeartOverlay extends StatefulWidget {
-  const _FloatingHeartOverlay({required this.position, super.key});
+  const _FloatingHeartOverlay({required this.position, required this.angle, super.key});
   final Offset position;
+  final double angle;
 
   @override
   State<_FloatingHeartOverlay> createState() => _FloatingHeartOverlayState();
@@ -211,8 +234,7 @@ class _FloatingHeartOverlayState extends State<_FloatingHeartOverlay> with Singl
 
   @override
   Widget build(BuildContext context) {
-    // Centers the drawing origin completely above the user's touch vector radius
-    const double heartDimensions = 100.0;
+    const double heartDimensions = 110.0;
     final double adjustedLeft = widget.position.dx - (heartDimensions / 2);
     final double adjustedTop = widget.position.dy - (heartDimensions / 2);
 
@@ -222,26 +244,28 @@ class _FloatingHeartOverlayState extends State<_FloatingHeartOverlay> with Singl
       child: AnimatedBuilder(
         animation: _animationController,
         builder: (context, child) {
-          // Subtle upward drift modification applied smoothly over runtime lifecycle
-          final double upwardDriftModifier = _animationController.value * -35.0;
+          final double upwardDriftModifier = _animationController.value * -45.0;
 
           return Transform.translate(
             offset: Offset(0, upwardDriftModifier),
-            child: Transform.scale(
-              scale: _scaleAnimation.value,
-              child: Opacity(
-                opacity: _opacityAnimation.value,
-                child: const Icon(
-                  Icons.favorite,
-                  color: Color(0xFFFE2C55), // High-intensity corporate brand neon pink hue
-                  size: heartDimensions,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black45,
-                      blurRadius: 15,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
+            child: Transform.rotate(
+              angle: widget.angle, // Applies distinct energetic angular lean
+              child: Transform.scale(
+                scale: _scaleAnimation.value,
+                child: Opacity(
+                  opacity: _opacityAnimation.value,
+                  child: const Icon(
+                    Icons.favorite,
+                    color: Color(0xFFFE2C55), 
+                    size: heartDimensions,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
