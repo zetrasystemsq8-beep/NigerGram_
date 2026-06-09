@@ -16,7 +16,8 @@ class VideoFeedView extends StatefulWidget {
   State<VideoFeedView> createState() => _VideoFeedViewState();
 }
 
-class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserver {
+class _VideoFeedViewState extends State<VideoFeedView>
+    with WidgetsBindingObserver {
   final int _maxCacheSize = 3;
   List<VideoEntity> _videos = [];
   int _currentPage = 0;
@@ -45,7 +46,6 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final wasActive = _isAppActive;
     _isAppActive = state == AppLifecycleState.resumed;
-
     if (_isAppActive && !wasActive) {
       _cleanupAndReinitializeCurrentVideo();
     } else if (!_isAppActive && wasActive) {
@@ -77,7 +77,8 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
     if (mounted) setState(() {});
   }
 
-  VideoPlayerController? _getController(String videoId) => _controllerCache[videoId];
+  VideoPlayerController? _getController(String videoId) =>
+      _controllerCache[videoId];
 
   void _touchController(String videoId) {
     _accessOrder
@@ -85,14 +86,17 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
       ..add(videoId);
   }
 
-  Future<VideoPlayerController?> _getOrCreateController(VideoEntity video) async {
+  Future<VideoPlayerController?> _getOrCreateController(
+      VideoEntity video) async {
     if (_controllerCache.containsKey(video.id)) {
       _touchController(video.id);
       return _controllerCache[video.id];
     }
 
     try {
-      final videoFile = await context.read<VideoFeedCubit>().getCachedVideoFile(video.videoUrl);
+      final videoFile = await context
+          .read<VideoFeedCubit>()
+          .getCachedVideoFile(video.videoUrl);
       final controller = VideoPlayerController.file(videoFile);
 
       await controller.initialize();
@@ -104,14 +108,16 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
 
       return controller;
     } catch (e) {
-      debugPrint('NigerGram Log: Network buffering error on $e');
+      debugPrint('Error loading video: $e');
       return null;
     }
   }
 
   Future<void> _playController(String videoId) async {
     final controller = _controllerCache[videoId];
-    if (controller != null && controller.value.isInitialized && !controller.value.isPlaying) {
+    if (controller != null &&
+        controller.value.isInitialized &&
+        !controller.value.isPlaying) {
       await controller.play();
     }
   }
@@ -127,7 +133,6 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
   Future<void> _removeController(String videoId) async {
     if (_disposingControllers.contains(videoId)) return;
     _disposingControllers.add(videoId);
-
     try {
       final controller = _controllerCache.remove(videoId);
       _accessOrder.remove(videoId);
@@ -141,7 +146,8 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
   }
 
   void _enforceCacheLimit() {
-    while (_controllerCache.length > _maxCacheSize && _accessOrder.isNotEmpty) {
+    while (_controllerCache.length > _maxCacheSize &&
+        _accessOrder.isNotEmpty) {
       _removeController(_accessOrder.first);
     }
   }
@@ -156,17 +162,21 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
 
   Future<void> _handlePageChange(int newPage) async {
     if (_videos.isEmpty || newPage >= _videos.length) return;
-
     _currentPage = newPage;
     await _pauseAllControllers();
-    
-    // Adaptive windowing: Dispose far-away controllers to save memory/data
+
     final windowStart = (newPage - 1).clamp(0, _videos.length - 1);
     final windowEnd = (newPage + 1).clamp(0, _videos.length - 1);
-    final idsToKeep = _videos.getRange(windowStart, windowEnd + 1).map((v) => v.id).toSet();
-    
-    final toRemove = _controllerCache.keys.where((id) => !idsToKeep.contains(id)).toList();
-    for (final id in toRemove) { await _removeController(id); }
+    final idsToKeep = _videos
+        .getRange(windowStart, windowEnd + 1)
+        .map((v) => v.id)
+        .toSet();
+
+    final toRemove =
+        _controllerCache.keys.where((id) => !idsToKeep.contains(id)).toList();
+    for (final id in toRemove) {
+      await _removeController(id);
+    }
 
     await _initAndPlayVideo(newPage);
     await context.read<VideoFeedCubit>().onPageChanged(newPage);
@@ -178,18 +188,17 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Primary Video Stream Layer
           BlocListener<VideoFeedCubit, VideoFeedState>(
             listener: (context, state) {
               setState(() => _videos = state.videos);
             },
             child: _videos.isEmpty
-                ? _buildZetraLoader()
+                ? _buildLoader()
                 : PreloadPageView.builder(
                     scrollDirection: Axis.vertical,
                     controller: _pageController,
                     itemCount: _videos.length,
-                    preloadPagesCount: 1, // Lookahead optimized for snappy Zetra experience
+                    preloadPagesCount: 1,
                     onPageChanged: _handlePageChange,
                     itemBuilder: (context, index) {
                       final video = _videos[index];
@@ -201,8 +210,6 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
                     },
                   ),
           ),
-
-          // High-Fidelity Header Overlay (Screenshot_20260608-192648.jpg)
           _buildTopNavigationOverlay(),
         ],
       ),
@@ -211,7 +218,7 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
 
   Widget _buildTopNavigationOverlay() {
     return Positioned(
-      top: context.h(44), // Safe area offset
+      top: context.h(44),
       left: 0,
       right: 0,
       child: Padding(
@@ -220,7 +227,6 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
           children: [
             const Spacer(),
             _buildNavTab("Following", false),
-            _buildNavTab("Friends", false),
             _buildNavTab("For You", true),
             const Spacer(),
             Icon(Icons.search, color: white, size: context.sq(28)),
@@ -246,7 +252,7 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
           ),
           if (isActive)
             Container(
-              margin: EdgeInsets.top(4),
+              margin: const EdgeInsets.only(top: 4),
               height: 2,
               width: context.w(24),
               color: white,
@@ -256,7 +262,7 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
     );
   }
 
-  Widget _buildZetraLoader() {
+  Widget _buildLoader() {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -264,11 +270,13 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
           const CircularProgressIndicator(color: white, strokeWidth: 2),
           SizedBox(height: context.h(16)),
           Text(
-            "Optimizing feed...",
-            style: TextStyle(color: white.withAlpha(120), fontSize: context.fontSize(14)),
+            'Loading videos...',
+            style: TextStyle(
+                color: white.withAlpha(120),
+                fontSize: context.fontSize(14)),
           ),
         ],
       ),
     );
   }
-}
+}     
