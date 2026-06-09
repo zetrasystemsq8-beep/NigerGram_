@@ -60,17 +60,25 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     if (_isLiked) {
       await likeRef.delete();
       await videoRef.update({'likeCount': FieldValue.increment(-1)});
-      setState(() {
-        _isLiked = false;
-        _likeCount--;
-      });
+      
+      // Safety check: Ensure the user hasn't scrolled away before updating the UI
+      if (mounted) {
+        setState(() {
+          _isLiked = false;
+          _likeCount--;
+        });
+      }
     } else {
       await likeRef.set({'userId': user.uid, 'likedAt': FieldValue.serverTimestamp()});
       await videoRef.update({'likeCount': FieldValue.increment(1)});
-      setState(() {
-        _isLiked = true;
-        _likeCount++;
-      });
+      
+      // Safety check: Ensure the user hasn't scrolled away before updating the UI
+      if (mounted) {
+        setState(() {
+          _isLiked = true;
+          _likeCount++;
+        });
+      }
     }
   }
 
