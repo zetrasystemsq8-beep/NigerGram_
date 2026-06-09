@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_video_feed/core/design_system/colors.dart';
+import 'package:nigergram/core/design_system/colors.dart';
 import 'package:video_player/video_player.dart';
 
 class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
-  const VideoFeedViewOptimizedVideoPlayer({required this.controller, required this.videoId, super.key});
+  const VideoFeedViewOptimizedVideoPlayer({
+    required this.controller, 
+    required this.videoId, 
+    super.key
+  });
 
   final VideoPlayerController? controller;
   final String videoId;
@@ -51,7 +55,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       _playerKey = UniqueKey();
       _addControllerListener();
 
-      // Schedule the setState for the next frame to avoid build errors
       final bool shouldUpdateBuffering = widget.controller?.value.isBuffering ?? false;
       if (mounted && _isBuffering != shouldUpdateBuffering) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -78,12 +81,9 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
     final controller = widget.controller;
     if (controller == null) return;
-
     if (widget.videoId != _currentVideoId) return;
 
-    // Check if controller is disposed or in error state
     if (controller.value.hasError) {
-      // Schedule UI update for next frame to avoid build conflicts
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _isBuffering = false);
       });
@@ -93,19 +93,13 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
 
-    // Hide buffering indicator if:
-    // 1. Video is actually playing and has advanced
-    // 2. Video has loaded content (position > 0)
-    // 3. Video duration is known and valid
     bool shouldShowBuffering = isBuffering;
     if ((isPlaying && controller.value.position > Duration.zero) ||
         (controller.value.position > Duration.zero && controller.value.duration.inMilliseconds > 0)) {
       shouldShowBuffering = false;
     }
 
-    // Only update state if something changed
     if (_isBuffering != shouldShowBuffering || _isPlaying != isPlaying) {
-      // Use post-frame callback to avoid setState during build
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {
@@ -121,61 +115,45 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   Widget build(BuildContext context) {
     final controller = widget.controller;
 
+    // Handle Uninitialized or Null Controller Textures gracefully
     if (controller == null || !controller.value.isInitialized) {
       return Center(
         child: RotationTransition(
           turns: Tween<double>(begin: 0, end: 1).animate(_loadingController),
-          child: const CircularProgressIndicator(color: white),
+          child: const CircularProgressIndicator(
+            color: white,
+            strokeWidth: 2,
+          ),
         ),
       );
     }
 
-    return GestureDetector(
-      onTap: () {
-        // Schedule state updates for the next frame to avoid build errors
-        if (controller.value.isPlaying) {
-          controller
-              .pause()
-              .then((_) {
-                if (mounted) {
-                  // Use post-frame callback to avoid setState during build
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) setState(() {});
-                  });
-                }
-              })
-              .catchError((Object e) {
-                debugPrint('Error pausing video: $e');
-              });
-        } else {
-          controller
-              .play()
-              .then((_) {
-                if (mounted) {
-                  // Use post-frame callback to avoid setState during build
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) setState(() {});
-                  });
-                }
-              })
-              .catchError((Object e) {
-                debugPrint('Error playing video: $e');
-              });
-        }
-      },
-      child: SizedBox.expand(
-        child: FittedBox(
-          key: _playerKey,
-          fit: BoxFit.cover,
-          child: SizedBox(
-            width: controller.value.size.width,
-            height: controller.value.size.height,
-            child: Stack(
-              children: [VideoPlayer(controller), if (_isBuffering) const Center(child: CircularProgressIndicator())],
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // 1. Immersive Video Canvas Layer
+        SizedBox.expand(
+          child: FittedBox(
+            key: _playerKey,
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: VideoPlayer(controller),
             ),
           ),
         ),
-      ),
+
+        // 2. Isolated Screen-Space Buffering Overlay
+        // Positioned outside FittedBox to prevent any geometric stretching or warping on varying device displays
+        if (_isBuffering)
+          const Center(
+            child: CircularProgressIndicator(
+              color: white,
+              strokeWidth: 2,
+            ),
+          ),
+      ],
     );
   }
 }
