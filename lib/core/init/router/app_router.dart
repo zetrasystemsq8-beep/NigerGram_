@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:nigergram/core/init/router/custom_page_builder_widget.dart';
 import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
@@ -15,7 +16,9 @@ final GlobalKey<NavigatorState> _rootNavigatorKey =
 class AppRouter {
   final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/login',
+    initialLocation: FirebaseAuth.instance.currentUser != null
+        ? RouterEnum.dashboardView.routeName
+        : '/login',
     routes: [
       GoRoute(
         path: '/login',
