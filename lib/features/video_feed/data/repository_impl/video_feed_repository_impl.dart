@@ -5,7 +5,8 @@ import 'package:flutter_video_feed/features/video_feed/domain/repositories/video
 import 'package:fpdart/fpdart.dart';
 
 class VideoFeedRepositoryImpl implements VideoFeedRepository {
-  VideoFeedRepositoryImpl({required FirebaseFirestore firestore}) : _firestore = firestore;
+  VideoFeedRepositoryImpl({required FirebaseFirestore firestore})
+      : _firestore = firestore;
 
   final FirebaseFirestore _firestore;
   DocumentSnapshot? _lastDocument;
@@ -13,7 +14,6 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
   @override
   Future<Either<String, List<VideoEntity>>> fetchVideos() async {
     try {
-      // Reset pagination state for a fresh fetch
       _lastDocument = null;
       return await _fetchVideosHelper();
     } on FirebaseException catch (e) {
@@ -28,13 +28,14 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
     if (_lastDocument == null) {
       return const Right([]);
     }
-
     try {
       return await _fetchVideosHelper(startAfterDocument: _lastDocument);
     } on FirebaseException catch (e) {
-      return Left('Failed to fetch more videos: ${e.message ?? 'Unknown error'}');
+      return Left(
+          'Failed to fetch more videos: ${e.message ?? 'Unknown error'}');
     } catch (e) {
-      return const Left('An unexpected error occurred while fetching more videos');
+      return const Left(
+          'An unexpected error occurred while fetching more videos');
     }
   }
 
@@ -44,9 +45,8 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
     try {
       Query query = _firestore
           .collection('videos')
-          .orderBy('timestamp', descending: false)
-          .orderBy(FieldPath.documentId, descending: false)
-          .limit(2);
+          .orderBy('timestamp', descending: true)
+          .limit(10);
 
       if (startAfterDocument != null) {
         query = query.startAfterDocument(startAfterDocument);
