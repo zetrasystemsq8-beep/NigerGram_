@@ -1,26 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:nigergram/core/config/localization/app_localizations.dart';
+import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
-
-// Temporary placeholder containers to keep the shell compiled cleanly
-class DashboardTabPlaceholder extends StatelessWidget {
-  const DashboardTabPlaceholder({required this.name, super.key});
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Text(
-          name,
-          style: TextStyle(color: Colors.white, fontSize: context.fontSize(18)),
-        ),
-      ),
-    );
-  }
-}
+import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.dart';
+import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -32,23 +17,20 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   int _currentIndex = 0;
 
-  // Real-time navigation array managed by an IndexedStack to prevent tab destruction
-  final List<Widget> _navigationPages = [
-    const DashboardTabPlaceholder(name: 'Home Video Feed View'),
-    const DashboardTabPlaceholder(name: 'Explore Discovery View'),
-    const DashboardTabPlaceholder(name: 'Media Creation Overlay'),
-    const DashboardTabPlaceholder(name: 'Inbox Messaging View'),
-    const DashboardTabPlaceholder(name: 'User Profile View'),
+  late final List<Widget> _navigationPages = [
+    const VideoFeedView(),
+    const _ExplorePlaceholder(),
+    const SizedBox(),
+    const _InboxPlaceholder(),
+    const ProfileView(),
   ];
 
   void _handleTabSelection(int index) {
     if (index == 2) {
-      debugPrint('NigerGram Log: Intercepting core creation engine modal route.');
-      return; 
+      context.push(RouterEnum.uploadView.routeName);
+      return;
     }
-    setState(() {
-      _currentIndex = index;
-    });
+    setState(() => _currentIndex = index);
   }
 
   @override
@@ -59,15 +41,12 @@ class _DashboardViewState extends State<DashboardView> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Underlying Active Content Stream
           Positioned.fill(
             child: IndexedStack(
               index: _currentIndex,
               children: _navigationPages,
             ),
           ),
-
-          // Translucent Premium Bottom Bar Layer
           Positioned(
             left: 0,
             right: 0,
@@ -99,11 +78,9 @@ class _DashboardViewState extends State<DashboardView> {
                         ),
                         _buildNavigationTabItem(
                           index: 1,
-                          icon: Icons.grid_view_rounded, // Matches grid profile from Screenshot_20260608-192648.jpg
+                          icon: Icons.grid_view_rounded,
                           label: 'Explore',
                         ),
-                        
-                        // Centered Layered Create Button Custom Canvas Architecture
                         GestureDetector(
                           onTap: () => _handleTabSelection(2),
                           child: SizedBox(
@@ -111,7 +88,6 @@ class _DashboardViewState extends State<DashboardView> {
                             height: context.h(30),
                             child: Stack(
                               children: [
-                                // Left Neon Magenta Accent Frame Shadow
                                 Positioned(
                                   left: 0,
                                   top: 0,
@@ -120,11 +96,11 @@ class _DashboardViewState extends State<DashboardView> {
                                     width: context.w(38),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFFE2C55),
-                                      borderRadius: BorderRadius.circular(context.w(8)),
+                                      borderRadius: BorderRadius.circular(
+                                          context.w(8)),
                                     ),
                                   ),
                                 ),
-                                // Right Neon Cyan Accent Frame Shadow
                                 Positioned(
                                   right: 0,
                                   top: 0,
@@ -133,18 +109,19 @@ class _DashboardViewState extends State<DashboardView> {
                                     width: context.w(38),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF23F6E4),
-                                      borderRadius: BorderRadius.circular(context.w(8)),
+                                      borderRadius: BorderRadius.circular(
+                                          context.w(8)),
                                     ),
                                   ),
                                 ),
-                                // Crisp High-Contrast Centered Cap Button
                                 Center(
                                   child: Container(
                                     width: context.w(40),
                                     height: context.h(30),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
-                                      borderRadius: BorderRadius.circular(context.w(8)),
+                                      borderRadius: BorderRadius.circular(
+                                          context.w(8)),
                                     ),
                                     child: const Icon(
                                       Icons.add,
@@ -157,12 +134,10 @@ class _DashboardViewState extends State<DashboardView> {
                             ),
                           ),
                         ),
-
                         _buildNavigationTabItem(
                           index: 3,
                           icon: Icons.chat_bubble_outline_rounded,
                           label: 'Inbox',
-                          badgeNotificationCount: 13, // Fixed synchronization layout matching screen reference
                         ),
                         _buildNavigationTabItem(
                           index: 4,
@@ -181,7 +156,6 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
 
-  /// Adaptive, self-scaling layout tab component rendering tool
   Widget _buildNavigationTabItem({
     required int index,
     required IconData icon,
@@ -206,22 +180,26 @@ class _DashboardViewState extends State<DashboardView> {
               children: [
                 Icon(
                   icon,
-                  color: isActive ? Colors.white : Colors.white.withAlpha(150),
+                  color: isActive
+                      ? Colors.white
+                      : Colors.white.withAlpha(150),
                   size: context.sq(26),
                 ),
                 Text(
                   label,
                   maxLines: 1,
                   style: TextStyle(
-                    color: isActive ? Colors.white : Colors.white.withAlpha(150),
+                    color: isActive
+                        ? Colors.white
+                        : Colors.white.withAlpha(150),
                     fontSize: context.fontSize(10),
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                    fontWeight: isActive
+                        ? FontWeight.bold
+                        : FontWeight.w500,
                   ),
                 ),
               ],
             ),
-            
-            // Scalable Alert Indicator Overlay Node
             if (badgeNotificationCount > 0)
               Positioned(
                 top: context.h(-4),
@@ -233,11 +211,10 @@ class _DashboardViewState extends State<DashboardView> {
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFE2C55),
-                    borderRadius: BorderRadius.circular(context.w(10)),
+                    borderRadius:
+                        BorderRadius.circular(context.w(10)),
                   ),
-                  constraints: BoxConstraints(
-                    minWidth: context.w(16),
-                  ),
+                  constraints: BoxConstraints(minWidth: context.w(16)),
                   child: Text(
                     badgeNotificationCount.toString(),
                     style: TextStyle(
@@ -250,6 +227,40 @@ class _DashboardViewState extends State<DashboardView> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExplorePlaceholder extends StatelessWidget {
+  const _ExplorePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Text(
+          'Explore',
+          style: TextStyle(color: Colors.white, fontSize: 18),
+        ),
+      ),
+    );
+  }
+}
+
+class _InboxPlaceholder extends StatelessWidget {
+  const _InboxPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Text(
+          'Inbox',
+          style: TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),
     );
