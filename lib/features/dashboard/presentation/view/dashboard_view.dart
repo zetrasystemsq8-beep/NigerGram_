@@ -19,7 +19,7 @@ class _DashboardViewState extends State<DashboardView> {
 
   late final List<Widget> _navigationPages = [
     const VideoFeedView(),
-    const _ExplorePlaceholder(),
+    const ExploreView(),
     const SizedBox(),
     const _InboxPlaceholder(),
     const ProfileView(),
