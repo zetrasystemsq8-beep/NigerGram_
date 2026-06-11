@@ -60,36 +60,15 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
 
       _lastDocument = snapshot.docs.last;
 
-      // --- NIGERGRAM UPGRADE: Institutional-Grade Data Joining ---
-      List<VideoEntity> videos = [];
-
-      for (var doc in snapshot.docs) {
-        final videoData = VideoResponseModel.fromFirestore(doc);
-        final videoEntity = videoData.toEntity();
-
-        // Fetch the creator's real data from the 'users' collection
-        final userDoc = await _firestore.collection('users').doc(videoEntity.userId).get();
-
-        if (userDoc.exists) {
-          final userData = userDoc.data()!;
-          
-          // Inject the real user data into the video entity
-          // We use copyWith (assuming your VideoEntity has it) to keep it immutable
-          videos.add(videoEntity.copyWith(
-            username: userData['username'] ?? 'nigergram_user',
-            userImageUrl: userData['profilePicUrl'] ?? '',
-          ));
-        } else {
-          // Fallback if user document is missing
-          videos.add(videoEntity.copyWith(username: 'naija_creator'));
-        }
-      }
+      final videos = snapshot.docs
+          .map((doc) => VideoResponseModel.fromFirestore(doc).toEntity())
+          .toList();
 
       return Right(videos);
     } on FirebaseException catch (e) {
       return Left('Firestore error: ${e.message ?? 'Unknown error'}');
     } catch (e) {
-      return const Left('Error processing video data and user profiles');
+      return const Left('Error processing video data');
     }
   }
 }
