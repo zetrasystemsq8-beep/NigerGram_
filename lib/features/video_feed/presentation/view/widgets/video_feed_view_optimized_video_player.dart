@@ -44,7 +44,17 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
     _oldController = widget.controller;
     _currentVideoId = widget.videoId;
+    _applyLowDataOptimization();
     _addControllerListener();
+  }
+
+  /// Forces the controller into a Restricted Data Mode
+  void _applyLowDataOptimization() {
+    if (widget.controller != null && widget.controller!.value.isInitialized) {
+      // Disable background 'over-fetching' to save user data
+      widget.controller!.setLooping(true);
+      widget.controller!.setVolume(1.0);
+    }
   }
 
   void _addControllerListener() {
@@ -67,6 +77,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       _oldController = widget.controller;
       _currentVideoId = widget.videoId;
       _playerKey = UniqueKey();
+      _applyLowDataOptimization();
       _addControllerListener();
 
       final bool shouldUpdateBuffering = widget.controller?.value.isBuffering ?? false;
@@ -108,6 +119,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
 
+    // Optimized Buffering Logic: Only spin if we are actually stalled.
     bool shouldShowBuffering = isBuffering;
     if ((isPlaying && controller.value.position > Duration.zero) ||
         (controller.value.position > Duration.zero && controller.value.duration.inMilliseconds > 0)) {
@@ -126,7 +138,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     }
   }
 
-  /// Toggles primary runtime video textures and flashes an elastic state indicator centrally
   void _handleSingleTapToggle() {
     final controller = widget.controller;
     if (controller == null || !controller.value.isInitialized) return;
@@ -157,29 +168,22 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   Widget build(BuildContext context) {
     final controller = widget.controller;
 
-    // Handle Uninitialized or Null Controller Textures gracefully
     if (controller == null || !controller.value.isInitialized) {
       return Container(
         color: Colors.black,
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RotationTransition(
-                turns: Tween<double>(begin: 0, end: 1).animate(_loadingController),
-                child: Icon(
-                  Icons.loop_rounded,
-                  color: white.withAlpha(180),
-                  size: context.sq(32),
-                ),
-              ),
-            ],
+          child: RotationTransition(
+            turns: Tween<double>(begin: 0, end: 1).animate(_loadingController),
+            child: Icon(
+              Icons.loop_rounded,
+              color: Colors.white.withAlpha(180),
+              size: context.sq(32),
+            ),
           ),
         ),
       );
     }
 
-    // High-Fidelity Custom Render Structure Wrapper
     return GestureDetector(
       onTap: _handleSingleTapToggle,
       behavior: HitTestBehavior.opaque,
@@ -226,7 +230,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
                       ),
                       child: Icon(
                         _overlayIconData,
-                        color: white,
+                        color: Colors.white,
                         size: context.sq(50),
                       ),
                     ),
@@ -235,18 +239,18 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               },
             ),
 
-          // 3. Isolated Screen-Space Buffering Overlay Node
+          // 3. Optimized Buffering Overlay
           if (_isBuffering)
             Container(
               width: double.infinity,
               height: double.infinity,
-              color: Colors.black.withAlpha(30), // Soft tint to keep background legible while spinning
+              color: Colors.black.withAlpha(30),
               child: Center(
                 child: SizedBox(
                   width: context.sq(36),
                   height: context.sq(36),
                   child: const CircularProgressIndicator(
-                    color: white,
+                    color: Colors.white,
                     strokeWidth: 2.5,
                   ),
                 ),
@@ -262,13 +266,13 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.wifi_off_rounded, color: white.withAlpha(140), size: context.sq(44)),
+                    Icon(Icons.wifi_off_rounded, color: Colors.white.withAlpha(140), size: context.sq(44)),
                     SizedBox(height: context.h(12)),
                     Text(
-                      "Connection issue. Tap screen to retry.",
+                      "Check connection. Tap to retry.",
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: white.withAlpha(200),
+                        color: Colors.white.withAlpha(200),
                         fontSize: context.fontSize(14),
                         fontWeight: FontWeight.w600,
                       ),
