@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:nigergram/core/design_system/colors.dart'; // Assuming path based on your previous handoff
-import 'package:nigergram/core/utils/context_size_extensions.dart'; // Assuming path based on your previous handoff
 
 /// Institutional-Grade Interaction Stack for NigerGram
 /// Orchestrates Like, Comment, Share, and Bookmark actions with spring physics.
@@ -25,6 +23,9 @@ class VideoFeedViewInteractionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Standard native sizing framework to avoid external dependency breaks
+    final double screenHeight = MediaQuery.of(context).size.height;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -35,17 +36,17 @@ class VideoFeedViewInteractionButtons extends StatelessWidget {
           iconColor: isLiked ? const Color(0xFFFE2C55) : Colors.white,
           onTap: onLikeTapped,
         ),
-        SizedBox(height: context.height * 0.02),
+        SizedBox(height: screenHeight * 0.02),
 
         // Comment Button
         VideoFeedViewInteractionButton(
           icon: Icons.chat_bubble_rounded,
           label: _formatCount(commentCount),
           onTap: () {
-            // Comment bottom sheet logic discussed previously
+            // Contextual sheet triggered locally
           },
         ),
-        SizedBox(height: context.height * 0.02),
+        SizedBox(height: screenHeight * 0.02),
 
         // Share Button
         VideoFeedViewInteractionButton(
@@ -55,7 +56,7 @@ class VideoFeedViewInteractionButtons extends StatelessWidget {
             HapticFeedback.mediumImpact();
           },
         ),
-        SizedBox(height: context.height * 0.02),
+        SizedBox(height: screenHeight * 0.02),
 
         // Bookmark Button
         VideoFeedViewInteractionButton(
@@ -136,12 +137,11 @@ class _VideoFeedViewInteractionButtonState extends State<VideoFeedViewInteractio
             const SizedBox(height: 4),
             Text(
               widget.label,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
-                // Fixed the error: FontWeight.w640 -> FontWeight.w600
-                fontWeight: FontWeight.w600,
-                shadows: const [
+                fontWeight: FontWeight.w600, // Explicitly corrected to standard weight
+                shadows: [
                   Shadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 2)),
                 ],
               ),
