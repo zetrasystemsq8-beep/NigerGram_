@@ -35,7 +35,7 @@ class _UploadPageState extends State<UploadPage> {
   }
 
   Future<void> _pickVideo(ImageSource source) async {
-    HapticFeedback.mediumImpact();
+    await HapticFeedback.mediumImpact();
     final picker = ImagePicker();
     final picked = await picker.pickVideo(
       source: source,
@@ -71,10 +71,12 @@ class _UploadPageState extends State<UploadPage> {
   Future<void> _uploadVideo() async {
     if (_videoFile == null) return;
     if (_descriptionController.text.trim().isEmpty) {
-      HapticFeedback.vibrate();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add a description'), backgroundColor: Colors.red),
-      );
+      await HapticFeedback.vibrate();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please add a description'), backgroundColor: Colors.red),
+        );
+      }
       return;
     }
 
@@ -126,8 +128,8 @@ class _UploadPageState extends State<UploadPage> {
       setState(() => _uploadProgress = 1.0);
 
       if (mounted) {
+        await HapticFeedback.lightImpact();
         Navigator.pop(context);
-        HapticFeedback.successOver();
       }
     } catch (e) {
       setState(() => _isUploading = false);
@@ -164,7 +166,6 @@ class _UploadPageState extends State<UploadPage> {
   Widget _buildEditorUI() {
     return Stack(
       children: [
-        // Background Placeholder/Video Preview
         Positioned.fill(
           child: _videoFile != null
               ? Container(
@@ -183,8 +184,6 @@ class _UploadPageState extends State<UploadPage> {
                   ),
                 ),
         ),
-
-        // Bottom Controls Overlay
         Align(
           alignment: Alignment.bottomCenter,
           child: Container(
@@ -232,7 +231,7 @@ class _UploadPageState extends State<UploadPage> {
                 icon: Icons.videocam_rounded,
                 label: "Camera",
                 onTap: () => _pickVideo(ImageSource.camera),
-                color: const Color(0xFFFF0050), // NigerGram Red
+                color: const Color(0xFFFF0050),
               ),
             ),
           ],
@@ -266,7 +265,6 @@ class _UploadPageState extends State<UploadPage> {
   Widget _buildPostForm() {
     return Column(
       children: [
-        // Category Chips
         SizedBox(
           height: 36,
           child: ListView.builder(
@@ -276,8 +274,8 @@ class _UploadPageState extends State<UploadPage> {
               final cat = _categories[index];
               final isSelected = cat == _selectedCategory;
               return GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
+                onTap: () async {
+                  await HapticFeedback.selectionClick();
                   setState(() => _selectedCategory = cat);
                 },
                 child: Container(
@@ -295,7 +293,6 @@ class _UploadPageState extends State<UploadPage> {
           ),
         ),
         const SizedBox(height: 20),
-        // Description Input
         Container(
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.08),
@@ -307,17 +304,16 @@ class _UploadPageState extends State<UploadPage> {
             style: const TextStyle(color: Colors.white, fontSize: 15),
             maxLines: 2,
             maxLength: 150,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: 'Add a caption...',
-              hintStyle: const TextStyle(color: Colors.white38),
+              hintStyle: TextStyle(color: Colors.white38),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(16),
+              contentPadding: EdgeInsets.all(16),
               counterText: "",
             ),
           ),
         ),
         const SizedBox(height: 12),
-        // Tags Input
         Container(
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.08),
@@ -337,7 +333,6 @@ class _UploadPageState extends State<UploadPage> {
           ),
         ),
         const SizedBox(height: 24),
-        // Post Button
         SizedBox(
           width: double.infinity,
           height: 58,
@@ -366,7 +361,6 @@ class _UploadPageState extends State<UploadPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Circular Progress HUD
           Stack(
             alignment: Alignment.center,
             children: [
