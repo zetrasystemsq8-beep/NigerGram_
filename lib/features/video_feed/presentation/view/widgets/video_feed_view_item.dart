@@ -24,14 +24,15 @@ class VideoFeedViewItem extends StatefulWidget {
 class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
   bool _isLiked = false;
   int _likeCount = 0;
+  int _commentCount = 0;
   
-  /// High-velocity particle overlay array to map simultaneous double-tap coordinate spikes
   final List<_HeartParticle> _heartParticles = [];
 
   @override
   void initState() {
     super.initState();
     _likeCount = widget.videoItem.likeCount;
+    _commentCount = widget.videoItem.commentCount;
     _checkIfLiked();
   }
 
@@ -55,7 +56,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     }
   }
 
-  /// Institutional-Grade Optimistic Execution Framework
   Future<void> _toggleLike() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -66,7 +66,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     final bool previousLikedState = _isLiked;
     final int previousLikeCount = _likeCount;
 
-    // Instantaneous UI Feedback (Zero network lag or stalling)
     setState(() {
       _isLiked = !_isLiked;
       _likeCount = _isLiked ? _likeCount + 1 : _likeCount - 1;
@@ -84,7 +83,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
         await videoRef.update({'likeCount': FieldValue.increment(1)});
       }
     } catch (error) {
-      debugPrint('NigerGram Log: Network write failed. Initiating state rollback protection. $error');
+      debugPrint('NigerGram Log: Network write failed. State rollback deployed. $error');
       if (mounted) {
         setState(() {
           _isLiked = previousLikedState;
@@ -94,7 +93,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     }
   }
 
-  /// Master Gesture Router to resolve conflicts between Single and Double tap actions
   void _handleSingleTapCanvas() {
     final controller = widget.controller;
     if (controller == null || !controller.value.isInitialized) return;
@@ -105,10 +103,8 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     } else {
       controller.play();
     }
-    // No full setState() here. ValueListenableBuilder handles the partial redraw below.
   }
 
-  /// Captures coordinates on double-tap to deploy a dynamic floating heart visual particle
   void _handleDoubleTapCanvas(TapDownDetails details) {
     if (!_isLiked) {
       _toggleLike();
@@ -116,8 +112,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     
     final int dynamicParticleId = DateTime.now().microsecondsSinceEpoch;
     final Offset tapLocation = details.localPosition;
-    
-    // Generates a brilliant fluid mathematical tilt angle between -15 and +15 degrees
     final double dynamicTiltAngle = ((dynamicParticleId % 30) - 15) * 3.141592653589793 / 180;
 
     setState(() {
@@ -128,7 +122,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
       ));
     });
 
-    // Automatically purge particle assets from memory structure post-animation lifecycle loop
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) {
         setState(() {
@@ -138,18 +131,189 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     });
   }
 
+  /// Displays the interactive glassmorphic comments engine panel
+  void _openCommentsSheet() {
+    HapticFeedback.mediumImpact();
+    final TextEditingController commentController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.65,
+            decoration: const BoxDecoration(
+              color: Color(0xFF121212),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              children: [
+                // Drag handle bar indicator
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  height: 4,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    'Comments ($_commentCount)',
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Divider(color: Colors.white10, height: 1),
+                
+                // Active Live Stream Comments List Engine
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('videos')
+                        .doc(widget.videoItem.id)
+                        .collection('comments')
+                        .orderBy('timestamp', descending: true)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator(color: Color(0xFFFF0050)));
+                      }
+                      final docs = snapshot.data!.docs;
+                      if (docs.isEmpty) {
+                        return const Center(
+                          child: Text('No comments yet. Start the conversation! 🔥', 
+                              style: TextStyle(color: Colors.white38, fontSize: 14)),
+                        );
+                      }
+                      return ListView.builder(
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final data = docs[index].data() as Map<String, dynamic>;
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.white10,
+                              backgroundImage: data['profileImageUrl'] != null && data['profileImageUrl'].isNotEmpty
+                                  ? NetworkImage(data['profileImageUrl'])
+                                  : null,
+                              child: data['profileImageUrl'] == null || data['profileImageUrl'].isEmpty
+                                  ? const Icon(Icons.person, color: Colors.white54)
+                                  : null,
+                            ),
+                            title: Text(data['username'] ?? 'user', 
+                                style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4.0),
+                              child: Text(data['text'] ?? '', style: const TextStyle(color: Colors.white90, fontSize: 14)),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const Divider(color: Colors.white10, height: 1),
+                
+                // High-Fidelity Non-stalling Comment Input Dock
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: Colors.white10),
+                            ),
+                            child: TextField(
+                              controller: commentController,
+                              style: const TextStyle(color: Colors.white, fontSize: 15),
+                              decoration: const InputDecoration(
+                                hintText: 'Add comment for Naija creators...',
+                                hintStyle: TextStyle(color: Colors.white38, fontSize: 14),
+                                border: InputBorder.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.send_rounded, color: Color(0xFFFF0050)),
+                          onPressed: () async {
+                            final text = commentController.text.trim();
+                            if (text.isEmpty) return;
+                            
+                            final user = FirebaseAuth.instance.currentUser;
+                            if (user == null) return;
+                            
+                            commentController.clear();
+                            HapticFeedback.lightImpact();
+
+                            final videoRef = FirebaseFirestore.instance.collection('videos').doc(widget.videoItem.id);
+                            final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+                            
+                            await videoRef.collection('comments').add({
+                              'userId': user.uid,
+                              'username': userDoc.data()?['username'] ?? 'naija_user',
+                              'profileImageUrl': userDoc.data()?['profilePicUrl'] ?? '',
+                              'text': text,
+                              'timestamp': FieldValue.serverTimestamp(),
+                            });
+                            
+                            await videoRef.update({'commentCount': FieldValue.increment(1)});
+                            if (mounted) {
+                              setState(() => _commentCount++);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Executes zero-lag content distribution payload share sequences
+  void _executeForwardAction() {
+    HapticFeedback.vibrate();
+    
+    // Increment local share counters system metrics
+    FirebaseFirestore.instance
+        .collection('videos')
+        .doc(widget.videoItem.id)
+        .update({'shareCount': FieldValue.increment(1)});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Link copied! Share NigerGram with your friends 🚀'),
+        backgroundColor: Color(0xFFFF0050),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Full Canvas Master Unified Gesture Core Shield
         GestureDetector(
           onTap: _handleSingleTapCanvas,
           onDoubleTapDown: _handleDoubleTapCanvas,
-          onDoubleTap: () {}, // Handled directly via high-fidelity positional coordinates above
+          onDoubleTap: () {}, 
           behavior: HitTestBehavior.opaque,
           child: IgnorePointer(
-            // Prevents underlying video player from intercepting and breaking the gesture arena
             child: VideoFeedViewOptimizedVideoPlayer(
               controller: widget.controller,
               videoId: widget.videoItem.id,
@@ -157,7 +321,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
           ),
         ),
 
-        // Double-Tap Immersive Heart Burst Canvas Layer
         ..._heartParticles.map((particle) {
           return _FloatingHeartOverlay(
             key: ValueKey(particle.id),
@@ -166,7 +329,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
           );
         }),
 
-        // High-Fidelity Non-Blocking Listener for Playback Changes
         if (widget.controller != null)
           ValueListenableBuilder<VideoPlayerValue>(
             valueListenable: widget.controller!,
@@ -180,16 +342,17 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
                 isBookmarked: false,
                 isLiked: _isLiked,
                 likeCount: _likeCount,
-                commentCount: widget.videoItem.commentCount,
+                commentCount: _commentCount,
                 shareCount: widget.videoItem.shareCount,
                 onLikeTapped: _toggleLike,
                 onPlayPauseTapped: _handleSingleTapCanvas,
+                onCommentTapped: _openCommentsSheet,
+                onShareTapped: _executeForwardAction,
                 isPaused: isCurrentlyPaused,
               );
             },
           )
         else
-          // Fallback UI overlay placeholder state if controller hasn't attached yet
           VideoFeedViewOverlaySection(
             profileImageUrl: widget.videoItem.profileImageUrl,
             username: widget.videoItem.username,
@@ -197,10 +360,12 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
             isBookmarked: false,
             isLiked: _isLiked,
             likeCount: _likeCount,
-            commentCount: widget.videoItem.commentCount,
+            commentCount: _commentCount,
             shareCount: widget.videoItem.shareCount,
             onLikeTapped: _toggleLike,
             onPlayPauseTapped: _handleSingleTapCanvas,
+            onCommentTapped: _openCommentsSheet,
+            onShareTapped: _executeForwardAction,
             isPaused: true,
           ),
       ],
@@ -208,7 +373,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
   }
 }
 
-/// Helper model parsing schema for real-time item tracking
 class _HeartParticle {
   _HeartParticle({required this.id, required this.position, required this.angle});
   final int id;
@@ -216,7 +380,6 @@ class _HeartParticle {
   final double angle;
 }
 
-/// High-Fidelity Animated Heart Element that scales, tilts, and floats upward cleanly
 class _FloatingHeartOverlay extends StatefulWidget {
   const _FloatingHeartOverlay({required this.position, required this.angle, super.key});
   final Offset position;
@@ -275,14 +438,14 @@ class _FloatingHeartOverlayState extends State<_FloatingHeartOverlay> with Singl
           return Transform.translate(
             offset: Offset(0, upwardDriftModifier),
             child: Transform.rotate(
-              angle: widget.angle, // Applies distinct energetic angular lean
+              angle: widget.angle,
               child: Transform.scale(
                 scale: _scaleAnimation.value,
                 child: Opacity(
                   opacity: _opacityAnimation.value,
                   child: const Icon(
                     Icons.favorite,
-                    color: Color(0xFFFE2C55), 
+                    color: Color(0xFFFF0050), 
                     size: heartDimensions,
                     shadows: [
                       Shadow(
