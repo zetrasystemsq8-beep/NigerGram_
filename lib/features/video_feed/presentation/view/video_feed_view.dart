@@ -46,10 +46,16 @@ class _VideoFeedViewState extends State<VideoFeedView>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final wasActive = _isAppActive;
     _isAppActive = state == AppLifecycleState.resumed;
-    if (_isAppActive && !wasActive) {
-      _cleanupAndReinitializeCurrentVideo();
-    } else if (!_isAppActive && wasActive) {
+    
+    // ✅ FIXED: Pause videos when app is not in foreground
+    if (!_isAppActive && wasActive) {
+      debugPrint('🟡 [VIDEO FEED] App paused - stopping all videos');
       _pauseAllControllers();
+    }
+    // Resume on return
+    else if (_isAppActive && !wasActive) {
+      debugPrint('🟡 [VIDEO FEED] App resumed - reinitializing current video');
+      _cleanupAndReinitializeCurrentVideo();
     }
   }
 

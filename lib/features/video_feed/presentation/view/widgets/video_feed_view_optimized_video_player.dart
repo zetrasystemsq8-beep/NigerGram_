@@ -128,11 +128,8 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
 
-    bool shouldShowBuffering = isBuffering;
-    if ((isPlaying && controller.value.position > Duration.zero) ||
-        (controller.value.position > Duration.zero && controller.value.duration.inMilliseconds > 0)) {
-      shouldShowBuffering = false;
-    }
+    // ✅ FIXED: Only show loading spinner during buffering, not on initial load
+    bool shouldShowBuffering = isBuffering && isPlaying;
 
     if (_isBuffering != shouldShowBuffering || _isPlaying != isPlaying) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -160,7 +157,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
         controller.play();
         _overlayIconData = Icons.play_arrow_rounded;
       }
-      // UI FIX: Only show overlay on manual interaction
+      // ✅ FIXED: Only show overlay on manual interaction
       _showPlayIconOverlay = true;
     });
 
@@ -211,7 +208,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             ),
           ),
 
-          // OVERLAY FIX: The icon only appears when _showPlayIconOverlay is true (manually triggered)
+          // ✅ FIXED: The icon only appears when _showPlayIconOverlay is true (manually triggered)
           if (_showPlayIconOverlay)
             IgnorePointer(
               child: AnimatedBuilder(
@@ -249,6 +246,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
+          // ✅ FIXED: Show loading spinner only during buffering while playing
           if (_isBuffering)
             Center(
               child: SizedBox(

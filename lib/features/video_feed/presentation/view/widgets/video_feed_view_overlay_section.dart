@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
-import 'package:nigergram/features/video_feed/presentation/view/widgets/video_feed_view_interaction_buttons.dart';
-import 'package:nigergram/features/video_feed/presentation/view/widgets/video_feed_view_user_info_section.dart';
 
-class VideoFeedViewOverlaySection extends StatefulWidget {
+class VideoFeedViewOverlaySection extends StatelessWidget {
   const VideoFeedViewOverlaySection({
     required this.profileImageUrl,
     required this.username,
@@ -16,10 +14,9 @@ class VideoFeedViewOverlaySection extends StatefulWidget {
     required this.shareCount,
     required this.onLikeTapped,
     required this.onPlayPauseTapped,
-    this.isPaused = false,
-    this.onCommentTapped,
-    this.onShareTapped,
-    this.onBookmarkTapped,
+    required this.onCommentTapped,
+    required this.onShareTapped,
+    required this.isPaused,
     super.key,
   });
 
@@ -31,243 +28,217 @@ class VideoFeedViewOverlaySection extends StatefulWidget {
   final int likeCount;
   final int commentCount;
   final int shareCount;
-  final bool isPaused;
-  
-  // High-fidelity structural interaction channels
   final VoidCallback onLikeTapped;
   final VoidCallback onPlayPauseTapped;
-  final VoidCallback? onCommentTapped;
-  final VoidCallback? onShareTapped;
-  final VoidCallback? onBookmarkTapped;
-
-  @override
-  State<VideoFeedViewOverlaySection> createState() => _VideoFeedViewOverlaySectionState();
-}
-
-class _VideoFeedViewOverlaySectionState extends State<VideoFeedViewOverlaySection> with SingleTickerProviderStateMixin {
-  late final AnimationController _vinylRotationController;
-
-  @override
-  void initState() {
-    super.initState();
-    _vinylRotationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    );
-    
-    // Only spin the album art vinyl if the media stream is active
-    if (!widget.isPaused) {
-      _vinylRotationController.repeat();
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant VideoFeedViewOverlaySection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Dynamically toggle structural animation loops matching live state changes
-    if (widget.isPaused != oldWidget.isPaused) {
-      if (widget.isPaused) {
-        _vinylRotationController.stop();
-      } else {
-        _vinylRotationController.repeat();
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _vinylRotationController.dispose();
-    super.dispose();
-  }
+  final VoidCallback onCommentTapped;
+  final VoidCallback onShareTapped;
+  final bool isPaused;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // 1. Gesture Interception Surface Area Layer
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.onPlayPauseTapped,
-            onDoubleTap: widget.onLikeTapped,
-            child: const SizedBox.expand(),
-          ),
-        ),
-
-        // 2. Anti-Washout Linear Gradient Vignette Mask
+        // User info at bottom-left
         Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: IgnorePointer(
-            child: Container(
-              height: context.h(220),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withAlpha(40),
-                    Colors.black.withAlpha(120),
-                    Colors.black.withAlpha(200),
+          bottom: context.h(80),
+          left: context.w(12),
+          right: context.w(70),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: () {},
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: context.sq(18),
+                      backgroundImage: profileImageUrl.isNotEmpty
+                          ? NetworkImage(profileImageUrl)
+                          : null,
+                      backgroundColor: Colors.white12,
+                      child: profileImageUrl.isEmpty
+                          ? const Icon(Icons.person, color: Colors.white54)
+                          : null,
+                    ),
+                    SizedBox(width: context.w(10)),
+                    Text(
+                      username,
+                      style: TextStyle(
+                        color: white,
+                        fontSize: context.fontSize(15),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
-                  stops: const [0.0, 0.3, 0.7, 1.0],
                 ),
               ),
-            ),
+              SizedBox(height: context.h(8)),
+              Text(
+                description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: white,
+                  fontSize: context.fontSize(14),
+                ),
+              ),
+            ],
           ),
         ),
 
-        // 3. Center Play/Pause Status Indicator (TikTok Style)
-        if (widget.isPaused)
-          Center(
-            child: IgnorePointer(
-              child: AnimatedOpacity(
-                opacity: widget.isPaused ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 150),
-                child: Container(
-                  width: context.sq(64),
-                  height: context.sq(64),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withAlpha(100),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 44,
-                  ),
+        // Right-side action buttons
+        Positioned(
+          bottom: context.h(80),
+          right: context.w(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // Like button
+              GestureDetector(
+                onTap: onLikeTapped,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(context.sq(8)),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isLiked ? Icons.favorite : Icons.favorite_outline,
+                        color: isLiked ? const Color(0xFFFF0050) : white,
+                        size: context.sq(28),
+                      ),
+                    ),
+                    SizedBox(height: context.h(4)),
+                    Text(
+                      likeCount > 999
+                          ? '${(likeCount / 1000).toStringAsFixed(1)}k'
+                          : '$likeCount',
+                      style: TextStyle(
+                        color: white,
+                        fontSize: context.fontSize(12),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
+              SizedBox(height: context.h(16)),
 
-        // 4. Interactive Controls Layout Grid
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(
-                    left: context.w(14),
-                    right: context.w(10),
-                    bottom: context.h(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      // User Details & Metadata Profile Segment
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(right: context.w(16)),
-                          child: VideoFeedViewUserInfoSection(
-                            profileImageUrl: widget.profileImageUrl,
-                            username: widget.username,
-                            description: widget.description,
+              // ✅ FIXED: Comments button with count badge
+              GestureDetector(
+                onTap: onCommentTapped,
+                child: Column(
+                  children: [
+                    Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(context.sq(8)),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.message_outlined,
+                            color: white,
+                            size: context.sq(28),
                           ),
                         ),
-                      ),
-
-                      // Side Panel Interaction Column Tower
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          VideoFeedViewInteractionButtons(
-                            isLiked: widget.isLiked,
-                            isBookmarked: widget.isBookmarked,
-                            likeCount: widget.likeCount,
-                            commentCount: widget.commentCount,
-                            shareCount: widget.shareCount,
-                            onLikeTapped: widget.onLikeTapped,
-                            onCommentTapped: widget.onCommentTapped,
-                            onShareTapped: widget.onShareTapped,
-                            onBookmarkTapped: widget.onBookmarkTapped,
-                          ),
-                          SizedBox(height: context.h(12)),
-                          
-                          // Rotating Album Vinyl Disc
-                          RotationTransition(
-                            turns: _vinylRotationController,
+                        // ✅ NEW: Red badge with comment count
+                        if (commentCount > 0)
+                          Positioned(
+                            right: -4,
+                            top: -4,
                             child: Container(
-                              width: context.sq(38),
-                              height: context.sq(38),
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: RadialGradient(
-                                  colors: [
-                                    Color(0xFF2C2C2C),
-                                    Color(0xFF111111),
-                                    Color(0xFF050505),
-                                  ],
-                                  stops: [0.0, 0.7, 1.0],
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black54,
-                                    blurRadius: 8,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
+                              padding: EdgeInsets.symmetric(
+                                horizontal: context.w(4),
+                                vertical: context.h(2),
                               ),
-                              padding: const EdgeInsets.all(7.0),
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Color(0xFF1F1F1F),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: Image.network(
-                                    widget.profileImageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, _, __) => const Icon(
-                                      Icons.music_note_rounded,
-                                      color: Colors.white,
-                                      size: 14,
-                                    ),
-                                  ),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFF0050),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                commentCount > 99
+                                    ? '99+'
+                                    : '$commentCount',
+                                style: TextStyle(
+                                  color: white,
+                                  fontSize: context.fontSize(10),
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // 5. Linear Progress Timeline Track
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: context.w(4)),
-                  child: Container(
-                    height: 2.0,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(40),
-                      borderRadius: BorderRadius.circular(1),
+                      ],
                     ),
-                    alignment: Alignment.centerLeft,
-                    child: FractionallySizedBox(
-                      widthFactor: 0.35, // Structural timeline percentage metric position holder
-                      child: Container(
-                        height: 2.0,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(220),
-                          borderRadius: BorderRadius.circular(1),
-                        ),
+                    SizedBox(height: context.h(4)),
+                    Text(
+                      commentCount > 999
+                          ? '${(commentCount / 1000).toStringAsFixed(1)}k'
+                          : '$commentCount',
+                      style: TextStyle(
+                        color: white,
+                        fontSize: context.fontSize(12),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                  ],
+                ),
+              ),
+              SizedBox(height: context.h(16)),
+
+              // Share button
+              GestureDetector(
+                onTap: onShareTapped,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(context.sq(8)),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.share_rounded,
+                        color: white,
+                        size: context.sq(28),
+                      ),
+                    ),
+                    SizedBox(height: context.h(4)),
+                    Text(
+                      shareCount > 999
+                          ? '${(shareCount / 1000).toStringAsFixed(1)}k'
+                          : '$shareCount',
+                      style: TextStyle(
+                        color: white,
+                        fontSize: context.fontSize(12),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: context.h(16)),
+
+              // Play/Pause indicator (optional)
+              if (isPaused)
+                Container(
+                  padding: EdgeInsets.all(context.sq(8)),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.pause_rounded,
+                    color: white.withOpacity(0.6),
+                    size: context.sq(28),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ],

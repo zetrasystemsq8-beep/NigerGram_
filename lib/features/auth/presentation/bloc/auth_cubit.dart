@@ -61,24 +61,25 @@ class AuthCubit extends Cubit<AuthState> {
 
         debugPrint('✅ [REGISTER] Firestore user document created');
 
-        // ✅ FIXED: Send email verification without blocking auth flow
+        // ✅ SIMPLIFIED: Send verification email in background without blocking signup
         try {
           debugPrint('🟡 [REGISTER] Sending email verification link to $email');
           await firebaseUser.sendEmailVerification().timeout(
             const Duration(seconds: 5),
             onTimeout: () => throw TimeoutException('Email verification send timed out.'),
           );
-          debugPrint('✅ [REGISTER] Email verification link sent');
+          debugPrint('✅ [REGISTER] Email verification link sent to $email');
         } catch (e) {
           debugPrint('⚠️ [REGISTER] Could not send verification email: $e');
           // Don't block registration if email sending fails
         }
 
+        // ✅ SIMPLIFIED: Sign in to Supabase without verification requirement
         await _signInToSupabase(email, password);
       }
 
       emit(AuthSuccess());
-      debugPrint('✅ [REGISTER] Registration complete - awaiting email verification');
+      debugPrint('✅ [REGISTER] Registration complete - user can now access the app');
     } on TimeoutException catch (e) {
       debugPrint('🔴 [REGISTER] Timeout: ${e.message}');
       emit(AuthError('Network Timeout: ${e.message}'));
@@ -109,46 +110,6 @@ class AuthCubit extends Cubit<AuthState> {
 
       debugPrint('✅ [LOGIN] Firebase credentials accepted');
 
-      // ✅ FIXED: Get current user and handle email verification
-      final user = _auth.currentUser;
-      if (user != null) {
-        debugPrint('🟡 [LOGIN] Checking email verification status');
-        
-        // Reload user to get latest email verification status
-        await user.reload().timeout(
-          const Duration(seconds: 5),
-          onTimeout: () => throw TimeoutException('User reload timed out.'),
-        );
-
-        debugPrint('📧 [LOGIN] Email verified: ${user.emailVerified}');
-
-        // Check if email verification is required and not yet verified
-        if (!user.emailVerified) {
-          debugPrint('⚠️ [LOGIN] Email not verified - sending verification link');
-          
-          // Try to send verification email (non-blocking)
-          try {
-            await user.sendEmailVerification().timeout(
-              const Duration(seconds: 5),
-            );
-            debugPrint('✅ [LOGIN] Verification email sent to $email');
-          } catch (e) {
-            debugPrint('⚠️ [LOGIN] Could not send verification email: $e');
-          }
-
-          // Emit error message asking user to verify
-          emit(AuthError(
-            'Email Verification Required\n\n'
-            'A verification link has been sent to $email.\n\n'
-            'Please check your inbox (and spam folder) and click the link to verify your email. '
-            'Once verified, try logging in again.',
-          ));
-          return;
-        }
-
-        debugPrint('✅ [LOGIN] Email is verified, proceeding to Supabase sync');
-      }
-
       // Synced call to avoid unawaited microtask background failures
       await _signInToSupabase(email, password);
 
@@ -162,31 +123,6 @@ class AuthCubit extends Cubit<AuthState> {
       emit(AuthError(e.message ?? 'Invalid credentials or configuration issue.'));
     } catch (e) {
       debugPrint('🔴 [LOGIN] Error: $e');
-      emit(AuthError(e.toString()));
-    }
-  }
-
-  /// ✅ NEW: Allow users to resend verification email
-  Future<void> resendVerificationEmail() async {
-    debugPrint('🟡 [RESEND] Resending verification email');
-    try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        await user.sendEmailVerification().timeout(
-          const Duration(seconds: 5),
-          onTimeout: () => throw TimeoutException('Email send timed out.'),
-        );
-        debugPrint('✅ [RESEND] Verification email resent');
-        emit(AuthSuccess()); // Indicates success
-      } else {
-        debugPrint('🔴 [RESEND] No user logged in');
-        emit(AuthError('No user logged in.'));
-      }
-    } on TimeoutException catch (e) {
-      debugPrint('🔴 [RESEND] Timeout: ${e.message}');
-      emit(AuthError('Timeout: ${e.message}'));
-    } catch (e) {
-      debugPrint('🔴 [RESEND] Error: $e');
       emit(AuthError(e.toString()));
     }
   }
