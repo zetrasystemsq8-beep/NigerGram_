@@ -11,6 +11,9 @@ class VideoFeedViewInteractionButtons extends StatelessWidget {
     required this.shareCount,
     required this.onLikeTapped,
     this.isBookmarked = false,
+    this.onCommentTapped,
+    this.onShareTapped,
+    this.onBookmarkTapped,
     super.key,
   });
 
@@ -20,6 +23,9 @@ class VideoFeedViewInteractionButtons extends StatelessWidget {
   final int shareCount;
   final bool isBookmarked;
   final VoidCallback onLikeTapped;
+  final VoidCallback? onCommentTapped;
+  final VoidCallback? onShareTapped;
+  final VoidCallback? onBookmarkTapped;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +49,9 @@ class VideoFeedViewInteractionButtons extends StatelessWidget {
           icon: Icons.chat_bubble_rounded,
           label: _formatCount(commentCount),
           onTap: () {
-            // Contextual sheet triggered locally
+            if (onCommentTapped != null) {
+              onCommentTapped!();
+            }
           },
         ),
         SizedBox(height: screenHeight * 0.02),
@@ -54,6 +62,9 @@ class VideoFeedViewInteractionButtons extends StatelessWidget {
           label: _formatCount(shareCount),
           onTap: () {
             HapticFeedback.mediumImpact();
+            if (onShareTapped != null) {
+              onShareTapped!();
+            }
           },
         ),
         SizedBox(height: screenHeight * 0.02),
@@ -63,7 +74,11 @@ class VideoFeedViewInteractionButtons extends StatelessWidget {
           icon: isBookmarked ? Icons.bookmark : Icons.bookmark_border,
           label: "Save",
           iconColor: isBookmarked ? Colors.amber : Colors.white,
-          onTap: () {},
+          onTap: () {
+            if (onBookmarkTapped != null) {
+              onBookmarkTapped!();
+            }
+          },
         ),
       ],
     );
@@ -140,7 +155,7 @@ class _VideoFeedViewInteractionButtonState extends State<VideoFeedViewInteractio
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
-                fontWeight: FontWeight.w600, // Explicitly corrected to standard weight
+                fontWeight: FontWeight.w600,
                 shadows: [
                   Shadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 2)),
                 ],
