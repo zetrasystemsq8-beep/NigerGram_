@@ -195,7 +195,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                           child: Text(
                             bio,
                             style: const TextStyle(
-                              color: Colors.white80,
+                              color: Color(0xCCFFFFFF), // Smooth high-fidelity 80% opacity white
                               fontSize: 13,
                               height: 1.4,
                             ),
@@ -270,7 +270,6 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                       labelColor: Colors.white,
                       unselectedLabelColor: Colors.white38,
                       dividerColor: Colors.white10,
-                      backgroundColor: Colors.black,
                       onTap: (_) => HapticFeedback.lightImpact(),
                       tabs: const [
                         Tab(icon: Icon(Icons.grid_on_rounded, size: 20)),
@@ -308,7 +307,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                               context.push('/video-detail/$videoId');
                             },
                             child: Container(
-                              color: Colors.grey.shade950,
+                              color: const Color(0xFF0A0A0A), // Clean production ultra-black background
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
@@ -415,7 +414,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
         child: Container(
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.black25,
+            color: Color(0x40000000), // Clean 25% opacity black container
           ),
           padding: const EdgeInsets.all(8),
           child: const Icon(Icons.movie_filter_rounded, color: Colors.white12, size: 24),
