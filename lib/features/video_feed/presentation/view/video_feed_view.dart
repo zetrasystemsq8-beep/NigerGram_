@@ -59,6 +59,7 @@ class _VideoFeedViewState extends State<VideoFeedView>
       if (state.videos.isNotEmpty) {
         setState(() => _videos = state.videos);
         await _initAndPlayVideo(0);
+        _scheduleNextVideoPreload(1);
       }
     });
   }
@@ -180,6 +181,23 @@ class _VideoFeedViewState extends State<VideoFeedView>
 
     await _initAndPlayVideo(newPage);
     await context.read<VideoFeedCubit>().onPageChanged(newPage);
+
+    // Smart Low-Data Optimization: Wait to see if user stays on this video before downloading the next
+    _scheduleNextVideoPreload(newPage + 1);
+  }
+
+  /// Delays next video preloading to verify intentional consumption patterns
+  void _scheduleNextVideoPreload(int nextIndex) {
+    if (nextIndex >= _videos.length) return;
+    
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      // If the user has already swiped to a different video within 500ms, abort the preload
+      if (!mounted || _currentPage != nextIndex - 1) return;
+      
+      final nextVideo = _videos[nextIndex];
+      await _getOrCreateController(nextVideo);
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -279,4 +297,4 @@ class _VideoFeedViewState extends State<VideoFeedView>
       ),
     );
   }
-}     
+}
