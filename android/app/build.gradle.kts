@@ -30,10 +30,14 @@ android {
 
     defaultConfig {
         applicationId = "com.nigergram.app"
-        minSdk = flutter.minSdkVersion
+        // Fixed: Explicitly set to 21 for institutional video support
+        minSdk = 21 
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Added: Ensures the app handles large library sets without crashing
+        multiDexEnabled = true 
     }
 
     buildTypes {
