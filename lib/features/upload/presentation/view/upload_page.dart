@@ -2,8 +2,10 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -33,6 +35,7 @@ class _UploadPageState extends State<UploadPage> {
   }
 
   Future<void> _pickVideo(ImageSource source) async {
+    HapticFeedback.mediumImpact();
     final picker = ImagePicker();
     final picked = await picker.pickVideo(
       source: source,
@@ -68,11 +71,9 @@ class _UploadPageState extends State<UploadPage> {
   Future<void> _uploadVideo() async {
     if (_videoFile == null) return;
     if (_descriptionController.text.trim().isEmpty) {
+      HapticFeedback.vibrate();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add a description'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Please add a description'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -87,12 +88,9 @@ class _UploadPageState extends State<UploadPage> {
       if (user == null) return;
 
       await _ensureSupabaseSession();
-
       setState(() => _uploadProgress = 0.2);
 
-      final fileName =
-          '${user.uid}_${DateTime.now().millisecondsSinceEpoch}.mp4';
-
+      final fileName = '${user.uid}_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final supabase = Supabase.instance.client;
 
       setState(() => _uploadProgress = 0.4);
@@ -104,27 +102,19 @@ class _UploadPageState extends State<UploadPage> {
           );
 
       setState(() => _uploadProgress = 0.8);
+      final videoUrl = supabase.storage.from('videos').getPublicUrl(fileName);
 
-      final videoUrl =
-          supabase.storage.from('videos').getPublicUrl(fileName);
-
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       final username = userDoc.data()?['username'] ?? 'naija_creator';
 
-      final tags = _tagController.text
-          .split(' ')
-          .where((t) => t.startsWith('#'))
-          .toList();
+      final tags = _tagController.text.split(' ').where((t) => t.startsWith('#')).toList();
 
       await FirebaseFirestore.instance.collection('videos').add({
         'videoUrl': videoUrl,
         'description': _descriptionController.text.trim(),
         'userId': user.uid,
         'username': username,
-        'profileImageUrl': '',
+        'profileImageUrl': userDoc.data()?['profilePicUrl'] ?? '',
         'likeCount': 0,
         'commentCount': 0,
         'shareCount': 0,
@@ -137,21 +127,13 @@ class _UploadPageState extends State<UploadPage> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Video posted to NigerGram!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        HapticFeedback.successOver();
       }
     } catch (e) {
       setState(() => _isUploading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -161,274 +143,132 @@ class _UploadPageState extends State<UploadPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'New Post',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
+          'Create Post',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.5),
         ),
         centerTitle: true,
       ),
-      body: _isUploading
-          ? _buildUploadingScreen()
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildVideoSelector(),
-                  const SizedBox(height: 24),
-                  _buildDescriptionField(),
-                  const SizedBox(height: 16),
-                  _buildTagsField(),
-                  const SizedBox(height: 16),
-                  _buildCategorySelector(),
-                  const SizedBox(height: 32),
-                  _buildPostButton(),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
+      body: _isUploading ? _buildUploadingScreen() : _buildEditorUI(),
     );
   }
 
-  Widget _buildUploadingScreen() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.cloud_upload, color: Colors.red, size: 80),
-          const SizedBox(height: 24),
-          const Text(
-            'Uploading your video...',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Getting your content to Naija 🇳🇬',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-          ),
-          const SizedBox(height: 32),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Column(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: _uploadProgress,
-                    backgroundColor: Colors.grey.shade800,
-                    color: Colors.red,
-                    minHeight: 6,
+  Widget _buildEditorUI() {
+    return Stack(
+      children: [
+        // Background Placeholder/Video Preview
+        Positioned.fill(
+          child: _videoFile != null
+              ? Container(
+                  color: Colors.grey.shade900,
+                  child: const Center(
+                    child: Icon(Icons.play_circle_filled_rounded, color: Colors.white24, size: 80),
+                  ),
+                )
+              : Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.grey.shade900, Colors.black],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '${(_uploadProgress * 100).toInt()}%',
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                ),
+        ),
+
+        // Bottom Controls Overlay
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 40, 20, 30),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Colors.black.withOpacity(0.95)],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_videoFile == null) _buildEmptyPicker() else _buildPostForm(),
               ],
             ),
           ),
-        ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyPicker() {
+    return Column(
+      children: [
+        const Text(
+          "Share your vibe with Nigeria 🇳🇬",
+          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 30),
+        Row(
+          children: [
+            Expanded(
+              child: _actionButton(
+                icon: Icons.video_library_rounded,
+                label: "Gallery",
+                onTap: () => _pickVideo(ImageSource.gallery),
+                color: Colors.white.withOpacity(0.1),
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: _actionButton(
+                icon: Icons.videocam_rounded,
+                label: "Camera",
+                onTap: () => _pickVideo(ImageSource.camera),
+                color: const Color(0xFFFF0050), // NigerGram Red
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _actionButton({required IconData icon, required String label, required VoidCallback onTap, required Color color}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(16),
+          border: color == Colors.white.withOpacity(0.1) ? Border.all(color: Colors.white10) : null,
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: Colors.white, size: 32),
+            const SizedBox(height: 8),
+            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildVideoSelector() {
-    if (_videoFile != null) {
-      return Container(
-        width: double.infinity,
-        height: 200,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade900,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.red, width: 2),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 50),
-            const SizedBox(height: 8),
-            const Text(
-              'Video ready to post',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () => setState(() => _videoFile = null),
-              child: const Text('Change video',
-                  style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
-      );
-    }
-
+  Widget _buildPostForm() {
     return Column(
       children: [
-        GestureDetector(
-          onTap: () => _pickVideo(ImageSource.gallery),
-          child: Container(
-            width: double.infinity,
-            height: 160,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade900,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade700),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.video_library,
-                    color: Colors.red.shade400, size: 50),
-                const SizedBox(height: 12),
-                const Text(
-                  'Pick from Gallery',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'MP4, MOV up to 3 minutes',
-                  style: TextStyle(
-                      color: Colors.grey.shade500, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        GestureDetector(
-          onTap: () => _pickVideo(ImageSource.camera),
-          child: Container(
-            width: double.infinity,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.videocam, color: Colors.white, size: 28),
-                SizedBox(width: 12),
-                Text(
-                  'Record a Video',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDescriptionField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Description',
-          style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey.shade900,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: TextField(
-            controller: _descriptionController,
-            style: const TextStyle(color: Colors.white),
-            maxLines: 3,
-            maxLength: 150,
-            decoration: InputDecoration(
-              hintText: 'Tell Naija what this video is about...',
-              hintStyle: TextStyle(color: Colors.grey.shade600),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(16),
-              counterStyle: TextStyle(color: Colors.grey.shade600),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTagsField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Tags',
-          style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey.shade900,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: TextField(
-            controller: _tagController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              hintText: '#naija #comedy #viral',
-              hintStyle: TextStyle(color: Colors.grey.shade600),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(16),
-              prefixIcon:
-                  Icon(Icons.tag, color: Colors.grey.shade600, size: 20),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCategorySelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Category',
-          style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
+        // Category Chips
         SizedBox(
-          height: 40,
+          height: 36,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: _categories.length,
@@ -436,63 +276,121 @@ class _UploadPageState extends State<UploadPage> {
               final cat = _categories[index];
               final isSelected = cat == _selectedCategory;
               return GestureDetector(
-                onTap: () => setState(() => _selectedCategory = cat),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedCategory = cat);
+                },
                 child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
+                  margin: const EdgeInsets.only(right: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
                   decoration: BoxDecoration(
-                    color:
-                        isSelected ? Colors.red : Colors.grey.shade900,
+                    color: isSelected ? const Color(0xFFFF0050) : Colors.white10,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected
-                          ? Colors.red
-                          : Colors.grey.shade700,
-                    ),
                   ),
-                  child: Text(
-                    cat,
-                    style: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : Colors.grey.shade400,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      fontSize: 13,
-                    ),
-                  ),
+                  alignment: Alignment.center,
+                  child: Text(cat, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
               );
             },
           ),
         ),
+        const SizedBox(height: 20),
+        // Description Input
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: TextField(
+            controller: _descriptionController,
+            style: const TextStyle(color: Colors.white, fontSize: 15),
+            maxLines: 2,
+            maxLength: 150,
+            decoration: InputDecoration(
+              hintText: 'Add a caption...',
+              hintStyle: const TextStyle(color: Colors.white38),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(16),
+              counterText: "",
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Tags Input
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: TextField(
+            controller: _tagController,
+            style: const TextStyle(color: Color(0xFFFF0050), fontWeight: FontWeight.w600),
+            decoration: const InputDecoration(
+              hintText: '#tags #naija #viral',
+              hintStyle: TextStyle(color: Colors.white38, fontWeight: FontWeight.normal),
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              prefixIcon: Icon(Icons.tag_rounded, color: Colors.white38, size: 20),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Post Button
+        SizedBox(
+          width: double.infinity,
+          height: 58,
+          child: ElevatedButton(
+            onPressed: _uploadVideo,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF0050),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              elevation: 0,
+            ),
+            child: const Text('Share to NigerGram', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+          ),
+        ),
+        TextButton(
+          onPressed: () => setState(() => _videoFile = null),
+          child: const Text('Retake Video', style: TextStyle(color: Colors.white54, fontSize: 13)),
+        ),
       ],
     );
   }
 
-  Widget _buildPostButton() {
-    return SizedBox(
+  Widget _buildUploadingScreen() {
+    return Container(
       width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: _videoFile == null ? null : _uploadVideo,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          disabledBackgroundColor: Colors.grey.shade800,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+      color: Colors.black,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Circular Progress HUD
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 120,
+                height: 120,
+                child: CircularProgressIndicator(
+                  value: _uploadProgress,
+                  strokeWidth: 8,
+                  color: const Color(0xFFFF0050),
+                  backgroundColor: Colors.white10,
+                ),
+              ),
+              Text(
+                '${(_uploadProgress * 100).toInt()}%',
+                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+              ),
+            ],
           ),
-        ),
-        child: const Text(
-          'Post to NigerGram 🇳🇬',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+          const SizedBox(height: 40),
+          const Text('Publishing Content...', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text('Optimizing for Naija networks 🇳🇬', style: TextStyle(color: Colors.white38, fontSize: 14)),
+        ],
       ),
     );
   }
