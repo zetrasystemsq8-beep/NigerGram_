@@ -100,7 +100,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.whiteEfficacy, size: 22),
+            icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 22),
             onPressed: _logout,
           ),
         ],
@@ -176,12 +176,12 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                   ),
                   const SizedBox(height: 16),
 
-                  // Sleek Custom Action Row
+                  // Custom Action Row
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () {}, // Route to Edit Screen later
+                          onPressed: () {}, 
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Colors.white12),
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -211,7 +211,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
 
             const SizedBox(height: 8),
 
-            // 2. High-Fidelity Tab Indicator Bar
+            // 2. Tab Indicator Bar
             TabBar(
               controller: _tabController,
               indicatorColor: Colors.white,
@@ -224,12 +224,11 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
               ],
             ),
 
-            // 3. Immersive Content Grid Viewports
+            // 3. Content Grid Viewports
             Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  // First Tab: User Personal Video Gallery
                   _userVideos.isEmpty
                       ? _buildEmptyStateView()
                       : GridView.builder(
@@ -247,23 +246,18 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                             final int views = video['views'] ?? 0;
 
                             return GestureDetector(
-                              onTap: () {
-                                // Navigate to fullscreen video player feed
-                              },
+                              onTap: () {},
                               child: Container(
                                 color: Colors.grey.shade900,
                                 child: Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    // High-Fidelity Video Preview Thumbnail Asset
                                     thumbnailUrl != null
                                         ? Image.network(thumbnailUrl, fit: BoxFit.cover)
                                         : Container(
                                             color: Colors.grey.shade900,
                                             child: const Icon(Icons.movie_creation_outlined, color: Colors.white24),
                                           ),
-                                    
-                                    // Bottom Gradient Shield for readable metric text overlay
                                     Positioned.fill(
                                       child: Container(
                                         decoration: BoxDecoration(
@@ -276,8 +270,6 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                                         ),
                                       ),
                                     ),
-                                    
-                                    // Live View Counter Badge (TikTok Spec)
                                     Positioned(
                                       bottom: 6,
                                       left: 6,
@@ -302,8 +294,6 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                             );
                           },
                         ),
-                  
-                  // Second Tab: Liked/Bookmarked Videos Placeholder
                   _buildSavedSectionPlaceholder(),
                 ],
               ),
@@ -346,7 +336,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.video_library_outlined, color: Colors.white24, size: 48),
+            const Icon(Icons.video_library_outlined, color: Colors.white24, size: 48),
             const SizedBox(height: 16),
             const Text(
               'No videos published yet',
@@ -369,7 +359,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.lock_outline_rounded, color: Colors.white24, size: 36),
+          const Icon(Icons.lock_outline_rounded, color: Colors.white24, size: 36),
           const SizedBox(height: 12),
           const Text(
             'This user\'s liked videos are private',
