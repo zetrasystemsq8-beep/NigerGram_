@@ -100,13 +100,12 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     if (controller == null || !controller.value.isInitialized) return;
 
     HapticFeedback.lightImpact();
-    setState(() {
-      if (controller.value.isPlaying) {
-        controller.pause();
-      } else {
-        controller.play();
-      }
-    });
+    if (controller.value.isPlaying) {
+      controller.pause();
+    } else {
+      controller.play();
+    }
+    // No full setState() here. ValueListenableBuilder handles the partial redraw below.
   }
 
   /// Captures coordinates on double-tap to deploy a dynamic floating heart visual particle
@@ -141,11 +140,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
-    final bool isCurrentlyPaused = controller == null || !controller.value.isInitialized 
-        ? false 
-        : !controller.value.isPlaying;
-
     return Stack(
       children: [
         // Full Canvas Master Unified Gesture Core Shield
@@ -172,20 +166,43 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
           );
         }),
 
-        // Interactive Presentation Overlay Layer
-        VideoFeedViewOverlaySection(
-          profileImageUrl: widget.videoItem.profileImageUrl,
-          username: widget.videoItem.username,
-          description: widget.videoItem.description,
-          isBookmarked: false,
-          isLiked: _isLiked,
-          likeCount: _likeCount,
-          commentCount: widget.videoItem.commentCount,
-          shareCount: widget.videoItem.shareCount,
-          onLikeTapped: _toggleLike,
-          onPlayPauseTapped: _handleSingleTapCanvas,
-          isPaused: isCurrentlyPaused,
-        ),
+        // High-Fidelity Non-Blocking Listener for Playback Changes
+        if (widget.controller != null)
+          ValueListenableBuilder<VideoPlayerValue>(
+            valueListenable: widget.controller!,
+            builder: (context, value, child) {
+              final bool isCurrentlyPaused = !value.isInitialized || !value.isPlaying;
+              
+              return VideoFeedViewOverlaySection(
+                profileImageUrl: widget.videoItem.profileImageUrl,
+                username: widget.videoItem.username,
+                description: widget.videoItem.description,
+                isBookmarked: false,
+                isLiked: _isLiked,
+                likeCount: _likeCount,
+                commentCount: widget.videoItem.commentCount,
+                shareCount: widget.videoItem.shareCount,
+                onLikeTapped: _toggleLike,
+                onPlayPauseTapped: _handleSingleTapCanvas,
+                isPaused: isCurrentlyPaused,
+              );
+            },
+          )
+        else
+          // Fallback UI overlay placeholder state if controller hasn't attached yet
+          VideoFeedViewOverlaySection(
+            profileImageUrl: widget.videoItem.profileImageUrl,
+            username: widget.videoItem.username,
+            description: widget.videoItem.description,
+            isBookmarked: false,
+            isLiked: _isLiked,
+            likeCount: _likeCount,
+            commentCount: widget.videoItem.commentCount,
+            shareCount: widget.videoItem.shareCount,
+            onLikeTapped: _toggleLike,
+            onPlayPauseTapped: _handleSingleTapCanvas,
+            isPaused: true,
+          ),
       ],
     );
   }
