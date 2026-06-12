@@ -15,6 +15,11 @@ class VideoFeedViewOverlaySection extends StatefulWidget {
     required this.commentCount,
     required this.shareCount,
     required this.onLikeTapped,
+    required this.onPlayPauseTapped,
+    this.isPaused = false,
+    this.onCommentTapped,
+    this.onShareTapped,
+    this.onBookmarkTapped,
     super.key,
   });
 
@@ -26,7 +31,14 @@ class VideoFeedViewOverlaySection extends StatefulWidget {
   final int likeCount;
   final int commentCount;
   final int shareCount;
+  final bool isPaused;
+  
+  // High-fidelity structural interaction channels
   final VoidCallback onLikeTapped;
+  final VoidCallback onPlayPauseTapped;
+  final VoidCallback? onCommentTapped;
+  final VoidCallback? onShareTapped;
+  final VoidCallback? onBookmarkTapped;
 
   @override
   State<VideoFeedViewOverlaySection> createState() => _VideoFeedViewOverlaySectionState();
@@ -38,11 +50,28 @@ class _VideoFeedViewOverlaySectionState extends State<VideoFeedViewOverlaySectio
   @override
   void initState() {
     super.initState();
-    // Continuous, uninterrupted linear execution loop for the audio disc spinning frame
     _vinylRotationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 6),
-    )..repeat();
+    );
+    
+    // Only spin the album art vinyl if the media stream is active
+    if (!widget.isPaused) {
+      _vinylRotationController.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant VideoFeedViewOverlaySection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Dynamically toggle structural animation loops matching live state changes
+    if (widget.isPaused != oldWidget.isPaused) {
+      if (widget.isPaused) {
+        _vinylRotationController.stop();
+      } else {
+        _vinylRotationController.repeat();
+      }
+    }
   }
 
   @override
@@ -55,30 +84,66 @@ class _VideoFeedViewOverlaySectionState extends State<VideoFeedViewOverlaySectio
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // 1. Anti-Washout Linear Gradient Vignette Mask
+        // 1. Gesture Interception Surface Area Layer
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onPlayPauseTapped,
+            onDoubleTap: widget.onLikeTapped,
+            child: const SizedBox.expand(),
+          ),
+        ),
+
+        // 2. Anti-Washout Linear Gradient Vignette Mask
         Positioned(
           left: 0,
           right: 0,
           bottom: 0,
-          child: Container(
-            height: context.h(220),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withAlpha(40),
-                  Colors.black.withAlpha(120),
-                  Colors.black.withAlpha(200), // Solid contrast anchor at screen baseline
-                ],
-                stops: const [0.0, 0.3, 0.7, 1.0],
+          child: IgnorePointer(
+            child: Container(
+              height: context.h(220),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withAlpha(40),
+                    Colors.black.withAlpha(120),
+                    Colors.black.withAlpha(200),
+                  ],
+                  stops: const [0.0, 0.3, 0.7, 1.0],
+                ),
               ),
             ),
           ),
         ),
 
-        // 2. Interactive Controls Grid Layout
+        // 3. Center Play/Pause Status Indicator (TikTok Style)
+        if (widget.isPaused)
+          Center(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: widget.isPaused ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                child: Container(
+                  width: context.sq(64),
+                  height: context.sq(64),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(100),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 44,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // 4. Interactive Controls Layout Grid
         Positioned(
           left: 0,
           right: 0,
@@ -98,7 +163,7 @@ class _VideoFeedViewOverlaySectionState extends State<VideoFeedViewOverlaySectio
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      // User Info & Caption Block (Auto-wrapping execution bounds)
+                      // User Details & Metadata Profile Segment
                       Expanded(
                         child: Padding(
                           padding: EdgeInsets.only(right: context.w(16)),
@@ -110,7 +175,7 @@ class _VideoFeedViewOverlaySectionState extends State<VideoFeedViewOverlaySectio
                         ),
                       ),
 
-                      // Interaction Control Tower Column
+                      // Side Panel Interaction Column Tower
                       Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -121,10 +186,13 @@ class _VideoFeedViewOverlaySectionState extends State<VideoFeedViewOverlaySectio
                             commentCount: widget.commentCount,
                             shareCount: widget.shareCount,
                             onLikeTapped: widget.onLikeTapped,
+                            onCommentTapped: widget.onCommentTapped,
+                            onShareTapped: widget.onShareTapped,
+                            onBookmarkTapped: widget.onBookmarkTapped,
                           ),
                           SizedBox(height: context.h(12)),
                           
-                          // High-Fidelity 360° Rotating Album Vinyl Disk Node
+                          // Rotating Album Vinyl Disc
                           RotationTransition(
                             turns: _vinylRotationController,
                             child: Container(
@@ -161,7 +229,7 @@ class _VideoFeedViewOverlaySectionState extends State<VideoFeedViewOverlaySectio
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, _, __) => const Icon(
                                       Icons.music_note_rounded,
-                                      color: white,
+                                      color: Colors.white,
                                       size: 14,
                                     ),
                                   ),
@@ -175,23 +243,23 @@ class _VideoFeedViewOverlaySectionState extends State<VideoFeedViewOverlaySectio
                   ),
                 ),
                 
-                // 3. Ultra-Thin Premium Progress Scrub Timeline Bar
+                // 5. Linear Progress Timeline Track
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: context.w(4)),
                   child: Container(
-                    height: 2.0, // Sleek, non-obtrusive, clean hairline timeline
+                    height: 2.0,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: white.withAlpha(40),
+                      color: Colors.white.withAlpha(40),
                       borderRadius: BorderRadius.circular(1),
                     ),
                     alignment: Alignment.centerLeft,
                     child: FractionallySizedBox(
-                      widthFactor: 0.35, // Mock baseline tracker status percentage
+                      widthFactor: 0.35, // Structural timeline percentage metric position holder
                       child: Container(
                         height: 2.0,
                         decoration: BoxDecoration(
-                          color: white.withAlpha(220),
+                          color: Colors.white.withAlpha(220),
                           borderRadius: BorderRadius.circular(1),
                         ),
                       ),
