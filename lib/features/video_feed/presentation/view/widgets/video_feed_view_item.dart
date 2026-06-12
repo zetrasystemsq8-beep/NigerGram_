@@ -100,11 +100,13 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     if (controller == null || !controller.value.isInitialized) return;
 
     HapticFeedback.lightImpact();
-    if (controller.value.isPlaying) {
-      controller.pause();
-    } else {
-      controller.play();
-    }
+    setState(() {
+      if (controller.value.isPlaying) {
+        controller.pause();
+      } else {
+        controller.play();
+      }
+    });
   }
 
   /// Captures coordinates on double-tap to deploy a dynamic floating heart visual particle
@@ -139,6 +141,11 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
 
   @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final bool isCurrentlyPaused = controller == null || !controller.value.isInitialized 
+        ? false 
+        : !controller.value.isPlaying;
+
     return Stack(
       children: [
         // Full Canvas Master Unified Gesture Core Shield
@@ -176,6 +183,8 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
           commentCount: widget.videoItem.commentCount,
           shareCount: widget.videoItem.shareCount,
           onLikeTapped: _toggleLike,
+          onPlayPauseTapped: _handleSingleTapCanvas,
+          isPaused: isCurrentlyPaused,
         ),
       ],
     );
