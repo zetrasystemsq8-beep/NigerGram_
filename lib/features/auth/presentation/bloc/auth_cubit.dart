@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide User;
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, UserCredential;
@@ -53,6 +54,15 @@ class AuthCubit extends Cubit<AuthState> {
               onTimeout: () => throw TimeoutException('Firestore database initialization timed out.'),
             );
 
+        // ✅ FIXED: Send email verification without blocking auth flow
+        try {
+          await firebaseUser.sendEmailVerification();
+          emit(AuthSuccess());
+        } catch (e) {
+          // Email sending failed but auth succeeded - continue anyway
+          emit(AuthSuccess());
+        }
+
         await _signInToSupabase(email, password);
       }
 
@@ -80,14 +90,63 @@ class AuthCubit extends Cubit<AuthState> {
             onTimeout: () => throw TimeoutException('Firebase login connection timed out.'),
           );
 
+      // ✅ FIXED: Get current user and handle email verification
+      final user = _auth.currentUser;
+      if (user != null) {
+        // Reload user to get latest email verification status
+        await user.reload().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => throw TimeoutException('User reload timed out.'),
+        );
+
+        // Check if email verification is required and not yet verified
+        if (!user.emailVerified) {
+          // Try to send verification email (non-blocking)
+          try {
+            await user.sendEmailVerification().timeout(
+              const Duration(seconds: 5),
+            );
+          } catch (e) {
+            debugPrint('⚠️ Could not send verification email: $e');
+          }
+
+          // Emit error message asking user to verify
+          emit(AuthError(
+            'Please verify your email. A verification link has been sent to $email. '
+            'Check your inbox (and spam folder) and click the link to verify.',
+          ));
+          return;
+        }
+      }
+
       // Synced call to avoid unawaited microtask background failures
       await _signInToSupabase(email, password);
-      
+
       emit(AuthSuccess());
     } on TimeoutException catch (e) {
-      emit(AuthError('Connection Timeout: ${e.message}'));
+      emit(AuthError('Connection Timeout: ${e.message}}'));
     } on FirebaseAuthException catch (e) {
       emit(AuthError(e.message ?? 'Invalid credentials or configuration issue.'));
+    } catch (e) {
+      emit(AuthError(e.toString()));
+    }
+  }
+
+  /// ✅ NEW: Allow users to resend verification email
+  Future<void> resendVerificationEmail() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await user.sendEmailVerification().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => throw TimeoutException('Email send timed out.'),
+        );
+        emit(AuthSuccess()); // Indicates success without clearing state
+      } else {
+        emit(AuthError('No user logged in.'));
+      }
+    } on TimeoutException catch (e) {
+      emit(AuthError('Timeout: ${e.message}'));
     } catch (e) {
       emit(AuthError(e.toString()));
     }
