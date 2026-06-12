@@ -4,7 +4,14 @@ import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 
 class VideoFeedViewFollowButton extends StatefulWidget {
-  const VideoFeedViewFollowButton({this.onFollowChanged, super.key});
+  const VideoFeedViewFollowButton({
+    this.isFollowing = false,
+    this.onFollowChanged,
+    super.key,
+  });
+
+  /// Real-time initial state passed directly from data models to prevent recycler resets
+  final bool isFollowing;
 
   /// Optional execution callback to notify parent controllers or state machines
   final ValueChanged<bool>? onFollowChanged;
@@ -14,7 +21,25 @@ class VideoFeedViewFollowButton extends StatefulWidget {
 }
 
 class _VideoFeedViewFollowButtonState extends State<VideoFeedViewFollowButton> {
-  bool _isFollowing = false;
+  late bool _isFollowing;
+
+  @override
+  void initState() {
+    super.initState();
+    // Anchor the local state directly to the injected entity state parameters
+    _isFollowing = widget.isFollowing;
+  }
+
+  @override
+  void didUpdateWidget(covariant VideoFeedViewFollowButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Dynamically synchronize the visual state if the underlying data model array updates
+    if (widget.isFollowing != oldWidget.isFollowing) {
+      setState(() {
+        _isFollowing = widget.isFollowing;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,9 +67,9 @@ class _VideoFeedViewFollowButtonState extends State<VideoFeedViewFollowButton> {
         height: context.h(28), // Enforces a solid, standardized visual profile inside the user header row
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: _isFollowing ? white.withAlpha(30) : Colors.transparent,
+          color: _isFollowing ? Colors.white.withAlpha(30) : Colors.transparent,
           border: Border.all(
-            color: _isFollowing ? white.withAlpha(120) : white,
+            color: _isFollowing ? Colors.white.withAlpha(120) : Colors.white,
             width: 1.5,
           ),
           borderRadius: context.radiusAll(6),
@@ -52,7 +77,7 @@ class _VideoFeedViewFollowButtonState extends State<VideoFeedViewFollowButton> {
         child: Text(
           _isFollowing ? followingLabel : followLabel,
           style: TextStyle(
-            color: _isFollowing ? white.withAlpha(180) : white,
+            color: _isFollowing ? Colors.white.withAlpha(180) : Colors.white,
             fontSize: context.fontSize(13),
             fontWeight: FontWeight.w600,
             letterSpacing: 0.3,
