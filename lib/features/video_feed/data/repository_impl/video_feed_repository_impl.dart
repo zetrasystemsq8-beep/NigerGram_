@@ -10,6 +10,9 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
 
   final FirebaseFirestore _firestore;
   DocumentSnapshot? _lastDocument;
+  
+  // Confined payload envelope to strictly regulate data transmission limits
+  static const int _pageSize = 10;
 
   @override
   Future<Either<String, List<VideoEntity>>> fetchVideos() async {
@@ -39,6 +42,7 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
     }
   }
 
+  /// Low-Data Assisted Retrieval Helper Architecture
   Future<Either<String, List<VideoEntity>>> _fetchVideosHelper({
     DocumentSnapshot? startAfterDocument,
   }) async {
@@ -46,13 +50,25 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
       Query query = _firestore
           .collection('videos')
           .orderBy('timestamp', descending: true)
-          .limit(10);
+          .limit(_pageSize);
 
       if (startAfterDocument != null) {
         query = query.startAfterDocument(startAfterDocument);
       }
 
-      final snapshot = await query.get();
+      QuerySnapshot snapshot;
+      try {
+        // Enforce a server-first query behavior to secure fresh document lineages
+        snapshot = await query.get(const GetOptions(source: Source.server));
+      } on FirebaseException catch (e) {
+        // Institutional-grade network fallback: If the user has zero signal or a dropped packet,
+        // seamlessly parse historical metadata cache records instead of displaying a blank error state.
+        if (e.code == 'unavailable') {
+          snapshot = await query.get(const GetOptions(source: Source.cache));
+        } else {
+          rethrow;
+        }
+      }
 
       if (snapshot.docs.isEmpty) {
         return const Right([]);
