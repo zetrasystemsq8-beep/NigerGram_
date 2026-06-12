@@ -28,7 +28,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   bool _isPlaying = false;
   Key _playerKey = UniqueKey();
   
-  // Icon toggles for central play/pause state feedback bursts
   bool _showPlayIconOverlay = false;
   IconData _overlayIconData = Icons.play_arrow_rounded;
 
@@ -46,12 +45,21 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     _currentVideoId = widget.videoId;
     _applyLowDataOptimization();
     _addControllerListener();
+    
+    // AUTO-PLAY FIX: Ensure the video starts immediately if initialized
+    _ensureAutoplay();
   }
 
-  /// Forces the controller into a Restricted Data Mode
+  void _ensureAutoplay() {
+    if (widget.controller != null && widget.controller!.value.isInitialized) {
+      if (!widget.controller!.value.isPlaying) {
+        widget.controller!.play();
+      }
+    }
+  }
+
   void _applyLowDataOptimization() {
     if (widget.controller != null && widget.controller!.value.isInitialized) {
-      // Disable background 'over-fetching' to save user data
       widget.controller!.setLooping(true);
       widget.controller!.setVolume(1.0);
     }
@@ -79,6 +87,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       _playerKey = UniqueKey();
       _applyLowDataOptimization();
       _addControllerListener();
+      _ensureAutoplay();
 
       final bool shouldUpdateBuffering = widget.controller?.value.isBuffering ?? false;
       if (mounted && _isBuffering != shouldUpdateBuffering) {
@@ -119,7 +128,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
 
-    // Optimized Buffering Logic: Only spin if we are actually stalled.
     bool shouldShowBuffering = isBuffering;
     if ((isPlaying && controller.value.position > Duration.zero) ||
         (controller.value.position > Duration.zero && controller.value.duration.inMilliseconds > 0)) {
@@ -152,11 +160,12 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
         controller.play();
         _overlayIconData = Icons.play_arrow_rounded;
       }
+      // UI FIX: Only show overlay on manual interaction
       _showPlayIconOverlay = true;
     });
 
     _actionIconAnimationController.forward(from: 0.0).then((_) {
-      Future.delayed(const Duration(milliseconds: 200), () {
+      Future.delayed(const Duration(milliseconds: 400), () {
         if (mounted) {
           setState(() => _showPlayIconOverlay = false);
         }
@@ -190,7 +199,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // 1. Immersive Video Canvas Layer
           SizedBox.expand(
             child: FittedBox(
               key: _playerKey,
@@ -203,65 +211,59 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             ),
           ),
 
-          // 2. High-Velocity Action Icon Pop Overlay
+          // OVERLAY FIX: The icon only appears when _showPlayIconOverlay is true (manually triggered)
           if (_showPlayIconOverlay)
-            AnimatedBuilder(
-              animation: _actionIconAnimationController,
-              builder: (context, child) {
-                final double scaleFactor = TweenSequence<double>([
-                  TweenSequenceItem(tween: Tween<double>(begin: 0.4, end: 1.2).chain(CurveTween(curve: Curves.easeOutBack)), weight: 70),
-                  TweenSequenceItem(tween: Tween<double>(begin: 1.2, end: 1.0), weight: 30),
-                ]).evaluate(_actionIconAnimationController);
+            IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _actionIconAnimationController,
+                builder: (context, child) {
+                  final double scaleFactor = TweenSequence<double>([
+                    TweenSequenceItem(tween: Tween<double>(begin: 0.4, end: 1.2).chain(CurveTween(curve: Curves.easeOutBack)), weight: 70),
+                    TweenSequenceItem(tween: Tween<double>(begin: 1.2, end: 1.0), weight: 30),
+                  ]).evaluate(_actionIconAnimationController);
 
-                final double opacityFactor = TweenSequence<double>([
-                  TweenSequenceItem(tween: Tween<double>(begin: 0.0, end: 0.8), weight: 40),
-                  TweenSequenceItem(tween: Tween<double>(begin: 0.8, end: 0.0).chain(CurveTween(curve: Curves.easeIn)), weight: 60),
-                ]).evaluate(_actionIconAnimationController);
+                  final double opacityFactor = TweenSequence<double>([
+                    TweenSequenceItem(tween: Tween<double>(begin: 0.0, end: 0.8), weight: 40),
+                    TweenSequenceItem(tween: Tween<double>(begin: 0.8, end: 0.0).chain(CurveTween(curve: Curves.easeIn)), weight: 60),
+                  ]).evaluate(_actionIconAnimationController);
 
-                return Opacity(
-                  opacity: opacityFactor,
-                  child: Transform.scale(
-                    scale: scaleFactor,
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withAlpha(100),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _overlayIconData,
-                        color: Colors.white,
-                        size: context.sq(50),
+                  return Opacity(
+                    opacity: opacityFactor,
+                    child: Transform.scale(
+                      scale: scaleFactor,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withAlpha(100),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _overlayIconData,
+                          color: Colors.white,
+                          size: context.sq(50),
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
 
-          // 3. Optimized Buffering Overlay
           if (_isBuffering)
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.black.withAlpha(30),
-              child: Center(
-                child: SizedBox(
-                  width: context.sq(36),
-                  height: context.sq(36),
-                  child: const CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2.5,
-                  ),
+            Center(
+              child: SizedBox(
+                width: context.sq(36),
+                height: context.sq(36),
+                child: const CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
                 ),
               ),
             ),
             
-          // 4. Premium Error UI Recovery Matrix
           if (controller.value.hasError)
             Container(
               color: Colors.black87,
-              padding: EdgeInsets.symmetric(horizontal: context.w(32)),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -270,7 +272,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
                     SizedBox(height: context.h(12)),
                     Text(
                       "Check connection. Tap to retry.",
-                      textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white.withAlpha(200),
                         fontSize: context.fontSize(14),
