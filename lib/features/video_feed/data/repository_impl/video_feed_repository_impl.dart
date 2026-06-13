@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fpdart/fpdart.dart';
-import 'package:nigergram/features/video_feed/data/models/response/video_response_model.dart' hide VideoEntity;
+// Use a prefix to avoid the VideoEntity collision while keeping the Model accessible
+import 'package:nigergram/features/video_feed/data/models/response/video_response_model.dart' as model;
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:nigergram/features/video_feed/domain/repositories/video_feed_repository.dart';
 
@@ -60,8 +61,9 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
 
       _lastDocument = snapshot.docs.last;
 
+      // Accessing the model via the 'model' prefix
       final List<VideoEntity> videos = snapshot.docs
-          .map<VideoEntity>((doc) => VideoResponseModel.fromFirestore(doc).toEntity())
+          .map<VideoEntity>((doc) => model.VideoResponseModel.fromFirestore(doc).toEntity())
           .toList();
 
       return Right(videos);
