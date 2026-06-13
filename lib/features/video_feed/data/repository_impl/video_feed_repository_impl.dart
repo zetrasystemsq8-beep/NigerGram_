@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fpdart/fpdart.dart';
-// Use a prefix to avoid the VideoEntity collision while keeping the Model accessible
 import 'package:nigergram/features/video_feed/data/models/response/video_response_model.dart' as model;
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:nigergram/features/video_feed/domain/repositories/video_feed_repository.dart';
@@ -10,7 +9,9 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
       : _firestore = firestore;
 
   final FirebaseFirestore _firestore;
-  DocumentSnapshot? _lastDocument;
+  
+  /// Strongly typed tracking reference to allow safe cursor-based pagination
+  DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
 
   @override
   Future<Either<String, List<VideoEntity>>> fetchVideos() async {
@@ -40,11 +41,14 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
     }
   }
 
+  /// Private helper designed with precise type constraints to enforce 
+  /// clean mapping from raw Firestore queries to Domain entities.
   Future<Either<String, List<VideoEntity>>> _fetchVideosHelper({
-    DocumentSnapshot? startAfterDocument,
+    DocumentSnapshot<Map<String, dynamic>>? startAfterDocument,
   }) async {
     try {
-      Query query = _firestore
+      // Enforcing Map<String, dynamic> prevents fallback typing to Object?
+      Query<Map<String, dynamic>> query = _firestore
           .collection('videos')
           .orderBy('timestamp', descending: true)
           .limit(10);
@@ -61,7 +65,7 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
 
       _lastDocument = snapshot.docs.last;
 
-      // Accessing the model via the 'model' prefix
+      // The snapshot maps safely now because both components expect Map<String, dynamic>
       final List<VideoEntity> videos = snapshot.docs
           .map<VideoEntity>((doc) => model.VideoResponseModel.fromFirestore(doc).toEntity())
           .toList();
