@@ -60,8 +60,8 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
 
       _lastDocument = snapshot.docs.last;
 
-      final videos = snapshot.docs
-          .map((doc) => VideoResponseModel.fromFirestore(doc).toEntity())
+      final List<VideoEntity> videos = snapshot.docs
+          .map<VideoEntity>((doc) => VideoResponseModel.fromFirestore(doc).toEntity())
           .toList();
 
       return Right(videos);
