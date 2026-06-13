@@ -1,7 +1,120 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:video_player/video_player.dart';
+
+class VideoFeedView extends StatefulWidget {
+  const VideoFeedView({super.key});
+
+  @override
+  State<VideoFeedView> createState() => _VideoFeedViewState();
+}
+
+class _VideoFeedViewState extends State<VideoFeedView> {
+  late PageController _pageController;
+  final Map<int, VideoPlayerController> _controllers = {};
+  int _focusedIndex = 0;
+
+  // Placeholder feed items list to compile clean; link this to your bloc/state stream.
+  final List<VideoEntity> _videoItems = [];
+
+  @override
+  void AlignmentInit() {
+    _pageController = PageController();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    for (var controller in _controllers.values) {
+      controller.dispose();
+    }
+    _controllers.clear();
+    super.dispose();
+  }
+
+  void _onPageChanged(int index) {
+    setState(() {
+      _focusedIndex = index;
+    });
+    _manageControllerLifecycle(index);
+  }
+
+  /// Optimizes data consumption and hardware memory by keeping only 
+  /// active and immediately adjacent video players initialized.
+  void _manageControllerLifecycle(int index) {
+    // Play current focused item
+    _getOrCreateController(index)?.play();
+
+    // Pause adjacent buffers
+    _getOrCreateController(index - 1)?.pause();
+    _getOrCreateController(index + 1)?.pause();
+
+    // Aggressively dispose distant players to save cellular data and RAM
+    _controllers.removeWhere((key, controller) {
+      if ((key - index).abs() > 1) {
+        controller.dispose();
+        return true;
+      }
+      return false;
+    });
+  }
+
+  VideoPlayerController? _getOrCreateController(int index) {
+    if (index < 0 || index >= _videoItems.length) return null;
+    if (_controllers.containsKey(index)) return _controllers[index];
+
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(_videoItems[index].videoUrl),
+    );
+    
+    _controllers[index] = controller;
+    
+    controller.initialize().then((_) {
+      if (mounted && index == _focusedIndex) {
+        controller.setLooping(true);
+        controller.play();
+        setState(() {});
+      }
+    });
+
+    return controller;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_videoItems.isEmpty) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: PageView.builder(
+        controller: _pageController,
+        scrollDirection: Axis.vertical,
+        onPageChanged: _onPageChanged,
+        itemCount: _videoItems.length,
+        itemBuilder: (context, index) {
+          final controller = _getOrCreateController(index);
+          return VideoFeedViewItem(
+            videoItem: _videoItems[index],
+            controller: controller,
+          );
+        },
+      ),
+    );
+  }
+}
 
 class VideoFeedViewItem extends StatelessWidget {
   final VideoEntity videoItem;
@@ -79,7 +192,7 @@ class VideoFeedViewItem extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Colors.white, // Fixed typo: whiteee -> white
+                  color: Colors.white,
                   fontSize: 14,
                   height: 1.3,
                 ),
@@ -154,7 +267,7 @@ class DecorateBackgroundGradient extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black54, // Fixed typo: black3c -> black54
+              Colors.black54,
               Colors.transparent,
               Colors.transparent,
               Colors.black54,
@@ -167,4 +280,3 @@ class DecorateBackgroundGradient extends StatelessWidget {
     );
   }
 }
-// VideoDetailView implementation follows...
