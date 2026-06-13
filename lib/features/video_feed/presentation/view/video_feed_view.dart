@@ -47,14 +47,12 @@ class _VideoFeedViewState extends State<VideoFeedView>
     final wasActive = _isAppActive;
     _isAppActive = state == AppLifecycleState.resumed;
     
-    // Pause videos when app is not in foreground
     if (!_isAppActive && wasActive) {
-      debugPrint('自由 [VIDEO FEED] App paused - stopping all videos');
+      debugPrint('🟡 [VIDEO FEED] App paused - stopping all videos');
       _pauseAllControllers();
     }
-    // Resume on return
     else if (_isAppActive && !wasActive) {
-      debugPrint('自由 [VIDEO FEED] App resumed - reinitializing current video');
+      debugPrint('🟡 [VIDEO FEED] App resumed - reinitializing current video');
       _cleanupAndReinitializeCurrentVideo();
     }
   }
@@ -188,16 +186,13 @@ class _VideoFeedViewState extends State<VideoFeedView>
     await _initAndPlayVideo(newPage);
     await context.read<VideoFeedCubit>().onPageChanged(newPage);
 
-    // Smart Low-Data Optimization: Wait to see if user stays on this video before downloading the next
     _scheduleNextVideoPreload(newPage + 1);
   }
 
-  /// Delays next video preloading to verify intentional consumption patterns
   void _scheduleNextVideoPreload(int nextIndex) {
     if (nextIndex >= _videos.length) return;
     
     Future.delayed(const Duration(milliseconds: 500), () async {
-      // If the user has already swiped to a different video within 500ms, abort the preload
       if (!mounted || _currentPage != nextIndex - 1) return;
       
       final nextVideo = _videos[nextIndex];
@@ -299,7 +294,7 @@ class _VideoFeedViewState extends State<VideoFeedView>
                 color: white.withAlpha(120),
                 fontSize: context.fontSize(14)),
           ),
-          ],
+        ],
       ),
     );
   }
