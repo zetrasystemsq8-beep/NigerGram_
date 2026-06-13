@@ -8,6 +8,8 @@ import 'package:nigergram/features/dashboard/presentation/view/dashboard_view.da
 import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 import 'package:nigergram/features/upload/presentation/view/upload_page.dart';
 import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.dart';
+// TODO: Ensure this import points to your actual VideoDetailView location
+// import 'package:nigergram/features/video_feed/presentation/view/video_detail_view.dart'; 
 import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -50,6 +52,23 @@ class AppRouter {
         path: RouterEnum.profileView.routeName,
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const ProfileView()),
+      ),
+      // Institutional Grade Route for Video Detail
+      // This handles the navigation from ProfileView without crashing
+      GoRoute(
+        path: '/video-detail/:videoId',
+        pageBuilder: (context, state) {
+          final videoId = state.pathParameters['videoId']!;
+          // Return your VideoDetailView here once the UI file is ready
+          return customPageBuilderWidget(
+            context, 
+            state, 
+            Scaffold(
+              appBar: AppBar(title: const Text('Video Detail')),
+              body: Center(child: Text('Loading video: $videoId')),
+            ),
+          );
+        },
       ),
     ],
   );
