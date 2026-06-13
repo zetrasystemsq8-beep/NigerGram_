@@ -47,14 +47,14 @@ class _VideoFeedViewState extends State<VideoFeedView>
     final wasActive = _isAppActive;
     _isAppActive = state == AppLifecycleState.resumed;
     
-    // ✅ FIXED: Pause videos when app is not in foreground
+    // Pause videos when app is not in foreground
     if (!_isAppActive && wasActive) {
-      debugPrint('🟡 [VIDEO FEED] App paused - stopping all videos');
+      debugPrint('自由 [VIDEO FEED] App paused - stopping all videos');
       _pauseAllControllers();
     }
     // Resume on return
     else if (_isAppActive && !wasActive) {
-      debugPrint('🟡 [VIDEO FEED] App resumed - reinitializing current video');
+      debugPrint('自由 [VIDEO FEED] App resumed - reinitializing current video');
       _cleanupAndReinitializeCurrentVideo();
     }
   }
@@ -299,7 +299,7 @@ class _VideoFeedViewState extends State<VideoFeedView>
                 color: white.withAlpha(120),
                 fontSize: context.fontSize(14)),
           ),
-        ],
+          ],
       ),
     );
   }
