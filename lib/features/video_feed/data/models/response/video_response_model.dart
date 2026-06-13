@@ -11,6 +11,7 @@ class VideoResponseModel {
     required this.username,
     required this.description,
     required this.videoUrl,
+    required this.thumbnailUrl,
     required this.profileImageUrl,
     required this.likeCount,
     required this.commentCount,
@@ -22,21 +23,20 @@ class VideoResponseModel {
   final String username;
   final String description;
   final String videoUrl;
+  final String thumbnailUrl;
   final String profileImageUrl;
   final int likeCount;
   final int commentCount;
   final int shareCount;
+
   @JsonKey(fromJson: _timestampFromJson, toJson: _timestampToJson)
   final Timestamp timestamp;
 
-  /// Factory constructor from JSON
   factory VideoResponseModel.fromJson(Map<String, dynamic> json) =>
       _$VideoResponseModelFromJson(json);
 
-  /// Convert to JSON
   Map<String, dynamic> toJson() => _$VideoResponseModelToJson(this);
 
-  /// Factory constructor to create a VideoResponseModel from a Firestore DocumentSnapshot
   factory VideoResponseModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
 
@@ -45,21 +45,24 @@ class VideoResponseModel {
       username: data['username'] is String ? data['username'] as String : '',
       description: data['description'] is String ? data['description'] as String : '',
       videoUrl: data['videoUrl'] is String ? data['videoUrl'] as String : '',
+      thumbnailUrl: data['thumbnailUrl'] is String ? data['thumbnailUrl'] as String : '',
       profileImageUrl: data['profileImageUrl'] is String ? data['profileImageUrl'] as String : '',
       likeCount: _safeInt(data['likeCount']),
       commentCount: _safeInt(data['commentCount']),
       shareCount: _safeInt(data['shareCount']),
-      timestamp: data['timestamp'] is Timestamp ? data['timestamp'] as Timestamp : Timestamp.now(),
+      timestamp: data['timestamp'] is Timestamp
+          ? data['timestamp'] as Timestamp
+          : Timestamp.now(),
     );
   }
 
-  /// Convert to domain entity
   VideoEntity toEntity() {
     return VideoEntity(
       id: id,
       username: username,
       description: description,
       videoUrl: videoUrl,
+      thumbnailUrl: thumbnailUrl,
       profileImageUrl: profileImageUrl,
       likeCount: likeCount,
       commentCount: commentCount,
@@ -68,19 +71,19 @@ class VideoResponseModel {
     );
   }
 
-  /// Helper for JSON serialization of Timestamp
   static Timestamp _timestampFromJson(dynamic json) {
     if (json is Timestamp) return json;
+
     if (json is Map) {
       return Timestamp(
         json['_seconds'] as int? ?? 0,
         json['_nanoseconds'] as int? ?? 0,
       );
     }
+
     return Timestamp.now();
   }
 
-  /// Helper for JSON deserialization of Timestamp
   static Map<String, dynamic> _timestampToJson(Timestamp timestamp) {
     return {
       '_seconds': timestamp.seconds,
@@ -89,7 +92,6 @@ class VideoResponseModel {
   }
 }
 
-/// Helper function to safely convert a dynamic value to an int
 int _safeInt(dynamic value, {int defaultValue = 0}) {
   if (value is int) return value;
   if (value is String) return int.tryParse(value) ?? defaultValue;
