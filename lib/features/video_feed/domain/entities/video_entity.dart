@@ -6,6 +6,7 @@ class VideoEntity extends Equatable {
     required this.username,
     required this.description,
     required this.videoUrl,
+    required this.thumbnailUrl,
     required this.profileImageUrl,
     required this.likeCount,
     required this.commentCount,
@@ -17,6 +18,7 @@ class VideoEntity extends Equatable {
   final String username;
   final String description;
   final String videoUrl;
+  final String thumbnailUrl;
   final String profileImageUrl;
   final int likeCount;
   final int commentCount;
@@ -29,6 +31,7 @@ class VideoEntity extends Equatable {
         username,
         description,
         videoUrl,
+        thumbnailUrl,
         profileImageUrl,
         likeCount,
         commentCount,
