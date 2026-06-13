@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_video_feed/features/video_feed/data/models/response/video_response_model.dart';
-import 'package:flutter_video_feed/features/video_feed/domain/entities/video_entity.dart';
-import 'package:flutter_video_feed/features/video_feed/domain/repositories/video_feed_repository.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:nigergram/features/video_feed/data/models/response/video_response_model.dart' hide VideoEntity;
+import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
+import 'package:nigergram/features/video_feed/domain/repositories/video_feed_repository.dart';
 
 class VideoFeedRepositoryImpl implements VideoFeedRepository {
   VideoFeedRepositoryImpl({required FirebaseFirestore firestore})
