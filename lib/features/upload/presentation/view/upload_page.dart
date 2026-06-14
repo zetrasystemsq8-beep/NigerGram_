@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:video_compress/video_compress.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 
 class UploadPage extends StatefulWidget {
@@ -90,16 +91,32 @@ class _UploadPageState extends State<UploadPage> {
       if (user == null) return;
 
       await _ensureSupabaseSession();
-      setState(() => _uploadProgress = 0.2);
+      
+      // Step 1: Initialize compression phase
+      setState(() => _uploadProgress = 0.15);
+
+      // Compress the video payload locally on-device to low-data thresholds
+      final mediaInfo = await VideoCompress.compressVideo(
+        _videoFile!.path,
+        quality: VideoQuality.MediumQuality,
+        includeAudio: true,
+        deleteOrigin: false,
+      );
+
+      if (mediaInfo == null || mediaInfo.file == null) {
+        throw Exception('Optimization pipeline failed to process raw layout data.');
+      }
+
+      final compressedFile = mediaInfo.file!;
+      setState(() => _uploadProgress = 0.4);
 
       final fileName = '${user.uid}_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final supabase = Supabase.instance.client;
 
-      setState(() => _uploadProgress = 0.4);
-
+      // Transfer the streamlined asset payload directly into Supabase Storage Buckets
       await supabase.storage.from('videos').upload(
             fileName,
-            _videoFile!,
+            compressedFile,
             fileOptions: const FileOptions(contentType: 'video/mp4'),
           );
 
