@@ -169,7 +169,7 @@ class _UploadPageState extends State<UploadPage> {
       await _ensureSupabaseSession();
       setState(() => _uploadProgress = 0.15);
 
-      // In institutional production, the primary master asset dictates the baseline stream composition container
+      // Identify primary stream composition container asset
       final primaryAsset = _mediaTimeline.firstWhere(
         (element) => element.type == AssetType.video, 
         orElse: () => _mediaTimeline.first
@@ -178,13 +178,13 @@ class _UploadPageState extends State<UploadPage> {
       File finalUploadPayloadFile = File(primaryAsset.path);
       File? thumbnailFile;
 
-      // 1. Conditional check expression parsing branch based on concrete media track metadata definitions
       if (primaryAsset.type == AssetType.video) {
-        // Process and compress raw video input frames via hardware acceleration blocks
+        // High-efficiency, low-bitrate compression optimized heavily for Nigerian data networks
         final mediaInfo = await VideoCompress.compressVideo(
           primaryAsset.path,
           quality: VideoQuality.MediumQuality,
           deleteOrigin: false,
+          includeAudio: true,
         );
         if (mediaInfo != null && mediaInfo.file != null) {
           finalUploadPayloadFile = mediaInfo.file!;
@@ -192,14 +192,12 @@ class _UploadPageState extends State<UploadPage> {
 
         setState(() => _uploadProgress = 0.4);
 
-        // Generate a clean video preview frame thumbnail anchor asset
         thumbnailFile = await VideoCompress.getFileThumbnail(
           primaryAsset.path,
           quality: 50,
           position: -1,
         );
       } else {
-        // High-fidelity image sequence rendering path bypasses video engine completely to prevent null crashes
         finalUploadPayloadFile = File(primaryAsset.path);
         thumbnailFile = File(primaryAsset.path);
         setState(() => _uploadProgress = 0.4);
@@ -215,7 +213,7 @@ class _UploadPageState extends State<UploadPage> {
       final thumbFileName = '${user.uid}_$timestamp.jpg';
       final supabase = Supabase.instance.client;
 
-      // 2. Dispatch media payload straight to object storage partitions
+      // Dispatch compressed media container straight to object storage
       await supabase.storage.from('videos').upload(
             videoFileName,
             finalUploadPayloadFile,
@@ -224,7 +222,7 @@ class _UploadPageState extends State<UploadPage> {
 
       setState(() => _uploadProgress = 0.65);
 
-      // 3. Dispatch extracted or cloned preview thumbnail assets to authenticated buckets
+      // Dispatch high-fidelity thumbnail preview matrix
       await supabase.storage.from('thumbnails').upload(
             thumbFileName,
             thumbnailFile,
@@ -240,7 +238,6 @@ class _UploadPageState extends State<UploadPage> {
       final username = userDoc.data()?['username'] ?? 'naija_creator';
       final tags = _tagController.text.split(' ').where((t) => t.startsWith('#')).toList();
 
-      // Serialization formatting map for structural storage representation of custom subtitling layers
       final mappedSubtitles = _subtitleTracks.map((sub) => {
         'id': sub.id,
         'text': sub.text,
@@ -250,7 +247,7 @@ class _UploadPageState extends State<UploadPage> {
         'positionY': sub.compositionPosition.dy,
       }).toList();
 
-      // 4. Commit structured transactional document down into Firestore collection trees
+      // Commit core unified database document to Firestore
       await FirebaseFirestore.instance.collection('videos').add({
         'videoUrl': videoUrl,
         'thumbnailUrl': thumbnailUrl,
@@ -268,6 +265,7 @@ class _UploadPageState extends State<UploadPage> {
           'totalAssetCount': _mediaTimeline.length,
           'hasSubtitles': _subtitleTracks.isNotEmpty,
           'mediaType': primaryAsset.type == AssetType.video ? 'video' : 'image',
+          'engineVersion': 'Zetra Studio Framework v2',
         },
         'timestamp': FieldValue.serverTimestamp(),
       });
@@ -314,7 +312,7 @@ class _UploadPageState extends State<UploadPage> {
     return _isStudioModeActive ? _buildAdvancedStudioWorkspaceUI() : _buildEmptyInitialPickerUI();
   }
 
-  /// Initial entry screen offering robust single or multi-asset selection branches
+  /// Initial entry screen featuring explicit structural Zetra Lab branding positioning
   Widget _buildEmptyInitialPickerUI() {
     return Container(
       decoration: const BoxDecoration(
@@ -324,37 +322,87 @@ class _UploadPageState extends State<UploadPage> {
           colors: [Color(0xFF0A0A0A), Colors.black],
         ),
       ),
-      child: Center(
+      child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Share your vibe with Nigeria 🇳🇬",
-                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+              // Mandated Top Branding Block Alignment
+              Column(
+                children: [
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF0050).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: const Color(0xFFFF0050).withOpacity(0.2)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.blur_on_rounded, color: Color(0xFFFF0050), size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          "ZETRA LABS OS",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                "Upload multiple clips, compile pictures, and design unique subtitles custom styled down to the frame.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13, height: 1.4),
+
+              // Deep Action Grid Controls
+              Column(
+                children: [
+                  const Text(
+                    "Share your vibe with Nigeria 🇳🇬",
+                    style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Upload multiple clips, compile pictures, and design unique subtitles custom styled down to the frame.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 40),
+                  _buildLargeStudioMenuButton(
+                    icon: Icons.video_collection_rounded,
+                    title: "Compile Video Clips",
+                    subtitle: "Select and merge multiple records into one dynamic master sequence",
+                    onTap: () => _importAssets(AssetType.video, ImageSource.gallery),
+                    accentColor: const Color(0xFFFF0050),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildLargeStudioMenuButton(
+                    icon: Icons.photo_library_rounded,
+                    title: "Photo Sequencing Matrix",
+                    subtitle: "Transform dynamic high-res photos into high-performing video threads",
+                    onTap: () => _importAssets(AssetType.image, ImageSource.gallery),
+                    accentColor: Colors.blueAccent,
+                  ),
+                ],
               ),
-              const SizedBox(height: 40),
-              _buildLargeStudioMenuButton(
-                icon: Icons.video_collection_rounded,
-                title: "Compile Video Clips",
-                subtitle: "Select and merge multiple records into one dynamic master sequence",
-                onTap: () => _importAssets(AssetType.video, ImageSource.gallery),
-                accentColor: const Color(0xFFFF0050),
-              ),
-              const SizedBox(height: 16),
-              _buildLargeStudioMenuButton(
-                icon: Icons.photo_library_rounded,
-                title: "Photo Sequencing Matrix",
-                subtitle: "Transform dynamic high-res photos into high-performing video threads",
-                onTap: () => _importAssets(AssetType.image, ImageSource.gallery),
-                accentColor: Colors.blueAccent,
+
+              // Mandated Baseline Attribution Signature Footer
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Text(
+                  "make from zetra lab",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.25),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.8,
+                  ),
+                ),
               ),
             ],
           ),
@@ -408,90 +456,90 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
-  /// Advanced multi-asset composite lane editing dashboard interface matching professional post-production software layers
+  /// Core timeline asset composition pane view configuration dashboard
   Widget _buildAdvancedStudioWorkspaceUI() {
-    return Column(
-      children: [
-        // 1. High-Fidelity Main Playback Live View Monitor Frame Canvas
-        Expanded(
-          flex: 4,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                color: Colors.grey.shade900,
-                width: double.infinity,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.movie_filter_rounded, color: Colors.white.withOpacity(0.15), size: 64),
-                      const SizedBox(height: 8),
-                      Text(
-                        "Live Composited Lane Video Monitoring Area", 
-                        style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11)
-                      ),
-                    ],
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          // 1. Live Composition Visual Realtime Playback Monitor Overlay View
+          Expanded(
+            flex: 4,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  color: Colors.grey.shade900,
+                  width: double.infinity,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.movie_filter_rounded, color: Colors.white.withOpacity(0.15), size: 64),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Live Composited Lane Video Monitoring Area", 
+                          style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11)
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              // Dynamic Floating Canvas Subtitle Presentation Renderer Engine Array
-              ..._subtitleTracks.map((sub) {
-                return Positioned(
-                  left: MediaQuery.of(context).size.width * sub.compositionPosition.dx - 100,
-                  top: MediaQuery.of(context).size.height * 0.4 * sub.compositionPosition.dy,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.75),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFFF0050).withOpacity(0.5), width: 1),
+                // Subtitle Overlay Presentation Engine
+                ..._subtitleTracks.map((sub) {
+                  return Positioned(
+                    left: MediaQuery.of(context).size.width * sub.compositionPosition.dx - 100,
+                    top: MediaQuery.of(context).size.height * 0.4 * sub.compositionPosition.dy,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.75),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFFF0050).withOpacity(0.5), width: 1),
+                      ),
+                      constraints: const BoxConstraints(maxWidth: 200),
+                      child: Text(
+                        sub.text,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                    constraints: const BoxConstraints(maxWidth: 200),
-                    child: Text(
-                      sub.text,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                );
-              }),
-            ],
+                  );
+                }),
+              ],
+            ),
           ),
-        ),
 
-        // 2. High-Performance Studio Operations Matrix Controls
-        Expanded(
-          flex: 5,
-          child: Container(
-            color: const Color(0xFF0D0D0D),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Linear Production Lane Track
-                  const Text("TRACK LAYOUT CHANNELS", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
-                  const SizedBox(height: 10),
-                  _buildStudioTimelineLaneScroller(),
-                  const SizedBox(height: 24),
+          // 2. High-Performance Studio Operations Control Deck Layer
+          Expanded(
+            flex: 5,
+            child: Container(
+              color: const Color(0xFF0D0D0D),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("TRACK LAYOUT CHANNELS", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                    const SizedBox(height: 10),
+                    _buildStudioTimelineLaneScroller(),
+                    const SizedBox(height: 24),
 
-                  // Interactive Custom Script Subtitling Dock Layout Block
-                  const Text("TIMED SUBTITLE INJECTION DOCK", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
-                  const SizedBox(height: 10),
-                  _buildSubtitlingDockEngineLayout(),
-                  const SizedBox(height: 24),
+                    const Text("TIMED SUBTITLE INJECTION DOCK", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                    const SizedBox(height: 10),
+                    _buildSubtitlingDockEngineLayout(),
+                    const SizedBox(height: 24),
 
-                  // Traditional Descriptive Metadata Index Forms
-                  const Text("METADATA DISPATCH PARAMS", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
-                  const SizedBox(height: 10),
-                  _buildPostFormFieldsLayout(),
-                ],
+                    const Text("METADATA DISPATCH PARAMS", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                    const SizedBox(height: 10),
+                    _buildPostFormFieldsLayout(),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -773,6 +821,12 @@ class _UploadPageState extends State<UploadPage> {
             child: const Text('Compile & Publish to NigerGram', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
           ),
         ),
+        const SizedBox(height: 8),
+        Text(
+          "Powered by Zetra Lab Core Framework",
+          style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        ),
+        const SizedBox(height: 8),
         TextButton(
           onPressed: () => setState(() {
             _mediaTimeline.clear();
