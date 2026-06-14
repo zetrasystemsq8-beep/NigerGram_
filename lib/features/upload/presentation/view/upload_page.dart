@@ -306,11 +306,11 @@ class _UploadPageState extends State<UploadPage> {
   /// Initial entry screen offering robust single or multi-asset selection branches
   Widget _buildEmptyInitialPickerUI() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.grey.shade950, Colors.black],
+          colors: [Color(0xFF0A0A0A), Colors.black],
         ),
       ),
       child: Center(
@@ -506,7 +506,7 @@ class _UploadPageState extends State<UploadPage> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFFF0050).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFF0050).withOpacity(0.3), style: BorderStyle.dashed),
+                  border: Border.all(color: const Color(0xFFFF0050).withOpacity(0.4), width: 1.5),
                 ),
                 child: const Icon(Icons.add_rounded, color: Color(0xFFFF0050), size: 20),
               ),
