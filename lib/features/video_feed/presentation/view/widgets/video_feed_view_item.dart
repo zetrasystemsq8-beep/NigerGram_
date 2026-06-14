@@ -27,6 +27,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
   // Local interaction states for zero-latency UI responsiveness
   bool _isLikedLocal = false;
   int _likeCountLocal = 0;
+  int _commentCountLocal = 0;
   bool _showHeartOverlay = false;
   Offset _heartOverlayPosition = Offset.zero;
 
@@ -34,6 +35,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
   void initState() {
     super.initState();
     _likeCountLocal = widget.videoItem.likeCount;
+    _commentCountLocal = widget.videoItem.commentCount;
     
     _heartAnimationController = AnimationController(
       vsync: this,
@@ -52,7 +54,8 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
     if (oldWidget.videoItem.id != widget.videoItem.id) {
       setState(() {
         _likeCountLocal = widget.videoItem.likeCount;
-        _isLikedLocal = false; // Reset interaction vector for clean pagination view contexts
+        _commentCountLocal = widget.videoItem.commentCount;
+        _isLikedLocal = false;
       });
     }
   }
@@ -63,8 +66,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
     super.dispose();
   }
 
-  /// Optimistic State Mutation Loop.
-  /// Updates local memory instances immediately to bypass network roundtrip friction.
   void _handleLikeToggle() {
     HapticFeedback.mediumImpact();
     setState(() {
@@ -80,7 +81,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
     _syncLikeStateToCloud();
   }
 
-  /// Double-tap gesture intersection callback mapping spatial coordinates to visual overlay anchors
   void _handleDoubleTap(TapDownDetails details) {
     if (!_isLikedLocal) {
       setState(() {
@@ -106,7 +106,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
     });
   }
 
-  /// Asynchronous background transactional execution to ensure cluster consistency
   void _syncLikeStateToCloud() {
     FirebaseFirestore.instance
         .collection('videos')
@@ -115,8 +114,24 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
           'likeCount': _likeCountLocal,
         }).catchError((error) {
           debugPrint('Zetra Interaction Engine Cloud Sync Mutation dropped: $error');
-          // Graceful degradation fallback code here if strict state parity is required
         });
+  }
+
+  void _openCommentsOverlay() {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _CommentsBottomSheet(
+        videoId: widget.videoItem.id,
+        onCommentAdded: () {
+          setState(() {
+            _commentCountLocal++;
+          });
+        },
+      ),
+    );
   }
 
   @override
@@ -128,9 +143,8 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
         // Video Interactive Canvas Layer
         Positioned.fill(
           child: GestureDetector(
-            onTapDown: (details) {}, // Reserved for pause-play toggles if necessary
             onDoubleTapDown: _handleDoubleTap,
-            onDoubleTap: () {}, // Required hook parameter to explicitly capture sequence chains
+            onDoubleTap: () {}, 
             child: Container(
               color: Colors.black,
               child: isInitialized
@@ -223,7 +237,13 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
                 ),
               ),
               const SizedBox(height: 16),
-              _buildInteractionButton(Icons.comment_rounded, widget.videoItem.commentCount.toString()),
+              GestureDetector(
+                onTap: _openCommentsOverlay,
+                child: _buildInteractionButton(
+                  Icons.comment_rounded, 
+                  _commentCountLocal.toString()
+                ),
+              ),
               const SizedBox(height: 16),
               _buildInteractionButton(Icons.share_rounded, widget.videoItem.shareCount.toString()),
             ],
@@ -260,7 +280,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
                 ),
               ),
               const SizedBox(height: 12),
-              // Technical Ecosystem Footer
               Text(
                 'powered by zetra lab',
                 style: TextStyle(
@@ -349,6 +368,256 @@ class DecorateBackgroundGradient extends StatelessWidget {
             stops: const [0.0, 0.2, 0.6, 0.85, 1.0],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Isolated performance-tuned real-time comment layout structure.
+/// Eliminates video rendering jitter by keeping text canvas mutation vectors contextual.
+class _CommentsBottomSheet extends StatefulWidget {
+  final String videoId;
+  final VoidCallback onCommentAdded;
+
+  const _CommentsBottomSheet({
+    required this.videoId,
+    required this.onCommentAdded,
+  });
+
+  @override
+  State<_CommentsBottomSheet> createState() => _CommentsBottomSheetState();
+}
+
+class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
+  final TextEditingController _commentTextController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _commentTextController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitComment() async {
+    final text = _commentTextController.text.trim();
+    if (text.isEmpty || _isSubmitting) return;
+
+    setState(() => _isSubmitting = true);
+    _commentTextController.clear();
+    FocusScope.of(context).unfocus();
+
+    // Notify parent instantaneously for optimistic feedback metrics updates
+    widget.onCommentAdded();
+
+    final commentDocRef = FirebaseFirestore.instance
+        .collection('videos')
+        .doc(widget.videoId)
+        .collection('comments')
+        .doc();
+
+    final videoDocRef = FirebaseFirestore.instance
+        .collection('videos')
+        .doc(widget.videoId);
+
+    final WriteBatch batch = FirebaseFirestore.instance.batch();
+
+    batch.set(commentDocRef, {
+      'id': commentDocRef.id,
+      'username': 'nigergram_user', // Will map to authentic user session configurations
+      'profileImageUrl': '',
+      'commentText': text,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+
+    batch.update(videoDocRef, {
+      'commentCount': FieldValue.increment(1),
+    });
+
+    try {
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Zetra Comment Engine Batch committing failure: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    
+    return Container(
+      height: mediaQuery.size.height * 0.65,
+      decoration: const BoxDecoration(
+        color: Color(0xFF121212),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // Drag Notch / Top Title Layer
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8.0),
+            child: Text(
+              'Comments',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const Divider(color: Colors.white10, height: 1),
+
+          // Stream Pipeline Container
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('videos')
+                  .doc(widget.videoId)
+                  .collection('comments')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(
+                    child: Text('Error loading comments', style: TextStyle(color: Colors.white38)),
+                  );
+                }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFFF0050), strokeWidth: 2),
+                  );
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No comments yet. Start the conversation.',
+                      style: TextStyle(color: Colors.white38, fontSize: 13),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data() as Map<String, dynamic>;
+                    final username = data['username'] ?? 'user';
+                    final commentText = data['commentText'] ?? '';
+                    final profileUrl = data['profileImageUrl'] ?? '';
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.white12,
+                            backgroundImage: profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                            child: profileUrl.isEmpty ? const Icon(Icons.person, size: 16, color: Colors.white60) : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '@$username',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.5),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  commentText,
+                                  style: const TextStyle(
+                                    color: Colors.whitee,
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    height: 1.25,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+
+          const Divider(color: Colors.white10, height: 1),
+
+          // Secure Input Field Dock with Dynamic Keyboard Safety Margins
+          Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 10,
+              bottom: mediaQuery.viewInsets.bottom + 12,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TextField(
+                      controller: _commentTextController,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      maxLines: null,
+                      decoration: const InputDecoration(
+                        hintText: 'Add comment...',
+                        hintStyle: TextStyle(color: Colors.white38, fontSize: 14),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: _submitComment,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF0050),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_upward_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
