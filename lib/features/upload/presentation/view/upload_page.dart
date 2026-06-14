@@ -169,15 +169,18 @@ class _UploadPageState extends State<UploadPage> {
       await _ensureSupabaseSession();
       setState(() => _uploadProgress = 0.15);
 
-      // In institutional production, the primary master video asset dictates the baseline stream composition container
-      final primaryAsset = _mediaTimeline.firstWhere((element) => element.type == AssetType.video, 
+      // In institutional production, the primary master asset dictates the baseline stream composition container
+      final primaryAsset = _mediaTimeline.firstWhere(
+        (element) => element.type == AssetType.video, 
         orElse: () => _mediaTimeline.first
       );
 
       File finalUploadPayloadFile = File(primaryAsset.path);
+      File? thumbnailFile;
 
-      // 1. Process and compress raw input frames via background hardware acceleration blocks
+      // 1. Conditional check expression parsing branch based on concrete media track metadata definitions
       if (primaryAsset.type == AssetType.video) {
+        // Process and compress raw video input frames via hardware acceleration blocks
         final mediaInfo = await VideoCompress.compressVideo(
           primaryAsset.path,
           quality: VideoQuality.MediumQuality,
@@ -186,35 +189,42 @@ class _UploadPageState extends State<UploadPage> {
         if (mediaInfo != null && mediaInfo.file != null) {
           finalUploadPayloadFile = mediaInfo.file!;
         }
+
+        setState(() => _uploadProgress = 0.4);
+
+        // Generate a clean video preview frame thumbnail anchor asset
+        thumbnailFile = await VideoCompress.getFileThumbnail(
+          primaryAsset.path,
+          quality: 50,
+          position: -1,
+        );
+      } else {
+        // High-fidelity image sequence rendering path bypasses video engine completely to prevent null crashes
+        finalUploadPayloadFile = File(primaryAsset.path);
+        thumbnailFile = File(primaryAsset.path);
+        setState(() => _uploadProgress = 0.4);
       }
 
-      setState(() => _uploadProgress = 0.4);
-
-      // 2. Generate a clean video preview frame thumbnail anchor asset
-      final thumbnailFile = await VideoCompress.getFileThumbnail(
-        primaryAsset.path,
-        quality: 50,
-        position: -1,
-      );
-
       if (thumbnailFile == null) {
-        throw Exception('Optimization pipeline failed to process thumbnail previews.');
+        throw Exception('Optimization pipeline failed to extract preview layers.');
       }
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final videoFileName = '${user.uid}_$timestamp.mp4';
+      final fileExtension = primaryAsset.type == AssetType.video ? 'mp4' : 'jpg';
+      final videoFileName = '${user.uid}_$timestamp.$fileExtension';
       final thumbFileName = '${user.uid}_$timestamp.jpg';
       final supabase = Supabase.instance.client;
 
-      // 3. Dispatch media payload straight to object storage partitions
+      // 2. Dispatch media payload straight to object storage partitions
       await supabase.storage.from('videos').upload(
             videoFileName,
             finalUploadPayloadFile,
-            fileOptions: const FileOptions(contentType: 'video/mp4'),
+            fileOptions: FileOptions(contentType: primaryAsset.type == AssetType.video ? 'video/mp4' : 'image/jpeg'),
           );
 
       setState(() => _uploadProgress = 0.65);
 
+      // 3. Dispatch extracted or cloned preview thumbnail assets to authenticated buckets
       await supabase.storage.from('thumbnails').upload(
             thumbFileName,
             thumbnailFile,
@@ -257,6 +267,7 @@ class _UploadPageState extends State<UploadPage> {
         'studioCompositionMeta': {
           'totalAssetCount': _mediaTimeline.length,
           'hasSubtitles': _subtitleTracks.isNotEmpty,
+          'mediaType': primaryAsset.type == AssetType.video ? 'video' : 'image',
         },
         'timestamp': FieldValue.serverTimestamp(),
       });
