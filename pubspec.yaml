@@ -9,19 +9,27 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
-  # Core Backend Infrastructure (Firestore & Supabase Systems)
+  # --- RESTORED CORE ARCHITECTURE ---
+  get_it: ^7.7.0
+  flutter_bloc: ^8.1.6
+  go_router: ^14.2.0
+  fpdart: ^1.1.0
+  intl: ^0.19.0
+  flutter_cache_manager: ^3.3.2
+
+  # --- BACKEND & MEDIA ---
   firebase_core: ^3.0.0
   cloud_firestore: ^5.0.0
   firebase_auth: ^5.0.0
   supabase_flutter: ^2.5.0
-
-  # Advanced Video Processing & Hardware Playback Pipelines
   video_player: ^2.8.2
   video_compress: ^3.1.2
   image_picker: ^1.1.0
 
-  # Network Optimization & Custom Iconography Engines
+  # --- UI & OPTIMIZATION ---
   preload_page_view: ^0.2.0
   lucide_icons_flutter: ^1.0.0
 
@@ -32,5 +40,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # CRITICAL FIX: Enables the automatic localizations code generator required by l10n.yaml
-  generate: true
+  generate: true # Fixes the l10n.yaml build error
