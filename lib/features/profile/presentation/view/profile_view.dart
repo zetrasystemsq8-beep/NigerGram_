@@ -67,6 +67,247 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
     if (mounted) context.go('/login');
   }
 
+  Future<void> _updateProfileData(String newName, String newUsername, String newBio) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Sanitize input strings for production database safety
+    final cleanName = newName.trim();
+    final cleanUsername = newUsername.trim().toLowerCase();
+    final cleanBio = newBio.trim();
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'displayName': cleanName,
+        'username': cleanUsername,
+        'bio': cleanBio,
+      });
+      
+      await _loadProfile();
+    } catch (e) {
+      debugPrint('Database write failure: $e');
+      rethrow;
+    }
+  }
+
+  void _showEditProfileSheet() {
+    HapticFeedback.mediumImpact();
+    
+    final currentUsername = _userData?['username'] ?? '';
+    final currentDisplayName = _userData?['displayName'] ?? '';
+    final currentBio = _userData?['bio'] ?? '';
+
+    final nameController = TextEditingController(text: currentDisplayName);
+    final usernameController = TextEditingController(text: currentUsername);
+    final bioController = TextEditingController(text: currentBio);
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F0F11),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 20,
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Form Header Accent Handle Bar
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Edit Profile',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          // Subtle production branding badge inside operational views
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF0050).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'ZETRA LAB',
+                              style: TextStyle(
+                                color: Color(0xFFFF0050),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Name input matrix field
+                      const Text(
+                        'Name',
+                        style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: nameController,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        maxLength: 30,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                        decoration: _buildInputDecoration('Enter your display name'),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Name cannot be blank' : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Handle configuration frame
+                      const Text(
+                        'Username',
+                        style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: usernameController,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        maxLength: 20,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9._]')),
+                        ],
+                        decoration: _buildInputDecoration('Enter raw username handle'),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Username handle is mandatory';
+                          if (v.trim().length < 3) return 'Handle requires 3 or more characters';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Creator bio editor frame
+                      const Text(
+                        'Bio',
+                        style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: bioController,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        maxLines: 3,
+                        maxLength: 80,
+                        decoration: _buildInputDecoration('Tell NigerGram about yourself...'),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Safe atomic operation save layout triggers
+                      ElevatedButton(
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                if (formKey.currentState!.validate()) {
+                                  setModalState(() => isSaving = true);
+                                  HapticFeedback.mediumImpact();
+                                  try {
+                                    await _updateProfileData(
+                                      nameController.text,
+                                      usernameController.text,
+                                      bioController.text,
+                                    );
+                                    if (context.mounted) Navigator.pop(context);
+                                  } catch (e) {
+                                    setModalState(() => isSaving = false);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Failed synchronization engine routine.'),
+                                        backgroundColor: Color(0xFFFF0050),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF0050),
+                          disabledBackgroundColor: const Color(0xFFFF0050).withOpacity(0.4),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        child: isSaving
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Text(
+                                'Save Changes',
+                                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  InputDecoration _buildInputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.03),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      enabledBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Colors.white10),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Color(0xFFFF0050), width: 1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Colors.redAccent, width: 15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -209,9 +450,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                           children: [
                             Expanded(
                               child: InkWell(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                },
+                                onTap: _showEditProfileSheet,
                                 borderRadius: BorderRadius.circular(8),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 11),
@@ -254,6 +493,17 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                               ),
                             )
                           ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Master Branding Footnote Layout Component
+                        const Text(
+                          'POWERED BY ZETRA LAB',
+                          style: TextStyle(
+                            color: Colors.white10,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2.0,
+                          ),
                         ),
                       ],
                     ),
