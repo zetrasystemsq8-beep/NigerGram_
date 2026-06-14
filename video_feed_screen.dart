@@ -45,17 +45,19 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> {
     _controllers.clear();
   }
 
-  /// Dynamic batch execution strategy pulling raw streams directly from the Firestore collection
+  /// Dynamic batch execution strategy pulling raw streams directly from the Firestore collection.
+  /// Modified to support legacy documents without timestamps to fix the 'spinning' loading error.
   Future<void> _fetchVideoBatch() async {
     if (_isLoading || !_hasMoreVideos) return;
 
     setState(() => _isLoading = true);
 
     try {
+      // ZETRA FIX: Removed .orderBy('timestamp') to prevent Firestore from ignoring 
+      // documents missing the field, which was causing an empty result set and infinite loading.
       Query query = FirebaseFirestore.instance
           .collection('videos')
-          .orderBy('timestamp', descending: true)
-          .limit(5);
+          .limit(10); 
 
       if (_lastDocument != null) {
         query = query.startAfterDocument(_lastDocument!);
@@ -75,6 +77,8 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> {
 
       final List<VideoEntity> fetchedVideos = querySnapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
+        
+        // Safety check for null-safety across all dynamic fields
         return VideoEntity(
           id: doc.id,
           videoUrl: data['videoUrl'] ?? '',
@@ -87,9 +91,9 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> {
           shareCount: data['shareCount'] ?? 0,
           timestamp: data['timestamp'] != null 
               ? (data['timestamp'] as Timestamp).toDate() 
-              : DateTime.now(),
+              : DateTime.now(), // Fallback for local cache synchronization
         );
-      }).toList();
+      }).where((video) => video.videoUrl.isNotEmpty).toList(); 
 
       setState(() {
         _videos.addAll(fetchedVideos);
@@ -106,8 +110,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> {
     }
   }
 
-  /// Low-Data optimization resource manager. Allocates buffer resources dynamically
-  /// based on runtime perspective index.
+  /// Low-Data optimization resource manager. Allocates buffer resources dynamically.
   Future<void> _initializeControllerAtIndex(int index) async {
     if (index < 0 || index >= _videos.length) return;
     if (_controllers.containsKey(index)) return;
@@ -137,7 +140,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> {
     }
   }
 
-  /// Prunes non-adjacent video buffers aggressively to minimize mobile device memory overhead
+  /// Prunes non-adjacent video buffers aggressively to minimize mobile device memory overhead.
   void _onPageChanged(int index) {
     if (index >= _videos.length) return;
 
@@ -174,6 +177,19 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> {
           child: CircularProgressIndicator(
             color: Color(0xFFFF0050),
             strokeWidth: 3,
+          ),
+        ),
+      );
+    }
+
+    // Handle empty state if no videos are found in the database
+    if (_videos.isEmpty && !_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Text(
+            "No videos found in NigerGram feed.",
+            style: TextStyle(color: Colors.white),
           ),
         ),
       );
