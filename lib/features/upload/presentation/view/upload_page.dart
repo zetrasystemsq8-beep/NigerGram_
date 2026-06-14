@@ -92,44 +92,62 @@ class _UploadPageState extends State<UploadPage> {
 
       await _ensureSupabaseSession();
       
-      // Step 1: Initialize compression phase
-      setState(() => _uploadProgress = 0.15);
+      setState(() => _uploadProgress = 0.1);
 
-      // Compress the video payload locally on-device to low-data thresholds
+      // 1. Compress raw video payload
       final mediaInfo = await VideoCompress.compressVideo(
         _videoFile!.path,
         quality: VideoQuality.MediumQuality,
-        includeAudio: true,
         deleteOrigin: false,
       );
 
-      if (mediaInfo == null || mediaInfo.file == null) {
-        throw Exception('Optimization pipeline failed to process raw layout data.');
+      // 2. Generate thumbnail preview image
+      final thumbnailFile = await VideoCompress.getFileThumbnail(
+        _videoFile!.path,
+        quality: 50,
+        position: -1,
+      );
+
+      if (mediaInfo == null || mediaInfo.file == null || thumbnailFile == null) {
+        throw Exception('Optimization pipeline failed to process media assets.');
       }
 
-      final compressedFile = mediaInfo.file!;
-      setState(() => _uploadProgress = 0.4);
+      setState(() => _uploadProgress = 0.3);
 
-      final fileName = '${user.uid}_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final videoFileName = '${user.uid}_$timestamp.mp4';
+      final thumbFileName = '${user.uid}_$timestamp.jpg';
       final supabase = Supabase.instance.client;
 
-      // Transfer the streamlined asset payload directly into Supabase Storage Buckets
+      // 3. Upload Compressed Video
       await supabase.storage.from('videos').upload(
-            fileName,
-            compressedFile,
+            videoFileName,
+            mediaInfo.file!,
             fileOptions: const FileOptions(contentType: 'video/mp4'),
           );
 
+      setState(() => _uploadProgress = 0.6);
+
+      // 4. Upload Thumbnail Image
+      await supabase.storage.from('thumbnails').upload(
+            thumbFileName,
+            thumbnailFile,
+            fileOptions: const FileOptions(contentType: 'image/jpeg'),
+          );
+
       setState(() => _uploadProgress = 0.8);
-      final videoUrl = supabase.storage.from('videos').getPublicUrl(fileName);
+
+      final videoUrl = supabase.storage.from('videos').getPublicUrl(videoFileName);
+      final thumbnailUrl = supabase.storage.from('thumbnails').getPublicUrl(thumbFileName);
 
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       final username = userDoc.data()?['username'] ?? 'naija_creator';
-
       final tags = _tagController.text.split(' ').where((t) => t.startsWith('#')).toList();
 
+      // 5. Commit structured payload to Firestore
       await FirebaseFirestore.instance.collection('videos').add({
         'videoUrl': videoUrl,
+        'thumbnailUrl': thumbnailUrl,
         'description': _descriptionController.text.trim(),
         'userId': user.uid,
         'username': username,
