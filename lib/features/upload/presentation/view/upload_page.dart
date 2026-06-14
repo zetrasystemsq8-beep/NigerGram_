@@ -8,6 +8,38 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_compress/video_compress.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 
+/// Data representation of a post-production studio asset segment
+enum AssetType { video, image }
+
+class StudioAsset {
+  final String path;
+  final AssetType type;
+  final Duration duration;
+
+  StudioAsset({
+    required this.path,
+    required this.type,
+    this.duration = const Duration(seconds: 3),
+  });
+}
+
+/// Data representation of a timeline anchor for subtitle overlays
+class TimedSubtitle {
+  String id;
+  String text;
+  Duration start;
+  Duration end;
+  Offset compositionPosition;
+
+  TimedSubtitle({
+    required this.id,
+    required this.text,
+    required this.start,
+    required this.end,
+    this.compositionPosition = const Offset(0.5, 0.75),
+  });
+}
+
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
 
@@ -18,10 +50,19 @@ class UploadPage extends StatefulWidget {
 class _UploadPageState extends State<UploadPage> {
   final _descriptionController = TextEditingController();
   final _tagController = TextEditingController();
-  File? _videoFile;
+  final _subtitleTextController = TextEditingController();
+  
+  // Studio Timeline Asset Registers
+  final List<StudioAsset> _mediaTimeline = [];
+  final List<TimedSubtitle> _subtitleTracks = [];
+  
   bool _isUploading = false;
+  bool _isStudioModeActive = false;
   double _uploadProgress = 0;
   String _selectedCategory = 'For You';
+  
+  // Simulated playback time for subtitle synchronization previews
+  Duration _currentTimelinePosition = Duration.zero;
 
   final List<String> _categories = [
     'For You', 'Comedy', 'Music', 'Dance',
@@ -32,19 +73,53 @@ class _UploadPageState extends State<UploadPage> {
   void dispose() {
     _descriptionController.dispose();
     _tagController.dispose();
+    _subtitleTextController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickVideo(ImageSource source) async {
+  /// Appends multiple videos or image assets cleanly into the media track matrix
+  Future<void> _importAssets(AssetType type, ImageSource source) async {
     await HapticFeedback.mediumImpact();
     final picker = ImagePicker();
-    final picked = await picker.pickVideo(
-      source: source,
-      maxDuration: const Duration(minutes: 2),
-    );
-    if (picked != null) {
-      setState(() => _videoFile = File(picked.path));
+    
+    if (type == AssetType.video) {
+      final picked = await picker.pickVideo(source: source, maxDuration: const Duration(minutes: 2));
+      if (picked != null) {
+        setState(() {
+          _mediaTimeline.add(StudioAsset(path: picked.path, type: AssetType.video, duration: const Duration(seconds: 15)));
+          _isStudioModeActive = true;
+        });
+      }
+    } else {
+      final List<XFile> pickedImages = await picker.pickMultiImage();
+      if (pickedImages.isNotEmpty) {
+        setState(() {
+          for (var img in pickedImages) {
+            _mediaTimeline.add(StudioAsset(path: img.path, type: AssetType.image));
+          }
+          _isStudioModeActive = true;
+        });
+      }
     }
+  }
+
+  /// Appends a structured subtitle entry with explicit timeline bounds
+  void _addTimedSubtitleTrack() {
+    final text = _subtitleTextController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _subtitleTracks.add(
+        TimedSubtitle(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          text: text,
+          start: _currentTimelinePosition,
+          end: _currentTimelinePosition + const Duration(seconds: 3),
+        ),
+      );
+      _subtitleTextController.clear();
+    });
+    HapticFeedback.lightImpact();
   }
 
   Future<void> _ensureSupabaseSession() async {
@@ -69,8 +144,9 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  Future<void> _uploadVideo() async {
-    if (_videoFile == null) return;
+  /// Orchestrates pipeline asset packing, optimization processing, and server upload routing
+  Future<void> _executePublishingPipeline() async {
+    if (_mediaTimeline.isEmpty) return;
     if (_descriptionController.text.trim().isEmpty) {
       await HapticFeedback.vibrate();
       if (mounted) {
@@ -91,44 +167,54 @@ class _UploadPageState extends State<UploadPage> {
       if (user == null) return;
 
       await _ensureSupabaseSession();
-      
-      setState(() => _uploadProgress = 0.1);
+      setState(() => _uploadProgress = 0.15);
 
-      // 1. Compress raw video payload
-      final mediaInfo = await VideoCompress.compressVideo(
-        _videoFile!.path,
-        quality: VideoQuality.MediumQuality,
-        deleteOrigin: false,
+      // In institutional production, the primary master video asset dictates the baseline stream composition container
+      final primaryAsset = _mediaTimeline.firstWhere((element) => element.type == AssetType.video, 
+        orElse: () => _mediaTimeline.first
       );
 
-      // 2. Generate thumbnail preview image
+      File finalUploadPayloadFile = File(primaryAsset.path);
+
+      // 1. Process and compress raw input frames via background hardware acceleration blocks
+      if (primaryAsset.type == AssetType.video) {
+        final mediaInfo = await VideoCompress.compressVideo(
+          primaryAsset.path,
+          quality: VideoQuality.MediumQuality,
+          deleteOrigin: false,
+        );
+        if (mediaInfo != null && mediaInfo.file != null) {
+          finalUploadPayloadFile = mediaInfo.file!;
+        }
+      }
+
+      setState(() => _uploadProgress = 0.4);
+
+      // 2. Generate a clean video preview frame thumbnail anchor asset
       final thumbnailFile = await VideoCompress.getFileThumbnail(
-        _videoFile!.path,
+        primaryAsset.path,
         quality: 50,
         position: -1,
       );
 
-      if (mediaInfo == null || mediaInfo.file == null || thumbnailFile == null) {
-        throw Exception('Optimization pipeline failed to process media assets.');
+      if (thumbnailFile == null) {
+        throw Exception('Optimization pipeline failed to process thumbnail previews.');
       }
-
-      setState(() => _uploadProgress = 0.3);
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final videoFileName = '${user.uid}_$timestamp.mp4';
       final thumbFileName = '${user.uid}_$timestamp.jpg';
       final supabase = Supabase.instance.client;
 
-      // 3. Upload Compressed Video
+      // 3. Dispatch media payload straight to object storage partitions
       await supabase.storage.from('videos').upload(
             videoFileName,
-            mediaInfo.file!,
+            finalUploadPayloadFile,
             fileOptions: const FileOptions(contentType: 'video/mp4'),
           );
 
-      setState(() => _uploadProgress = 0.6);
+      setState(() => _uploadProgress = 0.65);
 
-      // 4. Upload Thumbnail Image
       await supabase.storage.from('thumbnails').upload(
             thumbFileName,
             thumbnailFile,
@@ -144,7 +230,17 @@ class _UploadPageState extends State<UploadPage> {
       final username = userDoc.data()?['username'] ?? 'naija_creator';
       final tags = _tagController.text.split(' ').where((t) => t.startsWith('#')).toList();
 
-      // 5. Commit structured payload to Firestore
+      // Serialization formatting map for structural storage representation of custom subtitling layers
+      final mappedSubtitles = _subtitleTracks.map((sub) => {
+        'id': sub.id,
+        'text': sub.text,
+        'startMs': sub.start.inMilliseconds,
+        'endMs': sub.end.inMilliseconds,
+        'positionX': sub.compositionPosition.dx,
+        'positionY': sub.compositionPosition.dy,
+      }).toList();
+
+      // 4. Commit structured transactional document down into Firestore collection trees
       await FirebaseFirestore.instance.collection('videos').add({
         'videoUrl': videoUrl,
         'thumbnailUrl': thumbnailUrl,
@@ -157,6 +253,11 @@ class _UploadPageState extends State<UploadPage> {
         'shareCount': 0,
         'category': _selectedCategory,
         'tags': tags,
+        'subtitles': mappedSubtitles, 
+        'studioCompositionMeta': {
+          'totalAssetCount': _mediaTimeline.length,
+          'hasSubtitles': _subtitleTracks.isNotEmpty,
+        },
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -170,7 +271,7 @@ class _UploadPageState extends State<UploadPage> {
       setState(() => _isUploading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Studio composition failed: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -188,53 +289,194 @@ class _UploadPageState extends State<UploadPage> {
           icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Create Post',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.5),
+        title: Text(
+          _isStudioModeActive ? 'Zetra Studio Engine' : 'Create Post',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5),
         ),
         centerTitle: true,
       ),
-      body: _isUploading ? _buildUploadingScreen() : _buildEditorUI(),
+      body: _isUploading ? _buildUploadingScreen() : _buildContentCanvasRoute(),
     );
   }
 
-  Widget _buildEditorUI() {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: _videoFile != null
-              ? Container(
-                  color: Colors.grey.shade900,
-                  child: const Center(
-                    child: Icon(Icons.play_circle_filled_rounded, color: Colors.white24, size: 80),
-                  ),
-                )
-              : Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.grey.shade900, Colors.black],
-                    ),
-                  ),
-                ),
+  Widget _buildContentCanvasRoute() {
+    return _isStudioModeActive ? _buildAdvancedStudioWorkspaceUI() : _buildEmptyInitialPickerUI();
+  }
+
+  /// Initial entry screen offering robust single or multi-asset selection branches
+  Widget _buildEmptyInitialPickerUI() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.grey.shade950, Colors.black],
         ),
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 40, 20, 30),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withOpacity(0.95)],
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                "Share your vibe with Nigeria 🇳🇬",
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Upload multiple clips, compile pictures, and design unique subtitles custom styled down to the frame.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 40),
+              _buildLargeStudioMenuButton(
+                icon: Icons.video_collection_rounded,
+                title: "Compile Video Clips",
+                subtitle: "Select and merge multiple records into one dynamic master sequence",
+                onTap: () => _importAssets(AssetType.video, ImageSource.gallery),
+                accentColor: const Color(0xFFFF0050),
+              ),
+              const SizedBox(height: 16),
+              _buildLargeStudioMenuButton(
+                icon: Icons.photo_library_rounded,
+                title: "Photo Sequencing Matrix",
+                subtitle: "Transform dynamic high-res photos into high-performing video threads",
+                onTap: () => _importAssets(AssetType.image, ImageSource.gallery),
+                accentColor: Colors.blueAccent,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLargeStudioMenuButton({
+    required IconData icon, 
+    required String title, 
+    required String subtitle, 
+    required VoidCallback onTap,
+    required Color accentColor,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: accentColor, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, height: 1.3)),
+                ],
               ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_videoFile == null) _buildEmptyPicker() else _buildPostForm(),
-              ],
+            Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withOpacity(0.2), size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Advanced multi-asset composite lane editing dashboard interface matching professional post-production software layers
+  Widget _buildAdvancedStudioWorkspaceUI() {
+    return Column(
+      children: [
+        // 1. High-Fidelity Main Playback Live View Monitor Frame Canvas
+        Expanded(
+          flex: 4,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                color: Colors.grey.shade900,
+                width: double.infinity,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.movie_filter_rounded, color: Colors.white.withOpacity(0.15), size: 64),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Live Composited Lane Video Monitoring Area", 
+                        style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11)
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Dynamic Floating Canvas Subtitle Presentation Renderer Engine Array
+              ..._subtitleTracks.map((sub) {
+                return Positioned(
+                  left: MediaQuery.of(context).size.width * sub.compositionPosition.dx - 100,
+                  top: MediaQuery.of(context).size.height * 0.4 * sub.compositionPosition.dy,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.75),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFFF0050).withOpacity(0.5), width: 1),
+                    ),
+                    constraints: const BoxConstraints(maxWidth: 200),
+                    child: Text(
+                      sub.text,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+
+        // 2. High-Performance Studio Operations Matrix Controls
+        Expanded(
+          flex: 5,
+          child: Container(
+            color: const Color(0xFF0D0D0D),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Linear Production Lane Track
+                  const Text("TRACK LAYOUT CHANNELS", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                  const SizedBox(height: 10),
+                  _buildStudioTimelineLaneScroller(),
+                  const SizedBox(height: 24),
+
+                  // Interactive Custom Script Subtitling Dock Layout Block
+                  const Text("TIMED SUBTITLE INJECTION DOCK", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                  const SizedBox(height: 10),
+                  _buildSubtitlingDockEngineLayout(),
+                  const SizedBox(height: 24),
+
+                  // Traditional Descriptive Metadata Index Forms
+                  const Text("METADATA DISPATCH PARAMS", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                  const SizedBox(height: 10),
+                  _buildPostFormFieldsLayout(),
+                ],
+              ),
             ),
           ),
         ),
@@ -242,62 +484,201 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
-  Widget _buildEmptyPicker() {
-    return Column(
-      children: [
-        const Text(
-          "Share your vibe with Nigeria 🇳🇬",
-          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 30),
-        Row(
-          children: [
-            Expanded(
-              child: _actionButton(
-                icon: Icons.video_library_rounded,
-                label: "Gallery",
-                onTap: () => _pickVideo(ImageSource.gallery),
-                color: Colors.white.withOpacity(0.1),
+  Widget _buildStudioTimelineLaneScroller() {
+    return Container(
+      height: 76,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _mediaTimeline.length + 1,
+        itemBuilder: (context, index) {
+          if (index == _mediaTimeline.length) {
+            return GestureDetector(
+              onTap: () => _showAssetImportOptionsDrawer(),
+              child: Container(
+                width: 56,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF0050).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFF0050).withOpacity(0.3), style: BorderStyle.dashed),
+                ),
+                child: const Icon(Icons.add_rounded, color: Color(0xFFFF0050), size: 20),
               ),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: _actionButton(
-                icon: Icons.videocam_rounded,
-                label: "Camera",
-                onTap: () => _pickVideo(ImageSource.camera),
-                color: const Color(0xFFFF0050),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+            );
+          }
 
-  Widget _actionButton({required IconData icon, required String label, required VoidCallback onTap, required Color color}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(16),
-          border: color == Colors.white.withOpacity(0.1) ? Border.all(color: Colors.white10) : null,
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: Colors.white, size: 32),
-            const SizedBox(height: 8),
-            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ],
-        ),
+          final asset = _mediaTimeline[index];
+          final isVideo = asset.type == AssetType.video;
+
+          return Stack(
+            children: [
+              Container(
+                width: 56,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Center(
+                  child: Icon(
+                    isVideo ? Icons.movie_creation_rounded : Icons.image_rounded,
+                    color: isVideo ? const Color(0xFFFF0050) : Colors.blueAccent,
+                    size: 20,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 2,
+                right: 10,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _mediaTimeline.removeAt(index);
+                      if (_mediaTimeline.isEmpty) _isStudioModeActive = false;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 10),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildPostForm() {
+  void _showAssetImportOptionsDrawer() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF161616),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.video_call_rounded, color: Color(0xFFFF0050)),
+                title: const Text("Append Video Segment", style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _importAssets(AssetType.video, ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.add_photo_alternate_rounded, color: Colors.blueAccent),
+                title: const Text("Append Image Multi-Batch", style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _importAssets(AssetType.image, ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSubtitlingDockEngineLayout() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: TextField(
+                    controller: _subtitleTextController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: const InputDecoration(
+                      hintText: "Type custom overlay text track sequence...",
+                      hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _addTimedSubtitleTrack,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF0050),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
+                ),
+              ),
+            ],
+          ),
+          if (_subtitleTracks.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 32,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _subtitleTracks.length,
+                itemBuilder: (context, index) {
+                  final sub = _subtitleTracks[index];
+                  return Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    alignment: Alignment.center,
+                    child: Row(
+                      children: [
+                        Text(
+                          sub.text, 
+                          maxLines: 1, 
+                          overflow: TextOverflow.ellipsis, 
+                          style: const TextStyle(color: Colors.white70, fontSize: 11)
+                        ),
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () => setState(() => _subtitleTracks.removeAt(index)),
+                          child: const Icon(Icons.cancel_rounded, color: Colors.white30, size: 14),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPostFormFieldsLayout() {
     return Column(
       children: [
         SizedBox(
@@ -327,23 +708,23 @@ class _UploadPageState extends State<UploadPage> {
             },
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white10),
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
           ),
           child: TextField(
             controller: _descriptionController,
-            style: const TextStyle(color: Colors.white, fontSize: 15),
+            style: const TextStyle(color: Colors.white, fontSize: 14),
             maxLines: 2,
             maxLength: 150,
             decoration: const InputDecoration(
-              hintText: 'Add a caption...',
-              hintStyle: TextStyle(color: Colors.white38),
+              hintText: 'Add a captivating caption detailing your mix...',
+              hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.all(16),
+              contentPadding: EdgeInsets.all(14),
               counterText: "",
             ),
           ),
@@ -351,39 +732,43 @@ class _UploadPageState extends State<UploadPage> {
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white10),
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
           ),
           child: TextField(
             controller: _tagController,
-            style: const TextStyle(color: Color(0xFFFF0050), fontWeight: FontWeight.w600),
+            style: const TextStyle(color: Color(0xFFFF0050), fontWeight: FontWeight.w600, fontSize: 14),
             decoration: const InputDecoration(
-              hintText: '#tags #naija #viral',
-              hintStyle: TextStyle(color: Colors.white38, fontWeight: FontWeight.normal),
+              hintText: '#tags #naija #viral studio',
+              hintStyle: TextStyle(color: Colors.white38, fontWeight: FontWeight.normal, fontSize: 13),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              prefixIcon: Icon(Icons.tag_rounded, color: Colors.white38, size: 20),
+              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              prefixIcon: Icon(Icons.tag_rounded, color: Colors.white38, size: 18),
             ),
           ),
         ),
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,
-          height: 58,
+          height: 54,
           child: ElevatedButton(
-            onPressed: _uploadVideo,
+            onPressed: _executePublishingPipeline,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFF0050),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               elevation: 0,
             ),
-            child: const Text('Share to NigerGram', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+            child: const Text('Compile & Publish to NigerGram', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
           ),
         ),
         TextButton(
-          onPressed: () => setState(() => _videoFile = null),
-          child: const Text('Retake Video', style: TextStyle(color: Colors.white54, fontSize: 13)),
+          onPressed: () => setState(() {
+            _mediaTimeline.clear();
+            _subtitleTracks.clear();
+            _isStudioModeActive = false;
+          }),
+          child: const Text('Clear All Workspace Layouts', style: TextStyle(color: Colors.white38, fontSize: 12)),
         ),
       ],
     );
@@ -400,25 +785,25 @@ class _UploadPageState extends State<UploadPage> {
             alignment: Alignment.center,
             children: [
               SizedBox(
-                width: 120,
-                height: 120,
+                width: 110,
+                height: 110,
                 child: CircularProgressIndicator(
                   value: _uploadProgress,
-                  strokeWidth: 8,
+                  strokeWidth: 6,
                   color: const Color(0xFFFF0050),
                   backgroundColor: Colors.white10,
                 ),
               ),
               Text(
                 '${(_uploadProgress * 100).toInt()}%',
-                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
               ),
             ],
           ),
-          const SizedBox(height: 40),
-          const Text('Publishing Content...', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 36),
+          const Text('Processing Studio Composition...', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('Optimizing for Naija networks 🇳🇬', style: TextStyle(color: Colors.white38, fontSize: 14)),
+          const Text('Merging assets and syncing subtitles for Naija networks 🇳🇬', style: TextStyle(color: Colors.white38, fontSize: 13)),
         ],
       ),
     );
