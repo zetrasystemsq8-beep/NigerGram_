@@ -42,7 +42,35 @@ class VideoFeedViewItem extends StatelessWidget {
 
         // Bottom Semantics Gradient Overlay
         Positioned.fill(
-          child: DecorateBackgroundGradient(),
+          child: const DecorateBackgroundGradient(),
+        ),
+
+        // Zetra Lab Corporate Brand Integration
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 12,
+          left: 16,
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFF0050),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'ZETRA LAB',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
         ),
 
         // Interaction Metrics Sidebar
@@ -86,10 +114,21 @@ class VideoFeedViewItem extends StatelessWidget {
                 videoItem.description,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.whiteee,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.85),
                   fontSize: 14,
                   height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Technical Ecosystem Footer
+              Text(
+                'powered by zetra lab',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.35),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.5,
                 ),
               ),
             ],
@@ -157,18 +196,18 @@ class DecorateBackgroundGradient extends StatelessWidget {
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black3c,
+              Colors.black.withOpacity(0.3),
               Colors.transparent,
               Colors.transparent,
-              Colors.black54,
-              Colors.black87,
+              Colors.black.withOpacity(0.54),
+              Colors.black.withOpacity(0.87),
             ],
-            stops: [0.0, 0.2, 0.6, 0.85, 1.0],
+            stops: const [0.0, 0.2, 0.6, 0.85, 1.0],
           ),
         ),
       ),
@@ -200,6 +239,7 @@ class _VideoDetailViewState extends State<VideoDetailView> {
 
   @override
   void dispose() {
+    _controller?.pause();
     _controller?.dispose();
     super.dispose();
   }
@@ -235,20 +275,24 @@ class _VideoDetailViewState extends State<VideoDetailView> {
             : DateTime.now(),
       );
 
+      // Low-Data Optimization Configuration Strategy
       _controller = VideoPlayerController.networkUrl(
         Uri.parse(_videoEntity!.videoUrl),
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        videoPlayerOptions: VideoPlayerOptions(
+          mixWithOthers: true,
+          allowBackgroundPlayback: false,
+        ),
       );
 
       await _controller!.initialize();
       await _controller!.setLooping(true);
-      await _controller!.play();
-
+      
       if (mounted) {
         setState(() => _isLoading = false);
+        await _controller!.play();
       }
     } catch (e) {
-      debugPrint('Withings detail tracking issue exception: $e');
+      debugPrint('Zetra Engine Network Asset pipeline failure: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
