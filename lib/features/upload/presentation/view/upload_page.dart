@@ -39,7 +39,7 @@ class _UploadPageState extends State<UploadPage> {
     final picker = ImagePicker();
     final picked = await picker.pickVideo(
       source: source,
-      maxDuration: const Duration(minutes: 3),
+      maxDuration: const Duration(minutes: 2),
     );
     if (picked != null) {
       setState(() => _videoFile = File(picked.path));
