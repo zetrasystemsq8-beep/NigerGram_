@@ -2,8 +2,10 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:video_compress/video_compress.dart';
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -87,32 +89,63 @@ class _UploadPageState extends State<UploadPage> {
       if (user == null) return;
 
       await _ensureSupabaseSession();
+      setState(() => _uploadProgress = 0.1);
 
-      setState(() => _uploadProgress = 0.2);
+      // Low-Data Optimization: Compress source stream to prevent massive bandwidth overhead
+      final mediaInfo = await VideoCompress.compressVideo(
+        _videoFile!.path,
+        quality: VideoQuality.MediumQuality,
+        deleteOrigin: false,
+        includeAudio: true,
+      );
 
-      final fileName =
-          '${user.uid}_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      File finalVideoPayload = _videoFile!;
+      if (mediaInfo != null && mediaInfo.file != null) {
+        finalVideoPayload = mediaInfo.file!;
+      }
+      setState(() => _uploadProgress = 0.3);
 
-      final supabase = Supabase.instance.client;
-
+      // Generate a clean preview layer matrix for the global feed index
+      final thumbnailFile = await VideoCompress.getFileThumbnail(
+        _videoFile!.path,
+        quality: 60,
+        position: -1,
+      );
       setState(() => _uploadProgress = 0.4);
 
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final videoFileName = '${user.uid}_$timestamp.mp4';
+      final thumbFileName = '${user.uid}_$timestamp.jpg';
+      final supabase = Supabase.instance.client;
+
+      // Upload target media file payload
       await supabase.storage.from('videos').upload(
-            fileName,
-            _videoFile!,
+            videoFileName,
+            finalVideoPayload,
             fileOptions: const FileOptions(contentType: 'video/mp4'),
           );
+      setState(() => _uploadProgress = 0.7);
 
-      setState(() => _uploadProgress = 0.8);
+      // Upload structural thumbnail payload
+      String thumbnailUrl = '';
+      if (thumbnailFile != null) {
+        await supabase.storage.from('thumbnails').upload(
+              thumbFileName,
+              thumbnailFile,
+              fileOptions: const FileOptions(contentType: 'image/jpeg'),
+            );
+        thumbnailUrl = supabase.storage.from('thumbnails').getPublicUrl(thumbFileName);
+      }
+      setState(() => _uploadProgress = 0.85);
 
-      final videoUrl =
-          supabase.storage.from('videos').getPublicUrl(fileName);
+      final videoUrl = supabase.storage.from('videos').getPublicUrl(videoFileName);
 
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .get();
       final username = userDoc.data()?['username'] ?? 'naija_creator';
+      final profilePic = userDoc.data()?['profilePicUrl'] ?? '';
 
       final tags = _tagController.text
           .split(' ')
@@ -121,10 +154,11 @@ class _UploadPageState extends State<UploadPage> {
 
       await FirebaseFirestore.instance.collection('videos').add({
         'videoUrl': videoUrl,
+        'thumbnailUrl': thumbnailUrl,
         'description': _descriptionController.text.trim(),
         'userId': user.uid,
         'username': username,
-        'profileImageUrl': '',
+        'profileImageUrl': profilePic,
         'likeCount': 0,
         'commentCount': 0,
         'shareCount': 0,
@@ -168,13 +202,29 @@ class _UploadPageState extends State<UploadPage> {
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'New Post',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
+        // Mandated Zetra Identity Branding Elements Header Anchor
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.blur_on_rounded, color: Colors.white, size: 14),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'ZETRA LAB ENGINE',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
         ),
         centerTitle: true,
       ),
@@ -194,6 +244,19 @@ class _UploadPageState extends State<UploadPage> {
                   _buildCategorySelector(),
                   const SizedBox(height: 32),
                   _buildPostButton(),
+                  const SizedBox(height: 32),
+                  // Mandated Corporate Bottom Branding Signature Anchor
+                  Center(
+                    child: Text(
+                      "make from zetra lab",
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.25),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -218,7 +281,7 @@ class _UploadPageState extends State<UploadPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Getting your content to Naija 🇳🇬',
+            'Optimizing compression assets for Naija 🇳🇬',
             style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
           ),
           const SizedBox(height: 32),
