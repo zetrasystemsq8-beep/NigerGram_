@@ -32,3 +32,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # CRITICAL FIX: Enables the automatic localizations code generator required by l10n.yaml
+  generate: true
