@@ -184,10 +184,10 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> with SingleTicker
                 ),
               ),
               const SizedBox(width: 6),
-              Text(
+              const Text(
                 'ZETRA LAB',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white60,
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.5,
@@ -373,8 +373,6 @@ class DecorateBackgroundGradient extends StatelessWidget {
   }
 }
 
-/// Isolated performance-tuned real-time comment layout structure.
-/// Eliminates video rendering jitter by keeping text canvas mutation vectors contextual.
 class _CommentsBottomSheet extends StatefulWidget {
   final String videoId;
   final VoidCallback onCommentAdded;
@@ -406,7 +404,6 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
     _commentTextController.clear();
     FocusScope.of(context).unfocus();
 
-    // Notify parent instantaneously for optimistic feedback metrics updates
     widget.onCommentAdded();
 
     final commentDocRef = FirebaseFirestore.instance
@@ -423,7 +420,7 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
 
     batch.set(commentDocRef, {
       'id': commentDocRef.id,
-      'username': 'nigergram_user', // Will map to authentic user session configurations
+      'username': 'nigergram_user',
       'profileImageUrl': '',
       'commentText': text,
       'timestamp': FieldValue.serverTimestamp(),
@@ -456,7 +453,6 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
       ),
       child: Column(
         children: [
-          // Drag Notch / Top Title Layer
           Container(
             margin: const EdgeInsets.symmetric(vertical: 12),
             width: 40,
@@ -478,8 +474,6 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
             ),
           ),
           const Divider(color: Colors.white10, height: 1),
-
-          // Stream Pipeline Container
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -547,8 +541,7 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
                                 Text(
                                   commentText,
                                   style: const TextStyle(
-                                    color: Colors.whitee,
-                                    color: Colors.white,
+                                    color: Colors.white, // FIX: Removed duplicated "whitee" property
                                     fontSize: 14,
                                     height: 1.25,
                                   ),
@@ -564,10 +557,7 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
               },
             ),
           ),
-
           const Divider(color: Colors.white10, height: 1),
-
-          // Secure Input Field Dock with Dynamic Keyboard Safety Margins
           Padding(
             padding: EdgeInsets.only(
               left: 16,
@@ -619,146 +609,6 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Specialized individual view panel displaying an isolated video transaction context
-class VideoDetailView extends StatefulWidget {
-  final String videoId;
-
-  const VideoDetailView({super.key, required this.videoId});
-
-  @override
-  State<VideoDetailView> createState() => _VideoDetailViewState();
-}
-
-class _VideoDetailViewState extends State<VideoDetailView> {
-  VideoPlayerController? _controller;
-  VideoEntity? _videoEntity;
-  bool _isLoading = true;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeInstitutionalPayload();
-  }
-
-  @override
-  void dispose() {
-    _controller?.pause();
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  Future<void> _initializeInstitutionalPayload() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('videos')
-          .doc(widget.videoId)
-          .get();
-
-      if (!doc.exists) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-        return;
-      }
-
-      final data = doc.data()!;
-      _videoEntity = VideoEntity(
-        id: doc.id,
-        videoUrl: data['videoUrl'] ?? '',
-        thumbnailUrl: data['thumbnailUrl'] ?? '',
-        username: data['username'] ?? 'nigergram_user',
-        description: data['description'] ?? '',
-        profileImageUrl: data['profileImageUrl'] ?? '',
-        likeCount: data['likeCount'] ?? 0,
-        commentCount: data['commentCount'] ?? 0,
-        shareCount: data['shareCount'] ?? 0,
-        timestamp: data['timestamp'] != null 
-            ? (data['timestamp'] as Timestamp).toDate() 
-            : DateTime.now(),
-      );
-
-      _controller = VideoPlayerController.networkUrl(
-        Uri.parse(_videoEntity!.videoUrl),
-        videoPlayerOptions: VideoPlayerOptions(
-          mixWithOthers: true,
-          allowBackgroundPlayback: false,
-        ),
-      );
-
-      await _controller!.initialize();
-      await _controller!.setLooping(true);
-      
-      if (mounted) {
-        setState(() => _isLoading = false);
-        await _controller!.play();
-      }
-    } catch (e) {
-      debugPrint('Zetra Engine Network Asset pipeline failure: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: _buildBody(),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFFFF0050),
-          strokeWidth: 3,
-        ),
-      );
-    }
-
-    if (_hasError || _videoEntity == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.white24, size: 48),
-            const SizedBox(height: 16),
-            const Text(
-              'Video unavailable',
-              style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Go Back', style: TextStyle(color: Color(0xFFFF0050))),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return VideoFeedViewItem(
-      videoItem: _videoEntity!,
-      controller: _controller,
     );
   }
 }
