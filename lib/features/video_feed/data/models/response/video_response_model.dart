@@ -6,7 +6,7 @@ class VideoResponseModel {
   final String username;
   final String description;
   final String videoUrl;
-  final String thumbnailUrl;
+  final String? thumbnailUrl; // Made nullable since thumbnails were deleted
   final String profileImageUrl;
   final int likeCount;
   final int commentCount;
@@ -18,7 +18,7 @@ class VideoResponseModel {
     required this.username,
     required this.description,
     required this.videoUrl,
-    required this.thumbnailUrl,
+    this.thumbnailUrl, // No longer required to protect the feed pipeline
     required this.profileImageUrl,
     required this.likeCount,
     required this.commentCount,
@@ -27,7 +27,7 @@ class VideoResponseModel {
   });
 
   /// Factory constructor to safely parse incoming Firestore documents.
-  /// Includes strong type protection and defensive fallbacks to prevent crashes.
+  /// Modified defensively to ensure deleted thumbnails never stall video initialization.
   factory VideoResponseModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
     
@@ -43,10 +43,10 @@ class VideoResponseModel {
 
     return VideoResponseModel(
       id: doc.id,
-      username: data['username'] as String? ?? '',
+      username: data['username'] as String? ?? 'anonymous',
       description: data['description'] as String? ?? '',
       videoUrl: data['videoUrl'] as String? ?? '',
-      thumbnailUrl: data['thumbnailUrl'] as String? ?? '',
+      thumbnailUrl: data['thumbnailUrl'] as String?, // Passes null instead of an empty string
       profileImageUrl: data['profileImageUrl'] as String? ?? '',
       likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
       commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
@@ -62,7 +62,7 @@ class VideoResponseModel {
       username: username,
       description: description,
       videoUrl: videoUrl,
-      thumbnailUrl: thumbnailUrl,
+      thumbnailUrl: thumbnailUrl, // Pass the nullable type down safely
       profileImageUrl: profileImageUrl,
       likeCount: likeCount,
       commentCount: commentCount,
