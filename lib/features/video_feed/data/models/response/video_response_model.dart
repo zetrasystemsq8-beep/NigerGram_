@@ -6,7 +6,6 @@ class VideoResponseModel {
   final String username;
   final String description;
   final String videoUrl;
-  final String? thumbnailUrl; // Made nullable since thumbnails were deleted
   final String profileImageUrl;
   final int likeCount;
   final int commentCount;
@@ -18,7 +17,6 @@ class VideoResponseModel {
     required this.username,
     required this.description,
     required this.videoUrl,
-    this.thumbnailUrl, // No longer required to protect the feed pipeline
     required this.profileImageUrl,
     required this.likeCount,
     required this.commentCount,
@@ -26,27 +24,19 @@ class VideoResponseModel {
     required this.timestamp,
   });
 
-  /// Factory constructor to safely parse incoming Firestore documents.
-  /// Modified defensively to ensure deleted thumbnails never stall video initialization.
-  factory VideoResponseModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
-    
-    // Safely handle Firestore Timestamp mappings
+  factory VideoResponseModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+
     DateTime parsedDate = DateTime.now();
-    if (data['timestamp'] != null) {
-      if (data['timestamp'] is Timestamp) {
-        parsedDate = (data['timestamp'] as Timestamp).toDate();
-      } else if (data['timestamp'] is String) {
-        parsedDate = DateTime.tryParse(data['timestamp'] as String) ?? DateTime.now();
-      }
+    if (data['timestamp'] != null && data['timestamp'] is Timestamp) {
+      parsedDate = (data['timestamp'] as Timestamp).toDate();
     }
 
     return VideoResponseModel(
       id: doc.id,
-      username: data['username'] as String? ?? 'anonymous',
+      username: data['username'] as String? ?? '',
       description: data['description'] as String? ?? '',
       videoUrl: data['videoUrl'] as String? ?? '',
-      thumbnailUrl: data['thumbnailUrl'] as String?, // Passes null instead of an empty string
       profileImageUrl: data['profileImageUrl'] as String? ?? '',
       likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
       commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
@@ -55,14 +45,12 @@ class VideoResponseModel {
     );
   }
 
-  /// Transforms the Data Layer Model into the Domain Layer Entity.
   VideoEntity toEntity() {
     return VideoEntity(
       id: id,
       username: username,
       description: description,
       videoUrl: videoUrl,
-      thumbnailUrl: thumbnailUrl, // Pass the nullable type down safely
       profileImageUrl: profileImageUrl,
       likeCount: likeCount,
       commentCount: commentCount,
