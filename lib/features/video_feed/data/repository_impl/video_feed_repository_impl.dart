@@ -65,9 +65,9 @@ class VideoFeedRepositoryImpl implements VideoFeedRepository {
 
       _lastDocument = snapshot.docs.last;
 
-      // The snapshot maps safely now because both components expect Map<String, dynamic>
+      // Cast the doc explicitly as DocumentSnapshot to perfectly match our updated model factory
       final List<VideoEntity> videos = snapshot.docs
-          .map<VideoEntity>((doc) => model.VideoResponseModel.fromFirestore(doc).toEntity())
+          .map<VideoEntity>((doc) => model.VideoResponseModel.fromFirestore(doc as DocumentSnapshot).toEntity())
           .toList();
 
       return Right(videos);
