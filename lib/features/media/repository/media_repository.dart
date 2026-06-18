@@ -47,7 +47,8 @@ class MediaRepository {
   /// Uploads the [file] to Supabase Storage in a single-shot upload.
   /// Fires [onProgress] callbacks with a value in [0..1]. Note: supabase_flutter
   /// does not give byte-level progress today, so this is a best-effort wrapper.
-  Future<void> uploadFile(
+  /// Returns a String representation of the upload result (object key/response).
+  Future<String> uploadFile(
     File file,
     String destinationPath, {
     void Function(double progress)? onProgress,
@@ -77,10 +78,10 @@ class MediaRepository {
               fileOptions: FileOptions(cacheControl: '3600'),
             );
 
-        // Successful upload returns a Map (or doesn't throw)
+        // Successful upload returns a result (may be String or Map). Return as String.
         onProgress?.call(1.0);
 
-        return res;
+        return res.toString();
       } catch (e) {
         if (attempt >= maxRetries) rethrow;
         // Backoff before retrying
