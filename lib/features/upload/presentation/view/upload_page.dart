@@ -4,7 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:video_compress/video_compress.dart';
+
+import 'package:nigergram/features/media/repository/media_repository.dart';
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -25,6 +26,8 @@ class _UploadPageState extends State<UploadPage> {
     'For You', 'Comedy', 'Music', 'Dance',
     'Skit', 'News', 'Sports', 'Fashion', 'Food'
   ];
+
+  final MediaRepository _mediaRepository = MediaRepository();
 
   @override
   void dispose() {
@@ -90,31 +93,28 @@ class _UploadPageState extends State<UploadPage> {
       await _ensureSupabaseSession();
       setState(() => _uploadProgress = 0.1);
 
-      // Low-Data Optimization: Compress source stream to prevent massive bandwidth overhead
-      final mediaInfo = await VideoCompress.compressVideo(
-        _videoFile!.path,
-        quality: VideoQuality.MediumQuality,
-        deleteOrigin: false,
-        includeAudio: true,
-      );
-
-      File finalVideoPayload = _videoFile!;
-      if (mediaInfo != null && mediaInfo.file != null) {
-        finalVideoPayload = mediaInfo.file!;
-      }
-      setState(() => _uploadProgress = 0.4);
-
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final videoFileName = '${user.uid}_$timestamp.mp4';
       final supabase = Supabase.instance.client;
 
-      // Upload target media file payload straight to your videos bucket
-      await supabase.storage.from('videos').upload(
-            videoFileName,
-            finalVideoPayload,
-            fileOptions: const FileOptions(contentType: 'video/mp4'),
-          );
-      setState(() => _uploadProgress = 0.8);
+      // Use MediaRepository to compress on-device, upload in a single-shot, and
+      // delete the original cached file after successful upload.
+      await _mediaRepository.compressUploadAndCleanup(
+        _videoFile!,
+        videoFileName,
+        onCompressProgress: (p) {
+          // Map compress progress to 0.1 -> 0.4
+          setState(() => _uploadProgress = 0.1 + (p * 0.3));
+        },
+        onUploadProgress: (p) {
+          // Map upload progress to 0.4 -> 1.0
+          setState(() => _uploadProgress = 0.4 + (p * 0.6));
+        },
+        bucketName: 'videos',
+      );
+
+      // After successful upload, get public URL and create Firestore doc
+      setState(() => _uploadProgress = 0.9);
 
       final videoUrl = supabase.storage.from('videos').getPublicUrl(videoFileName);
 
@@ -201,6 +201,7 @@ class _UploadPageState extends State<UploadPage> {
                 letterSpacing: 1.0,
               ),
             ),
+            const SizedBox(width: 8),
           ],
         ),
         centerTitle: true,
