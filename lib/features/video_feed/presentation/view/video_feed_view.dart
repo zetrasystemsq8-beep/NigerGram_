@@ -35,7 +35,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     super.dispose();
   }
 
-  void _onPageChanged(int index) {
+  void _onPageChanged(int index, List<VideoEntity> videos) {
     if (!mounted) return;
     
     setState(() {
@@ -45,18 +45,17 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     // Notify Cubit of page change for state tracking and pagination
     context.read<VideoFeedCubit>().onPageChanged(index);
     
-    _manageControllerLifecycle(index);
+    _manageControllerLifecycle(index, videos);
   }
 
-  /// Optimizes data consumption and hardware memory by keeping only 
-  /// active and immediately adjacent video players initialized.
-  void _manageControllerLifecycle(int index) {
+  /// ✅ FIXED: Added videos parameter to cleanly initialize controllers during lifecycle changes
+  void _manageControllerLifecycle(int index, List<VideoEntity> videos) {
     // Play current focused item
-    _getOrCreateController(index)?.play();
+    _getOrCreateController(index, videos)?.play();
 
     // Pause adjacent buffers
-    _getOrCreateController(index - 1)?.pause();
-    _getOrCreateController(index + 1)?.pause();
+    _getOrCreateController(index - 1, videos)?.pause();
+    _getOrCreateController(index + 1, videos)?.pause();
 
     // Aggressively dispose distant players to save cellular data and RAM
     _controllers.removeWhere((key, controller) {
@@ -210,7 +209,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
           body: PageView.builder(
             controller: _pageController,
             scrollDirection: Axis.vertical,
-            onPageChanged: _onPageChanged,
+            onPageChanged: (index) => _onPageChanged(index, state.videos),
             itemCount: state.videos.length,
             itemBuilder: (context, index) {
               final controller = _getOrCreateController(index, state.videos);
