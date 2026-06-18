@@ -1,6 +1,12 @@
 allprojects {
     repositories {
+        // ✅ PRIORITY REORDERED: Google Maven first (most reliable in CI/CD)
         google()
+        
+        // ✅ Gradle Plugin Portal as secondary for plugin dependencies
+        gradlePluginPortal()
+        
+        // ✅ Maven Central as tertiary fallback
         mavenCentral()
     }
 }
