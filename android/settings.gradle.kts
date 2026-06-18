@@ -10,9 +10,14 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
+        // ✅ PRIORITY REORDERED: Google Maven first to resolve Kotlin stdlib 2.0.20
         google()
-        mavenCentral()
+        
+        // ✅ Gradle Plugin Portal as secondary source for dev.flutter.flutter-plugin-loader
         gradlePluginPortal()
+        
+        // ✅ Maven Central as fallback (may have 403 issues in CI/CD, but other sources now handle it)
+        mavenCentral()
     }
 }
 
