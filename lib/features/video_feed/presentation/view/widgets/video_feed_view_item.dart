@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:video_player/video_player.dart';
@@ -101,6 +100,7 @@ class VideoFeedViewItem extends StatelessWidget {
     );
   }
 
+  /// ✅ FIXED: Complete profile icon widget with proper CircleAvatar
   Widget _buildProfileIcon(String url) {
     return Stack(
       alignment: Alignment.bottomCenter,
@@ -111,4 +111,75 @@ class VideoFeedViewItem extends StatelessWidget {
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white, width: 1.5),
           ),
-          child: CircleA
+          child: CircleAvatar(
+            radius: 22,
+            backgroundColor: Colors.grey[900],
+            backgroundImage: url.isNotEmpty ? NetworkImage(url) : null,
+            child: url.isEmpty ? const Icon(Icons.person_rounded, color: Colors.white54) : null,
+          ),
+        ),
+        Positioned(
+          bottom: -6,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFFFF0050),
+              shape: BoxShape.circle,
+            ),
+            padding: const EdgeInsets.all(2),
+            child: const Icon(Icons.add_rounded, color: Colors.white, size: 14),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// ✅ FIXED: Complete interaction button widget with proper Column structure
+  Widget _buildInteractionButton(
+    IconData icon,
+    String countingLabel, {
+    Color color = Colors.white,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 36),
+        const SizedBox(height: 4),
+        Text(
+          countingLabel,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// ✅ Background gradient overlay
+class _DecorateBackgroundGradient extends StatelessWidget {
+  const _DecorateBackgroundGradient();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black54,
+              Colors.transparent,
+              Colors.transparent,
+              Colors.black54,
+              Colors.black87,
+            ],
+            stops: [0.0, 0.2, 0.6, 0.85, 1.0],
+          ),
+        ),
+      ),
+    );
+  }
+}
