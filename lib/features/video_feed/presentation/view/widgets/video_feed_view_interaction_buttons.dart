@@ -3,7 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/features/video_feed/repository/interaction_repository.dart';
+import 'package:nigergram/features/video_feed/presentation/view/widgets/comments_viewer_bottom_sheet.dart';
 
 /// Interaction stack that now handles optimistic likes and comments via Firestore.
 class VideoFeedViewInteractionButtons extends StatefulWidget {
@@ -82,53 +84,20 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
       return;
     }
 
-    final textController = TextEditingController();
-
-    final result = await showModalBottomSheet<bool?>(
+    // Open the real-time comments bottom sheet (it handles posting & optimistic UI itself)
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: textController,
-                  maxLines: 4,
-                  decoration: const InputDecoration(hintText: 'Write a comment...'),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(ctx).pop(true),
-                  child: const Text('Post Comment'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (ctx) => CommentsViewerBottomSheet(videoId: widget.videoId),
     );
 
-    if (result != true) return; // cancelled
-
-    final commentText = textController.text.trim();
-    if (commentText.isEmpty) return;
-
-    // Optimistic update
-    setState(() {
-      _commentCount += 1;
-    });
-
+    // After the sheet closes, refresh commentCount from Firestore to keep badge in sync.
     try {
-      final username = user.displayName ?? user.email?.split('@').first ?? 'user';
-      await _repo.addComment(widget.videoId, user.uid, username, commentText);
-    } catch (e) {
-      // revert
-      setState(() => _commentCount -= 1);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to post comment: $e')));
+      final doc = await FirebaseFirestore.instance.collection('videos').doc(widget.videoId).get();
+      final newCount = (doc.data()?['commentCount'] as num?)?.toInt() ?? _commentCount;
+      setState(() => _commentCount = newCount);
+    } catch (_) {
+      // ignore refresh errors - keep existing count
     }
   }
 
