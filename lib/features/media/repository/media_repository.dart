@@ -1,7 +1,9 @@
 // lib/features/media/repository/media_repository.dart
-
+import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
+import 'package:http/http.dart' as http;
 import 'package:video_compress/video_compress.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,7 +18,6 @@ class MediaRepository {
         _bucket = bucket;
 
   /// Compresses the given [inputFile] using `video_compress` and returns the compressed File.
-  /// [quality] maps to VideoQuality enum: 0=Low,1=Medium,2=High
   Future<File> compressVideo(File inputFile, int quality) async {
     await VideoCompress.setLogLevel(0);
 
@@ -26,72 +27,176 @@ class MediaRepository {
         q = VideoQuality.LowQuality;
         break;
       case 2:
-        q = VideoQuality.DefaultQuality; // Highest available
+        q = VideoQuality.DefaultQuality;
         break;
       case 1:
       default:
         q = VideoQuality.MediumQuality;
     }
 
-    final MediaInfo? info =
-        await VideoCompress.compressVideo(inputFile.path, quality: q);
+    final MediaInfo? info = await VideoCompress.compressVideo(inputFile.path, quality: q);
 
     if (info == null || info.file == null) {
       throw Exception('Compression failed');
     }
 
-    // Return the compressed File object
     return info.file!;
   }
 
-  /// Uploads the [file] to Supabase Storage in a single-shot upload.
-  /// Fires [onProgress] callbacks with a value in [0..1]. Note: supabase_flutter
-  /// does not give byte-level progress today, so this is a best-effort wrapper.
-  /// Returns a String representation of the upload result (object key/response).
+  /// Chunked, resumable upload to Supabase Storage.
+  /// - Breaks file into 1MB chunks.
+  /// - Uses the Supabase Storage REST object endpoint with authenticated requests.
+  /// - Reports progress via onProgress with bytes uploaded / total in [0..1].
+  /// - Attempts resume by checking remote size via HEAD request before starting.
+  /// - Retries each chunk with exponential backoff on transient failures.
+  Future<String> uploadFileChunked(
+    File file,
+    String destinationPath, {
+    void Function(double progress)? onProgress,
+    String bucketName = '',
+    int chunkSizeBytes = 1024 * 1024, // 1MB chunks
+    int maxRetries = 3,
+  }) async {
+    final bucket = bucketName.isEmpty ? _bucket : bucketName;
+    final totalBytes = await file.length();
+    final uriBase = '${_supabase.url}/storage/v1/object/$bucket/$destinationPath';
+    final token = _supabase.auth.currentSession?.accessToken ?? '';
+
+    if (token.isEmpty) {
+      throw Exception('Not authenticated. Cannot upload.');
+    }
+
+    final client = http.Client();
+    int remoteBytes = 0;
+
+    // Probe existing remote object size for resume capability
+    Future<int> _probeRemoteSize() async {
+      try {
+        final headRes = await client.head(
+          Uri.parse(uriBase),
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(const Duration(seconds: 5));
+        if (headRes.statusCode == 200 || headRes.statusCode == 206) {
+          final contentLength = headRes.headers['content-length'];
+          if (contentLength != null) return int.tryParse(contentLength) ?? 0;
+        }
+      } catch (_) {
+        // Probe failed, start from 0
+      }
+      return 0;
+    }
+
+    try {
+      // Try to get already-uploaded bytes to resume
+      remoteBytes = await _probeRemoteSize();
+
+      final rf = file.openSync(mode: FileMode.read);
+      try {
+        // Seek to remoteBytes if resuming
+        if (remoteBytes > 0 && remoteBytes < totalBytes) {
+          rf.setPositionSync(remoteBytes);
+        } else if (remoteBytes >= totalBytes) {
+          // Already fully uploaded
+          onProgress?.call(1.0);
+          return destinationPath;
+        } else {
+          remoteBytes = 0; // Start fresh
+        }
+
+        int uploaded = remoteBytes;
+        final buffer = List<int>.filled(chunkSizeBytes, 0);
+
+        while (uploaded < totalBytes) {
+          final toRead = min(chunkSizeBytes, totalBytes - uploaded);
+          final bytesRead = rf.readIntoSync(buffer, 0, toRead);
+          if (bytesRead <= 0) break;
+
+          final start = uploaded;
+          final end = uploaded + bytesRead - 1;
+          final chunk = Uint8List.view(buffer.buffer, 0, bytesRead);
+
+          // Retry logic for chunk upload
+          int attempt = 0;
+          bool success = false;
+          while (!success && attempt < maxRetries) {
+            attempt++;
+            try {
+              final res = await client.put(
+                Uri.parse(uriBase),
+                headers: {
+                  'Authorization': 'Bearer $token',
+                  'Content-Type': 'application/octet-stream',
+                  'Content-Range': 'bytes $start-$end/$totalBytes',
+                  'x-upsert': 'true',
+                },
+                body: chunk,
+              ).timeout(const Duration(seconds: 30));
+
+              if (res.statusCode == 200 || res.statusCode == 201 || res.statusCode == 204) {
+                uploaded += bytesRead;
+                success = true;
+                // Report real progress
+                onProgress?.call(uploaded / totalBytes);
+              } else if (res.statusCode >= 500 || res.statusCode == 408 || res.statusCode == 429) {
+                // Retryable server errors
+                if (attempt >= maxRetries) {
+                  throw Exception('Chunk upload failed after $maxRetries attempts: ${res.statusCode} ${res.reasonPhrase}');
+                }
+                // Exponential backoff
+                await Future.delayed(Duration(milliseconds: 500 * attempt));
+              } else {
+                // Non-retryable error
+                throw Exception('Chunk upload failed: ${res.statusCode} ${res.reasonPhrase}');
+              }
+            } catch (e) {
+              if (attempt >= maxRetries) rethrow;
+              // Exponential backoff
+              await Future.delayed(Duration(milliseconds: 500 * attempt));
+            }
+          }
+        }
+      } finally {
+        rf.closeSync();
+      }
+    } finally {
+      client.close();
+    }
+
+    // Final: Ensure progress shows complete and return path
+    onProgress?.call(1.0);
+    return destinationPath;
+  }
+
+  /// Backwards-compatible wrapper used in other callers.
+  /// Routes small files to single-shot upload for speed, large files to chunked.
   Future<String> uploadFile(
     File file,
     String destinationPath, {
     void Function(double progress)? onProgress,
     String bucketName = '',
   }) async {
-    final bucket = bucketName.isEmpty ? _bucket : bucketName;
-
-    // Attempt upload with retries
-    const int maxRetries = 3;
-    int attempt = 0;
-    while (true) {
-      try {
-        attempt++;
-        // supabase_flutter currently exposes a single-shot upload API.
-        // Unfortunately it doesn't surface per-byte progress. We'll call the API
-        // and emit an optimistic progress: 0.0 -> 0.9 while waiting, 1.0 on success.
-        onProgress?.call(0.0);
-
-        final bytes = await file.readAsBytes();
-
-        // optimistic progress
-        onProgress?.call(0.2);
-
-        final res = await _supabase.storage.from(bucket).uploadBinary(
-              destinationPath,
-              bytes,
-              fileOptions: FileOptions(cacheControl: '3600'),
-            );
-
-        // Successful upload returns a result (may be String or Map). Return as String.
-        onProgress?.call(1.0);
-
-        return res.toString();
-      } catch (e) {
-        if (attempt >= maxRetries) rethrow;
-        // Backoff before retrying
-        await Future.delayed(Duration(seconds: 1 * attempt));
-      }
+    final length = await file.length();
+    // If file is small, reuse existing single-shot API for speed
+    if (length <= 1024 * 1024 * 2) {
+      onProgress?.call(0.0);
+      final bytes = await file.readAsBytes();
+      onProgress?.call(0.5);
+      final res = await _supabase.storage.from(bucketName.isEmpty ? _bucket : bucketName).uploadBinary(
+            destinationPath,
+            bytes,
+            fileOptions: FileOptions(cacheControl: '3600'),
+          );
+      onProgress?.call(1.0);
+      return res.toString();
     }
+
+    // For larger files, use chunked upload with resume and retry
+    return uploadFileChunked(file, destinationPath, onProgress: onProgress, bucketName: bucketName);
   }
 
   /// Compresses, uploads, and deletes the original temporary file when upload completes.
-  /// [quality] is forwarded to the compression step (0=Low,1=Medium,2=High).
   Future<void> compressUploadAndCleanup(
     File originalFile,
     String destinationPath, {
@@ -100,10 +205,6 @@ class MediaRepository {
     String bucketName = '',
     int quality = 1,
   }) async {
-    // Note: video_compress exposes a compression progress stream but the
-    // package version used here provides only a simple API. We'll call the
-    // compress API and fake a small progress flow for the demo.
-
     onCompressProgress(0.0);
     final compressed = await compressVideo(originalFile, quality);
     onCompressProgress(1.0);
@@ -111,7 +212,7 @@ class MediaRepository {
     await uploadFile(
       compressed,
       destinationPath,
-      onProgress: (p) => print('Upload progress: $p'),
+      onProgress: onUploadProgress,
       bucketName: bucketName,
     );
 

@@ -1,6 +1,8 @@
+// lib/features/video_feed/presentation/view/widgets/video_feed_view_item.dart
 import 'package:flutter/material.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:video_player/video_player.dart';
+import 'video_feed_view_optimized_video_player.dart';
 
 class VideoFeedViewItem extends StatelessWidget {
   final VideoEntity videoItem;
@@ -14,31 +16,16 @@ class VideoFeedViewItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isInitialized = controller != null && controller!.value.isInitialized;
-
+    // Use the optimized player widget which contains the GestureDetector and overlay
     return Stack(
       children: [
         Positioned.fill(
-          child: Container(
-            color: Colors.black,
-            child: isInitialized
-                ? Center(
-                    child: AspectRatio(
-                      aspectRatio: controller!.value.aspectRatio,
-                      child: VideoPlayer(controller!),
-                    ),
-                  )
-                : const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.white24,
-                      strokeWidth: 2,
-                    ),
-                  ),
+          child: VideoFeedViewOptimizedVideoPlayer(
+            controller: controller,
+            videoId: videoItem.id,
           ),
         ),
-        Positioned.fill(
-          child: const _DecorateBackgroundGradient(),
-        ),
+        const Positioned.fill(child: _DecorateBackgroundGradient()),
         Positioned(
           bottom: 100,
           right: 12,
@@ -100,7 +87,6 @@ class VideoFeedViewItem extends StatelessWidget {
     );
   }
 
-  /// ✅ FIXED: Complete profile icon widget with proper CircleAvatar
   Widget _buildProfileIcon(String url) {
     return Stack(
       alignment: Alignment.bottomCenter,
@@ -133,7 +119,6 @@ class VideoFeedViewItem extends StatelessWidget {
     );
   }
 
-  /// ✅ FIXED: Complete interaction button widget with proper Column structure
   Widget _buildInteractionButton(
     IconData icon,
     String countingLabel, {
@@ -157,7 +142,6 @@ class VideoFeedViewItem extends StatelessWidget {
   }
 }
 
-/// ✅ Background gradient overlay
 class _DecorateBackgroundGradient extends StatelessWidget {
   const _DecorateBackgroundGradient();
 
