@@ -29,6 +29,8 @@ class _UploadPageState extends State<UploadPage> {
 
   final MediaRepository _mediaRepository = MediaRepository();
 
+  double _qualitySlider = 1.0; // 0=Low,1=Medium,2=High
+
   @override
   void dispose() {
     _descriptionController.dispose();
@@ -91,30 +93,37 @@ class _UploadPageState extends State<UploadPage> {
       if (user == null) return;
 
       await _ensureSupabaseSession();
-      setState(() => _uploadProgress = 0.1);
+      setState(() => _uploadProgress = 0.05);
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final videoFileName = '${user.uid}_$timestamp.mp4';
       final supabase = Supabase.instance.client;
 
+      // Show an immediate snackbar so testers can see compression started
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Compression started — Media Engine ACTIVE'),
+        duration: Duration(seconds: 2),
+      ));
+
       // Use MediaRepository to compress on-device, upload in a single-shot, and
-      // delete the original cached file after successful upload.
+      // delete the original cached file after successful upload. Pass chosen quality.
       await _mediaRepository.compressUploadAndCleanup(
         _videoFile!,
         videoFileName,
         onCompressProgress: (p) {
-          // Map compress progress to 0.1 -> 0.4
-          setState(() => _uploadProgress = 0.1 + (p * 0.3));
+          // Map compress progress to 0.05 -> 0.35
+          setState(() => _uploadProgress = 0.05 + (p * 0.3));
         },
         onUploadProgress: (p) {
-          // Map upload progress to 0.4 -> 1.0
-          setState(() => _uploadProgress = 0.4 + (p * 0.6));
+          // Map upload progress to 0.35 -> 1.0
+          setState(() => _uploadProgress = 0.35 + (p * 0.65));
         },
         bucketName: 'videos',
+        quality: _qualitySlider.toInt(),
       );
 
       // After successful upload, get public URL and create Firestore doc
-      setState(() => _uploadProgress = 0.9);
+      setState(() => _uploadProgress = 0.95);
 
       final videoUrl = supabase.storage.from('videos').getPublicUrl(videoFileName);
 
@@ -213,8 +222,34 @@ class _UploadPageState extends State<UploadPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Small active banner so it's obvious this build contains the new media engine
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade900,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Media Engine: ACTIVE — Compression & fast upload enabled',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                   _buildVideoSelector(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+                  // Compression quality slider (production UI)
+                  Text('Compression quality', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  Slider(
+                    value: _qualitySlider,
+                    min: 0,
+                    max: 2,
+                    divisions: 2,
+                    label: _qualityLabel(_qualitySlider.toInt()),
+                    onChanged: (v) => setState(() => _qualitySlider = v),
+                  ),
+                  const SizedBox(height: 12),
                   _buildDescriptionField(),
                   const SizedBox(height: 16),
                   _buildTagsField(),
@@ -535,5 +570,16 @@ class _UploadPageState extends State<UploadPage> {
         ),
       ),
     );
+  }
+
+  String _qualityLabel(int q) {
+    switch (q) {
+      case 0:
+        return 'Low';
+      case 2:
+        return 'High';
+      default:
+        return 'Medium';
+    }
   }
 }

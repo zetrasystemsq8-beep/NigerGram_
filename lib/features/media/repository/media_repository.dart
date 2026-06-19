@@ -91,19 +91,21 @@ class MediaRepository {
   }
 
   /// Compresses, uploads, and deletes the original temporary file when upload completes.
+  /// [quality] is forwarded to the compression step (0=Low,1=Medium,2=High).
   Future<void> compressUploadAndCleanup(
     File originalFile,
     String destinationPath, {
     required void Function(double compressProgress) onCompressProgress,
     required void Function(double uploadProgress) onUploadProgress,
     String bucketName = '',
+    int quality = 1,
   }) async {
     // Note: video_compress exposes a compression progress stream but the
     // package version used here provides only a simple API. We'll call the
     // compress API and fake a small progress flow for the demo.
 
     onCompressProgress(0.0);
-    final compressed = await compressVideo(originalFile, 1);
+    final compressed = await compressVideo(originalFile, quality);
     onCompressProgress(1.0);
 
     await uploadFile(compressed, destinationPath,
