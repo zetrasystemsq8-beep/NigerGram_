@@ -60,8 +60,32 @@ class MediaRepository {
   }) async {
     final bucket = bucketName.isEmpty ? _bucket : bucketName;
     final totalBytes = await file.length();
-    // Use the Supabase client's URL getter. Different versions expose `url`.
-    final uriBase = '${_supabase.url}/storage/v1/object/$bucket/$destinationPath';
+
+    // Resolve base URL from client dynamically to be compatible across SDK versions
+    final dynamic supabaseDyn = _supabase as dynamic;
+    String? baseUrl;
+    try {
+      baseUrl = supabaseDyn.supabaseUrl as String?;
+    } catch (_) {}
+    try {
+      baseUrl ??= supabaseDyn.url as String?;
+    } catch (_) {}
+    try {
+      baseUrl ??= supabaseDyn.apiUrl as String?;
+    } catch (_) {}
+
+    if (baseUrl == null || baseUrl.isEmpty) {
+      // As a last resort, attempt to read from environment-like fields
+      try {
+        baseUrl = (supabaseDyn as dynamic).options?.url as String?;
+      } catch (_) {}
+    }
+
+    if (baseUrl == null || baseUrl.isEmpty) {
+      throw Exception('Unable to resolve Supabase base URL from SupabaseClient.');
+    }
+
+    final uriBase = '$baseUrl/storage/v1/object/$bucket/$destinationPath';
     final token = _supabase.auth.currentSession?.accessToken ?? '';
 
     if (token.isEmpty) {
