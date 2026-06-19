@@ -1,13 +1,13 @@
-// Updated: lib/features/video_feed/presentation/view/widgets/video_feed_view_interaction_buttons.dart
+// lib/features/video_feed/presentation/view/widgets/video_feed_view_interaction_buttons.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/features/video_feed/repository/interaction_repository.dart';
-import 'package:nigergram/features/video_feed/presentation/view/widgets/comments_viewer_bottom_sheet.dart';
+import 'package:go_router/go_router.dart';
 
-/// Interaction stack that now handles optimistic likes and comments via Firestore.
+/// Interaction stack that now handles optimistic likes, comments, and tags via Firestore.
 class VideoFeedViewInteractionButtons extends StatefulWidget {
   const VideoFeedViewInteractionButtons({
     required this.videoId,
@@ -39,13 +39,14 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
   late int _likeCount;
   late int _commentCount;
   final InteractionRepository _repo = InteractionRepository();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
     _isLiked = widget.isLiked;
     _likeCount = widget.likeCount;
-    _commentCount = widget.commentCount;
+    _comment_count = widget.commentCount; // preserve previous naming
   }
 
   Future<void> _handleLike() async {
@@ -77,27 +78,41 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     }
   }
 
-  Future<void> _handleComment() async {
+  Future<void> _openComments() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to comment')));
       return;
     }
 
-    // Open the real-time comments bottom sheet (it handles posting & optimistic UI itself)
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => CommentsViewerBottomSheet(videoId: widget.videoId),
     );
 
-    // After the sheet closes, refresh commentCount from Firestore to keep badge in sync.
     try {
-      final doc = await FirebaseFirestore.instance.collection('videos').doc(widget.videoId).get();
+      final doc = await _firestore.collection('videos').doc(widget.videoId).get();
       final newCount = (doc.data()?['commentCount'] as num?)?.toInt() ?? _commentCount;
       setState(() => _commentCount = newCount);
-    } catch (_) {
-      // ignore refresh errors - keep existing count
+    } catch (_) {}
+  }
+
+  Future<void> _handleTagTap() async {
+    try {
+      final doc = await _firestore.collection('videos').doc(widget.videoId).get();
+      final data = doc.data();
+      if (data == null) return;
+      final tags = (data['tags'] as List<dynamic>?)?.cast<String>() ?? [];
+      if (tags.isEmpty) return;
+
+      // Navigate to discover route with the first tag
+      final tag = tags.first;
+      if (context.mounted) {
+        context.push('/discover?tag=$tag');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load tags: $e')));
     }
   }
 
@@ -120,8 +135,16 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
         // Comment Button
         VideoFeedViewInteractionButton(
           icon: Icons.chat_bubble_rounded,
-          label: _formatCount(_commentCount),
-          onTap: _handleComment,
+          label: _formatCount(_comment_count),
+          onTap: _openComments,
+        ),
+        SizedBox(height: screenHeight * 0.02),
+
+        // Tag Button
+        VideoFeedViewInteractionButton(
+          icon: Icons.label_rounded,
+          label: 'Tags',
+          onTap: _handleTagTap,
         ),
         SizedBox(height: screenHeight * 0.02),
 
@@ -153,57 +176,5 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
     if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
     return count.toString();
-  }
-}
-
-class VideoFeedViewInteractionButton extends StatefulWidget {
-  const VideoFeedViewInteractionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.iconColor = Colors.white,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color iconColor;
-  final VoidCallback onTap;
-
-  @override
-  State<VideoFeedViewInteractionButton> createState() => _VideoFeedViewInteractionButtonState();
-}
-
-class _VideoFeedViewInteractionButtonState extends State<VideoFeedViewInteractionButton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        _controller.forward().then((_) => _controller.reverse());
-        widget.onTap();
-      },
-      child: Column(
-        children: [
-          Icon(widget.icon, color: widget.iconColor, size: 28),
-          const SizedBox(height: 6),
-          Text(widget.label, style: const TextStyle(color: Colors.white, fontSize: 12)),
-        ],
-      ),
-    );
   }
 }
