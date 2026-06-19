@@ -60,7 +60,8 @@ class MediaRepository {
   }) async {
     final bucket = bucketName.isEmpty ? _bucket : bucketName;
     final totalBytes = await file.length();
-    final uriBase = '${_supabase.supabaseUrl}/storage/v1/object/$bucket/$destinationPath';
+    // Use the Supabase client's URL getter. Different versions expose `url`.
+    final uriBase = '${_supabase.url}/storage/v1/object/$bucket/$destinationPath';
     final token = _supabase.auth.currentSession?.accessToken ?? '';
 
     if (token.isEmpty) {
