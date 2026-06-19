@@ -1,3 +1,4 @@
+// lib/features/profile/presentation/view/profile_view.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -14,13 +15,16 @@ class ProfileView extends StatefulWidget {
 class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStateMixin {
   Map<String, dynamic>? _userData;
   List<QueryDocumentSnapshot> _userVideos = [];
+  List<QueryDocumentSnapshot> _privateVideos = [];
+  List<QueryDocumentSnapshot> _bookmarkedVideos = [];
+  List<QueryDocumentSnapshot> _likedVideos = [];
   bool _isLoading = true;
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadProfile();
   }
 
@@ -40,9 +44,35 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
           .doc(user.uid)
           .get();
 
+      // Load public videos
       final videosSnapshot = await FirebaseFirestore.instance
           .collection('videos')
           .where('userId', isEqualTo: user.uid)
+          .where('isPrivate', isEqualTo: false)
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      // Load private videos
+      final privateSnapshot = await FirebaseFirestore.instance
+          .collection('videos')
+          .where('userId', isEqualTo: user.uid)
+          .where('isPrivate', isEqualTo: true)
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      // Load bookmarked videos
+      final bookmarkSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('bookmarks')
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      // Load liked videos
+      final likeSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('likes')
           .orderBy('timestamp', descending: true)
           .get();
 
@@ -50,6 +80,9 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
         setState(() {
           _userData = userDoc.data();
           _userVideos = videosSnapshot.docs;
+          _privateVideos = privateSnapshot.docs;
+          _bookmarkedVideos = bookmarkSnapshot.docs;
+          _likedVideos = likeSnapshot.docs;
           _isLoading = false;
         });
       }
@@ -82,7 +115,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
         'username': cleanUsername,
         'bio': cleanBio,
       });
-      
+
       await _loadProfile();
     } catch (e) {
       debugPrint('Database write failure: $e');
@@ -92,7 +125,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
 
   void _showEditProfileSheet() {
     HapticFeedback.mediumImpact();
-    
+
     final currentUsername = _userData?['username'] ?? '';
     final currentDisplayName = _userData?['displayName'] ?? '';
     final currentBio = _userData?['bio'] ?? '';
@@ -171,7 +204,6 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                         ],
                       ),
                       const SizedBox(height: 24),
-
                       // Name input matrix field
                       const Text(
                         'Name',
@@ -187,7 +219,6 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                         validator: (v) => (v == null || v.trim().isEmpty) ? 'Name cannot be blank' : null,
                       ),
                       const SizedBox(height: 16),
-
                       // Handle configuration frame
                       const Text(
                         'Username',
@@ -210,7 +241,6 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                         },
                       ),
                       const SizedBox(height: 16),
-
                       // Creator bio editor frame
                       const Text(
                         'Bio',
@@ -225,7 +255,6 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                         decoration: _buildInputDecoration('Tell NigerGram about yourself...'),
                       ),
                       const SizedBox(height: 24),
-
                       // Safe atomic operation save layout triggers
                       ElevatedButton(
                         onPressed: isSaving
@@ -366,41 +395,64 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                     padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
                     child: Column(
                       children: [
-                        // Avatar View Layout
+                        // Avatar View Layout with edit overlay badge
                         Center(
-                          child: Container(
-                            width: 96,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFFFF0050), width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFFF0050).withOpacity(0.15),
-                                  blurRadius: 16,
-                                  spreadRadius: 2,
-                                )
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(2.0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(48),
-                                child: profilePicUrl != null
-                                    ? Image.network(
-                                        profilePicUrl, 
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) => Container(
-                                          color: Colors.grey.shade900,
-                                          child: const Icon(Icons.person_rounded, color: Colors.white38, size: 50),
-                                        ),
-                                      )
-                                    : Container(
-                                        color: Colors.grey.shade900,
-                                        child: const Icon(Icons.person_rounded, color: Colors.white38, size: 50),
-                                      ),
+                          child: Stack(
+                            children: [
+                              Container(
+                                width: 96,
+                                height: 96,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: const Color(0xFFFF0050), width: 2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFFF0050).withOpacity(0.15),
+                                      blurRadius: 16,
+                                      spreadRadius: 2,
+                                    )
+                                  ],
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(2.0),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(48),
+                                    child: profilePicUrl != null
+                                        ? Image.network(
+                                            profilePicUrl,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => Container(
+                                              color: Colors.grey.shade900,
+                                              child: const Icon(Icons.person_rounded, color: Colors.white38, size: 50),
+                                            ),
+                                          )
+                                        : Container(
+                                            color: Colors.grey.shade900,
+                                            child: const Icon(Icons.person_rounded, color: Colors.white38, size: 50),
+                                          ),
+                                  ),
+                                ),
                               ),
-                            ),
+                              // Edit badge overlay
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFFFF0050),
+                                    border: Border.all(color: Colors.black, width: 2),
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit_rounded,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -415,9 +467,34 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                             letterSpacing: -0.2,
                           ),
                         ),
+                        const SizedBox(height: 4),
+
+                        // Verification Status Badge Indicator
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF0050).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.verified_rounded, color: Color(0xFFFF0050), size: 14),
+                              SizedBox(width: 4),
+                              Text(
+                                'NigerGram Creator',
+                                style: TextStyle(
+                                  color: Color(0xFFFF0050),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 16),
 
-                        // Stats Aggregation Layout
+                        // Stats Aggregation Layout - Following, Followers, Likes
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -486,7 +563,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                                   color: Colors.white.withOpacity(0.05),
                                 ),
                                 child: const Icon(
-                                  Icons.bookmark_border_rounded, 
+                                  Icons.bookmark_border_rounded,
                                   color: Colors.white,
                                   size: 22,
                                 ),
@@ -497,7 +574,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                         const SizedBox(height: 16),
                         // Master Branding Footnote Layout Component
                         const Text(
-                          'POWERED BY ZETRA LAB',
+                          'FROM ZETRA LAB',
                           style: TextStyle(
                             color: Colors.white10,
                             fontSize: 9,
@@ -522,8 +599,10 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                       dividerColor: Colors.white10,
                       onTap: (_) => HapticFeedback.lightImpact(),
                       tabs: const [
-                        Tab(icon: Icon(Icons.grid_on_rounded, size: 20)),
-                        Tab(icon: Icon(Icons.favorite_border_rounded, size: 20)),
+                        Tab(icon: Icon(Icons.grid_on_rounded, size: 20), text: 'My Videos'),
+                        Tab(icon: Icon(Icons.lock_outline_rounded, size: 20), text: 'Private'),
+                        Tab(icon: Icon(Icons.bookmark_border_rounded, size: 20), text: 'Bookmarks'),
+                        Tab(icon: Icon(Icons.favorite_border_rounded, size: 20), text: 'Liked'),
                       ],
                     ),
                   ),
@@ -533,9 +612,9 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
             body: TabBarView(
               controller: _tabController,
               children: [
-                // Main Creator Portfolio Grid
+                // Tab 1: My Videos - 3-column layout with post thumbnails and local like counts
                 _userVideos.isEmpty
-                    ? _buildEmptyStateView()
+                    ? _buildEmptyStateView('No videos published yet', 'Your uploaded content will appear right here.')
                     : GridView.builder(
                         padding: const EdgeInsets.all(1),
                         itemCount: _userVideos.length,
@@ -548,7 +627,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                         itemBuilder: (context, index) {
                           final video = _userVideos[index].data() as Map<String, dynamic>;
                           final String? thumbnailUrl = video['thumbnailUrl'];
-                          final int views = video['views'] ?? 0;
+                          final int likes = video['likeCount'] ?? 0;
                           final String videoId = _userVideos[index].id;
 
                           return GestureDetector(
@@ -557,13 +636,13 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                               context.push('/video-detail/$videoId');
                             },
                             child: Container(
-                              color: const Color(0xFF0A0A0A), // Clean production ultra-black background
+                              color: const Color(0xFF0A0A0A),
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
                                   thumbnailUrl != null
                                       ? Image.network(
-                                          thumbnailUrl, 
+                                          thumbnailUrl,
                                           fit: BoxFit.cover,
                                           errorBuilder: (context, error, stackTrace) => _buildPlaceholderThumbnailGrid(),
                                         )
@@ -585,17 +664,17 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                                       ),
                                     ),
                                   ),
-                                  // Metric counter tracking system display overlay
+                                  // Like count overlay
                                   Positioned(
                                     bottom: 8,
                                     left: 8,
                                     right: 8,
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
-                                        const SizedBox(width: 2),
+                                        const Icon(Icons.favorite_rounded, color: Color(0xFFFE2C55), size: 16),
+                                        const SizedBox(width: 4),
                                         Text(
-                                          _formatMetrics(views),
+                                          _formatMetrics(likes),
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 11.5,
@@ -611,7 +690,205 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                           );
                         },
                       ),
-                _buildSavedSectionPlaceholder(),
+
+                // Tab 2: Private Videos - securely hidden from public views
+                _privateVideos.isEmpty
+                    ? _buildEmptyStateView('No private videos', 'Your private content will appear right here.')
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(1),
+                        itemCount: _privateVideos.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 1.5,
+                          mainAxisSpacing: 1.5,
+                          childAspectRatio: 0.72,
+                        ),
+                        itemBuilder: (context, index) {
+                          final video = _privateVideos[index].data() as Map<String, dynamic>;
+                          final String? thumbnailUrl = video['thumbnailUrl'];
+                          final String videoId = _privateVideos[index].id;
+
+                          return GestureDetector(
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              context.push('/video-detail/$videoId');
+                            },
+                            child: Container(
+                              color: const Color(0xFF0A0A0A),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  thumbnailUrl != null
+                                      ? Image.network(
+                                          thumbnailUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) => _buildPlaceholderThumbnailGrid(),
+                                        )
+                                      : _buildPlaceholderThumbnailGrid(),
+                                  // Dark overlay with lock icon
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.transparent,
+                                            Colors.black.withOpacity(0.5),
+                                            Colors.black.withOpacity(0.9),
+                                          ],
+                                          stops: const [0.6, 0.85, 1.0],
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.lock_rounded,
+                                          color: Colors.white.withOpacity(0.5),
+                                          size: 28,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+
+                // Tab 3: Bookmarked Videos - saved collections
+                _bookmarkedVideos.isEmpty
+                    ? _buildEmptyStateView('No bookmarks yet', 'Save videos to your bookmarks collection.')
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(1),
+                        itemCount: _bookmarkedVideos.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 1.5,
+                          mainAxisSpacing: 1.5,
+                          childAspectRatio: 0.72,
+                        ),
+                        itemBuilder: (context, index) {
+                          final bookmarkData = _bookmarkedVideos[index].data() as Map<String, dynamic>;
+                          final String? thumbnailUrl = bookmarkData['thumbnailUrl'];
+                          final String videoId = bookmarkData['videoId'] ?? '';
+
+                          return GestureDetector(
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              if (videoId.isNotEmpty) context.push('/video-detail/$videoId');
+                            },
+                            child: Container(
+                              color: const Color(0xFF0A0A0A),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  thumbnailUrl != null
+                                      ? Image.network(
+                                          thumbnailUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) => _buildPlaceholderThumbnailGrid(),
+                                        )
+                                      : _buildPlaceholderThumbnailGrid(),
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.transparent,
+                                            Colors.black45,
+                                            Colors.black87,
+                                          ],
+                                          stops: [0.6, 0.85, 1.0],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 8,
+                                    left: 8,
+                                    right: 8,
+                                    child: const Icon(
+                                      Icons.bookmark_rounded,
+                                      color: Colors.amber,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+
+                // Tab 4: Liked Videos - historical video feed log of items liked by this user
+                _likedVideos.isEmpty
+                    ? _buildEmptyStateView('No liked videos yet', 'Your liked videos will appear here.')
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(1),
+                        itemCount: _likedVideos.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 1.5,
+                          mainAxisSpacing: 1.5,
+                          childAspectRatio: 0.72,
+                        ),
+                        itemBuilder: (context, index) {
+                          final likeData = _likedVideos[index].data() as Map<String, dynamic>;
+                          final String? thumbnailUrl = likeData['thumbnailUrl'];
+                          final String videoId = likeData['videoId'] ?? '';
+
+                          return GestureDetector(
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              if (videoId.isNotEmpty) context.push('/video-detail/$videoId');
+                            },
+                            child: Container(
+                              color: const Color(0xFF0A0A0A),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  thumbnailUrl != null
+                                      ? Image.network(
+                                          thumbnailUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) => _buildPlaceholderThumbnailGrid(),
+                                        )
+                                      : _buildPlaceholderThumbnailGrid(),
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.transparent,
+                                            Colors.black45,
+                                            Colors.black87,
+                                          ],
+                                          stops: [0.6, 0.85, 1.0],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 8,
+                                    left: 8,
+                                    right: 8,
+                                    child: const Icon(
+                                      Icons.favorite_rounded,
+                                      color: Color(0xFFFE2C55),
+                                      size: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
               ],
             ),
           ),
@@ -629,8 +906,8 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white, 
-              fontSize: 16, 
+              color: Colors.white,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
             ),
@@ -639,8 +916,8 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
           Text(
             label,
             style: const TextStyle(
-              color: Colors.white38, 
-              fontSize: 12, 
+              color: Colors.white38,
+              fontSize: 12,
               fontWeight: FontWeight.normal,
             ),
           ),
@@ -664,7 +941,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
         child: Container(
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            color: Color(0x40000000), // Clean 25% opacity black container
+            color: Color(0x40000000),
           ),
           padding: const EdgeInsets.all(8),
           child: const Icon(Icons.movie_filter_rounded, color: Colors.white12, size: 24),
@@ -673,7 +950,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildEmptyStateView() {
+  Widget _buildEmptyStateView(String title, String description) {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
@@ -691,43 +968,20 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                 child: const Icon(Icons.video_library_outlined, color: Colors.white38, size: 36),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'No videos published yet',
-                style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600),
+              Text(
+                title,
+                style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Your uploaded content will appear right here.',
-                style: TextStyle(color: Colors.white38, fontSize: 12),
+              Text(
+                description,
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
                 textAlign: TextAlign.center,
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSavedSectionPlaceholder() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.lock_outline_rounded, color: Colors.white24, size: 28),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'This user\'s liked videos are private',
-            style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
     );
   }
 

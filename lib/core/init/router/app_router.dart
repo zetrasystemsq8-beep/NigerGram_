@@ -12,7 +12,7 @@ import 'package:nigergram/features/upload/presentation/view/upload_page.dart';
 import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.dart';
 import 'package:nigergram/features/video_feed/presentation/view/discover_feed_view.dart';
 // TODO: Ensure this import points to your actual VideoDetailView location
-// import 'package:nigergram/features/video_feed/presentation/view/video_detail_view.dart'; 
+// import 'package:nigergram/features/video_feed/presentation/view/video_detail_view.dart';
 import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -64,8 +64,8 @@ class AppRouter {
           final videoId = state.pathParameters['videoId']!;
           // Return your VideoDetailView here once the UI file is ready
           return customPageBuilderWidget(
-            context, 
-            state, 
+            context,
+            state,
             Scaffold(
               appBar: AppBar(title: const Text('Video Detail')),
               body: Center(child: Text('Loading video: $videoId')),
