@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:video_compress/video_compress.dart';
@@ -59,7 +60,7 @@ class MediaRepository {
   }) async {
     final bucket = bucketName.isEmpty ? _bucket : bucketName;
     final totalBytes = await file.length();
-    final uriBase = '${_supabase.url}/storage/v1/object/$bucket/$destinationPath';
+    final uriBase = '${_supabase.supabaseUrl}/storage/v1/object/$bucket/$destinationPath';
     final token = _supabase.auth.currentSession?.accessToken ?? '';
 
     if (token.isEmpty) {
@@ -115,7 +116,7 @@ class MediaRepository {
 
           final start = uploaded;
           final end = uploaded + bytesRead - 1;
-          final chunk = Uint8List.view(buffer.buffer, 0, bytesRead);
+          final chunk = Uint8List.fromList(buffer.sublist(0, bytesRead));
 
           // Retry logic for chunk upload
           int attempt = 0;
