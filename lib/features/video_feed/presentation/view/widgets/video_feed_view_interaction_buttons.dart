@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/features/video_feed/repository/interaction_repository.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nigergram/features/video_feed/presentation/view/widgets/comments_viewer_bottom_sheet.dart';
 
 /// Interaction stack that now handles optimistic likes, comments, and tags via Firestore.
 class VideoFeedViewInteractionButtons extends StatefulWidget {
@@ -38,6 +39,8 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
   late bool _isLiked;
   late int _likeCount;
   late int _commentCount;
+  bool _likePending = false;
+
   final InteractionRepository _repo = InteractionRepository();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -46,7 +49,7 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     super.initState();
     _isLiked = widget.isLiked;
     _likeCount = widget.likeCount;
-    _comment_count = widget.commentCount; // preserve previous naming
+    _commentCount = widget.commentCount;
   }
 
   Future<void> _handleLike() async {
@@ -56,25 +59,45 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
       return;
     }
 
+    if (_likePending) return; // avoid concurrent toggles
+    _likePending = true;
+
     // Optimistic update
     setState(() {
       _isLiked = !_isLiked;
       _likeCount += _isLiked ? 1 : -1;
+      if (_likeCount < 0) _likeCount = 0;
     });
 
     try {
       final newStatus = await _repo.toggleLike(widget.videoId, user.uid);
-      // Ensure UI matches backend (in case of race)
-      setState(() {
-        _isLiked = newStatus;
-      });
+
+      // Reconcile like state and count from authoritative source
+      try {
+        final doc = await _firestore.collection('videos').doc(widget.videoId).get();
+        final authoritativeCount = (doc.data()?['likeCount'] as num?)?.toInt();
+        if (authoritativeCount != null) {
+          setState(() {
+            _likeCount = authoritativeCount < 0 ? 0 : authoritativeCount;
+            _isLiked = newStatus;
+          });
+        } else {
+          setState(() => _isLiked = newStatus);
+        }
+      } catch (_) {
+        // If fetching authoritative count fails, at least set the boolean
+        setState(() => _isLiked = newStatus);
+      }
     } catch (e) {
       // Revert optimistic change on error
       setState(() {
         _isLiked = !_isLiked;
         _likeCount += _isLiked ? 1 : -1;
+        if (_likeCount < 0) _likeCount = 0;
       });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update like: $e')));
+    } finally {
+      _likePending = false;
     }
   }
 
@@ -135,7 +158,7 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
         // Comment Button
         VideoFeedViewInteractionButton(
           icon: Icons.chat_bubble_rounded,
-          label: _formatCount(_comment_count),
+          label: _formatCount(_commentCount),
           onTap: _openComments,
         ),
         SizedBox(height: screenHeight * 0.02),
