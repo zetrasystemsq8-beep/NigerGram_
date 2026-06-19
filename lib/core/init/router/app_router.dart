@@ -77,7 +77,7 @@ class AppRouter {
       GoRoute(
         path: '/discover',
         pageBuilder: (context, state) {
-          final tag = state.queryParameters['tag'] ?? '';
+          final tag = state.uri.queryParameters['tag'] ?? '';
           return customPageBuilderWidget(
             context,
             state,
