@@ -8,7 +8,7 @@ import 'package:nigergram/features/video_feed/repository/interaction_repository.
 import 'package:go_router/go_router.dart';
 import 'package:nigergram/features/video_feed/presentation/view/widgets/comments_viewer_bottom_sheet.dart';
 
-/// Interaction stack that now handles optimistic likes, comments, and tags via Firestore.
+/// Production-ready interaction stack with live Firestore & InteractionRepository backend wiring.
 class VideoFeedViewInteractionButtons extends StatefulWidget {
   const VideoFeedViewInteractionButtons({
     required this.videoId,
@@ -52,17 +52,20 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     _commentCount = widget.commentCount;
   }
 
+  // --- BACKEND WIRED LIKE TRANSACTION ---
   Future<void> _handleLike() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to like')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to like videos')),
+      );
       return;
     }
 
-    if (_likePending) return; // avoid concurrent toggles
+    if (_likePending) return; // Prevent spam taps while processing
     _likePending = true;
 
-    // Optimistic update
+    // 1. Optimistic UI update: change instantly on screen for high-speed UX
     setState(() {
       _isLiked = !_isLiked;
       _likeCount += _isLiked ? 1 : -1;
@@ -70,72 +73,87 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     });
 
     try {
+      // 2. Execute real Firebase backend transaction via your repository
       final newStatus = await _repo.toggleLike(widget.videoId, user.uid);
 
-      // Reconcile like state and count from authoritative source
-      try {
-        final doc = await _firestore.collection('videos').doc(widget.videoId).get();
-        final authoritativeCount = (doc.data()?['likeCount'] as num?)?.toInt();
-        if (authoritativeCount != null) {
-          setState(() {
+      // 3. Reconcile with official Firestore numbers to stay perfectly synchronized
+      final doc = await _firestore.collection('videos').doc(widget.videoId).get();
+      final authoritativeCount = (doc.data()?['likeCount'] as num?)?.toInt();
+      
+      if (mounted) {
+        setState(() {
+          _isLiked = newStatus;
+          if (authoritativeCount != null) {
             _likeCount = authoritativeCount < 0 ? 0 : authoritativeCount;
-            _isLiked = newStatus;
-          });
-        } else {
-          setState(() => _isLiked = newStatus);
-        }
-      } catch (_) {
-        // If fetching authoritative count fails, at least set the boolean
-        setState(() => _isLiked = newStatus);
+          }
+        });
       }
     } catch (e) {
-      // Revert optimistic change on error
-      setState(() {
-        _isLiked = !_isLiked;
-        _likeCount += _isLiked ? 1 : -1;
-        if (_likeCount < 0) _likeCount = 0;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update like: $e')));
+      // Revert UI automatically if backend transaction fails completely
+      if (mounted) {
+        setState(() {
+          _isLiked = !_isLiked;
+          _likeCount += _isLiked ? 1 : -1;
+          if (_likeCount < 0) _likeCount = 0;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Backend connection failed: $e')),
+        );
+      }
     } finally {
       _likePending = false;
     }
   }
 
+  // --- BACKEND WIRED COMMENTS SECTION ---
   Future<void> _openComments() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to comment')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to comment')),
+      );
       return;
     }
 
+    // 1. Open the real-time paginated Comments Sheet stream component
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => CommentsViewerBottomSheet(videoId: widget.videoId),
     );
 
+    // 2. When the sheet closes, refresh the backend comment badge count instantly
     try {
       final doc = await _firestore.collection('videos').doc(widget.videoId).get();
       final newCount = (doc.data()?['commentCount'] as num?)?.toInt() ?? _commentCount;
-      setState(() => _commentCount = newCount);
+      if (mounted) {
+        setState(() => _commentCount = newCount);
+      }
     } catch (_) {}
   }
 
+  // --- BACKEND WIRED TAG ROUTING ---
   Future<void> _handleTagTap() async {
     try {
+      // Fetch matching document tag metadata directly from the video backend
       final doc = await _firestore.collection('videos').doc(widget.videoId).get();
       final data = doc.data();
       if (data == null) return;
+      
       final tags = (data['tags'] as List<dynamic>?)?.cast<String>() ?? [];
-      if (tags.isEmpty) return;
-
-      // Navigate to discover route with the first tag
-      final tag = tags.first;
+      
+      // If backend has tags, pick the first one; otherwise use a fallback discovery term
+      final tag = tags.isNotEmpty ? tags.first : 'NigerGram';
+      
       if (context.mounted) {
+        // Send user directly to the filtered layout router path
         context.push('/discover?tag=$tag');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load tags: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load tag destination: $e')),
+      );
     }
   }
 
@@ -202,7 +220,6 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
   }
 }
 
-/// Individual interaction button widget for like, comment, tag, share, bookmark
 class VideoFeedViewInteractionButton extends StatelessWidget {
   const VideoFeedViewInteractionButton({
     required this.icon,
