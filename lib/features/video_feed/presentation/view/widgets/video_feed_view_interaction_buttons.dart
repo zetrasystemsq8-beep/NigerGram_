@@ -1,5 +1,3 @@
-// lib/features/video_feed/presentation/view/widgets/video_feed_view_interaction_buttons.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/features/video_feed/repository/interaction_repository.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nigergram/features/video_feed/presentation/view/widgets/comments_viewer_bottom_sheet.dart';
+import 'package:nigergram/features/wallet/presentation/widgets/tip_bottom_sheet.dart';
 
 /// Production-ready interaction stack with live Firestore & InteractionRepository backend wiring.
 class VideoFeedViewInteractionButtons extends StatefulWidget {
@@ -19,6 +18,8 @@ class VideoFeedViewInteractionButtons extends StatefulWidget {
     this.isBookmarked = false,
     this.onShareTapped,
     this.onBookmarkTapped,
+    this.creatorId,
+    this.creatorUsername,
     super.key,
   });
 
@@ -30,6 +31,8 @@ class VideoFeedViewInteractionButtons extends StatefulWidget {
   final bool isBookmarked;
   final VoidCallback? onShareTapped;
   final VoidCallback? onBookmarkTapped;
+  final String? creatorId;
+  final String? creatorUsername;
 
   @override
   State<VideoFeedViewInteractionButtons> createState() => _VideoFeedViewInteractionButtonsState();
@@ -79,7 +82,7 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
       // 3. Reconcile with official Firestore numbers to stay perfectly synchronized
       final doc = await _firestore.collection('videos').doc(widget.videoId).get();
       final authoritativeCount = (doc.data()?['likeCount'] as num?)?.toInt();
-      
+
       if (mounted) {
         setState(() {
           _isLiked = newStatus;
@@ -140,12 +143,12 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
       final doc = await _firestore.collection('videos').doc(widget.videoId).get();
       final data = doc.data();
       if (data == null) return;
-      
+
       final tags = (data['tags'] as List<dynamic>?)?.cast<String>() ?? [];
-      
+
       // If backend has tags, pick the first one; otherwise use a fallback discovery term
       final tag = tags.isNotEmpty ? tags.first : 'NigerGram';
-      
+
       if (context.mounted) {
         // Send user directly to the filtered layout router path
         context.push('/discover?tag=$tag');
@@ -207,6 +210,52 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
           iconColor: widget.isBookmarked ? Colors.amber : Colors.white,
           onTap: () {
             if (widget.onBookmarkTapped != null) widget.onBookmarkTapped!();
+          },
+        ),
+        SizedBox(height: screenHeight * 0.02),
+
+        // Tip/Gift Button (opens TipBottomSheet)
+        VideoFeedViewInteractionButton(
+          icon: Icons.card_giftcard_rounded,
+          label: 'Tip',
+          onTap: () async {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please sign in to tip creators')),
+              );
+              return;
+            }
+
+            // Fetch creator details if not provided
+            String? creatorId = widget.creatorId;
+            String? creatorUsername = widget.creatorUsername;
+            if (creatorId == null || creatorUsername == null) {
+              try {
+                final doc = await _firestore.collection('videos').doc(widget.videoId).get();
+                final data = doc.data();
+                creatorId = data?['creatorId'] as String?;
+                creatorUsername = data?['creatorUsername'] as String?;
+              } catch (_) {}
+            }
+
+            if (creatorId == null || creatorId.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Creator information unavailable')),
+              );
+              return;
+            }
+
+            await showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (ctx) => TipBottomSheet(
+                creatorId: creatorId!,
+                creatorUsername: creatorUsername ?? '',
+                videoId: widget.videoId,
+              ),
+            );
           },
         ),
       ],
