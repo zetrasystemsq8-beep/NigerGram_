@@ -6,6 +6,7 @@ import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_state.dart';
 import 'package:nigergram/features/wallet/presentation/widgets/transaction_list_item.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 
 class WalletHomeView extends StatelessWidget {
   const WalletHomeView({super.key});
