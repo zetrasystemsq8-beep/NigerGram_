@@ -445,7 +445,7 @@ class ShareBottomSheet extends StatelessWidget {
               shrinkWrap: true,
               children: [
                 _ShareOption(
-                  icon: Icons.whatsapp,
+                  icon: Icons.share,
                   label: 'WhatsApp',
                   color: const Color(0xFF25D366),
                   onTap: () {
