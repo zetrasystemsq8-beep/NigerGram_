@@ -19,7 +19,7 @@ class AuthCubit extends Cubit<AuthState> {
     emit(AuthLoading());
     try {
       debugPrint('🟡 [REGISTER] Starting Firebase registration for $email');
-      
+
       // 15-second hard limit to prevent infinite platform-channel hangs during registration
       final UserCredential userCredential = await _auth
           .createUserWithEmailAndPassword(
@@ -60,6 +60,26 @@ class AuthCubit extends Cubit<AuthState> {
             );
 
         debugPrint('✅ [REGISTER] Firestore user document created');
+
+        // Create an initial wallet document for the user (non-blocking)
+        try {
+          await _firestore.collection('wallets').doc(firebaseUser.uid).set({
+            'uid': firebaseUser.uid,
+            'balance': 0.0,
+            'totalEarned': 0.0,
+            'bankAccountNumber': null,
+            'bankName': null,
+            'bankAccountName': null,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }).timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw TimeoutException('Firestore wallet initialization timed out.'),
+          );
+          debugPrint('✅ [REGISTER] Wallet document created for ${firebaseUser.uid}');
+        } catch (e) {
+          debugPrint('⚠️ [REGISTER] Could not create wallet document: $e');
+          // Do not block registration if wallet creation fails; it can be retried later.
+        }
 
         // ✅ SIMPLIFIED: Send verification email in background without blocking signup
         try {
