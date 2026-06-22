@@ -190,9 +190,15 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       );
     }
 
+    // ✅ FIXED: GestureDetector with proper behavior
     return GestureDetector(
       onTap: _handleSingleTapToggle,
-      behavior: HitTestBehavior.opaque,
+      onDoubleTap: () {
+        // Double-tap to like feature (will be connected to backend)
+        HapticFeedback.mediumImpact();
+        // Future: Trigger double-tap like animation
+      },
+      behavior: HitTestBehavior.opaque, // ✅ CRITICAL: Allows center tap to work
       child: Stack(
         alignment: Alignment.center,
         children: [

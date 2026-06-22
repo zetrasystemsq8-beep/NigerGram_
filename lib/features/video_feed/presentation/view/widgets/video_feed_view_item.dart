@@ -17,33 +17,74 @@ class VideoFeedViewItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use the optimized player widget which contains the GestureDetector and overlay
+    // ✅ FIXED: Restructured to prevent gesture conflicts
+    // Video player + center tap zone (for play/pause)
     return Stack(
       children: [
+        // LAYER 1: Video Player (with GestureDetector for tap-to-play/pause)
         Positioned.fill(
           child: VideoFeedViewOptimizedVideoPlayer(
             controller: controller,
             videoId: videoItem.id,
           ),
         ),
+
+        // LAYER 2: Dark gradient overlay (non-interactive, IgnorePointer)
         Positioned.fill(
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black45,
-                  Colors.black87,
-                ],
-                stops: [0.6, 0.85, 1.0],
+          child: IgnorePointer(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black45,
+                    Colors.black87,
+                  ],
+                  stops: [0.6, 0.85, 1.0],
+                ),
               ),
             ),
           ),
         ),
 
-        // Right-side interaction column replaced with live interaction widget
+        // LAYER 3: Top-left user info (non-blocking)
+        Positioned(
+          bottom: 32,
+          left: 16,
+          right: 88,
+          child: IgnorePointer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '@${videoItem.username}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  videoItem.description,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // LAYER 4: Right-side interaction buttons (interactive, allows taps to pass through center)
         Positioned(
           bottom: 100,
           right: 12,
@@ -57,97 +98,11 @@ class VideoFeedViewItem extends StatelessWidget {
             creatorId: videoItem.creatorId,
             creatorUsername: videoItem.username,
             onShareTapped: () {
-              // Optionally implement platform share logic here
+              // Native share implementation will be added
             },
             onBookmarkTapped: () {
-              // Optionally implement bookmark logic
+              // Bookmark logic
             },
-          ),
-        ),
-
-        Positioned(
-          bottom: 32,
-          left: 16,
-          right: 88,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '@${videoItem.username}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                videoItem.description,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  height: 1.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProfileIcon(String url) {
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 1.5),
-          ),
-          child: CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.grey[900],
-            backgroundImage: url.isNotEmpty ? NetworkImage(url) : null,
-            child: url.isEmpty ? const Icon(Icons.person_rounded, color: Colors.white54) : null,
-          ),
-        ),
-        Positioned(
-          bottom: -6,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFFFF0050),
-              shape: BoxShape.circle,
-            ),
-            padding: const EdgeInsets.all(2),
-            child: const Icon(Icons.add_rounded, color: Colors.white, size: 14),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInteractionButton(
-    IconData icon,
-    String countingLabel, {
-    Color color = Colors.white,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 36),
-        const SizedBox(height: 4),
-        Text(
-          countingLabel,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
           ),
         ),
       ],
