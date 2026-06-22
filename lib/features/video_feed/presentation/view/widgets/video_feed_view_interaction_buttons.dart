@@ -278,6 +278,17 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
         ),
         SizedBox(height: screenHeight * 0.02),
 
+        // Wallet Button (NEW) - quick access to user's wallet
+        VideoFeedViewInteractionButton(
+          icon: Icons.account_balance_wallet_rounded,
+          label: 'Wallet',
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            context.push('/wallet');
+          },
+        ),
+        SizedBox(height: screenHeight * 0.02),
+
         // Tip/Gift Button (opens TipBottomSheet)
         VideoFeedViewInteractionButton(
           icon: Icons.card_giftcard_rounded,
