@@ -10,6 +10,9 @@ class VideoEntity {
   final int commentCount;
   final int shareCount;
   final DateTime timestamp;
+  final bool? isLiked;
+  final bool? isBookmarked;
+  final String? creatorId;
 
   const VideoEntity({
     required this.id,
@@ -21,5 +24,8 @@ class VideoEntity {
     required this.commentCount,
     required this.shareCount,
     required this.timestamp,
+    this.isLiked,
+    this.isBookmarked,
+    this.creatorId,
   });
 }
