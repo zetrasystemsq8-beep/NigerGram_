@@ -33,6 +33,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    debugPrint('🟢 VideoFeedView initialized');
   }
 
   @override
@@ -48,6 +49,8 @@ class _VideoFeedViewState extends State<VideoFeedView> {
 
   void _onPageChanged(int index, List<VideoEntity> videos) {
     if (!mounted) return;
+
+    debugPrint('➡️ Page changed to index $index for videoId=${videos[index].id}');
 
     setState(() {
       _focusedIndex = index;
@@ -126,6 +129,8 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     final controller = _controllers[index];
     if (controller == null) return;
 
+    debugPrint('🔔 Attaching view listener for videoId=$videoId at index $index');
+
     // If view already reported for this video in session, skip
     if (_viewReported.contains(videoId)) return;
 
@@ -145,6 +150,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
         // If we've passed 3 seconds continuously, report view (once)
         if (pos.inSeconds >= 3 && !_viewReported.contains(videoId)) {
           _viewReported.add(videoId);
+          debugPrint('👁️ Reporting view for $videoId');
           FirebaseFirestore.instance
               .collection('videos')
               .doc(videoId)
@@ -166,6 +172,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
               // loop restarted
               final current = (_loopCounts[videoId] ?? 0) + 1;
               _loopCounts[videoId] = current;
+              debugPrint('🔁 Loop detected for $videoId — count: $current');
               FirebaseFirestore.instance
                   .collection('videos')
                   .doc(videoId)
@@ -308,6 +315,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
             itemBuilder: (context, index) {
               final controller = _getOrCreateController(index, state.videos);
               return VideoFeedViewItem(
+                key: ValueKey(state.videos[index].id),
                 videoItem: state.videos[index],
                 controller: controller,
               );
