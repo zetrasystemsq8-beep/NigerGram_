@@ -38,9 +38,14 @@ class _FundWalletViewState extends State<FundWalletView> {
       // Use authenticated user's email when available; fallback to a placeholder
       final user = FirebaseAuth.instance.currentUser;
       final customerEmail = user?.email ?? 'user@example.com';
+      final customerName = user?.displayName ?? 'NigerGram User';
 
-      // Pass customerEmail as required by the Monnify SDK wrapper
-      final init = await _monnify.initTransaction(amount: amount, customerEmail: customerEmail);
+      // Pass required Monnify params including customerName and customerEmail
+      final init = await _monnify.initTransaction(
+        amount: amount,
+        customerEmail: customerEmail,
+        customerName: customerName,
+      );
       final checkoutUrl = init['checkoutUrl'] as String?;
       final transactionReference = init['reference'] as String?;
 
