@@ -26,7 +26,22 @@ class VideoFeedViewItem extends StatelessWidget {
             videoId: videoItem.id,
           ),
         ),
-        Positioned.fill(child: _DecorateBackgroundGradient()),
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black45,
+                  Colors.black87,
+                ],
+                stops: [0.6, 0.85, 1.0],
+              ),
+            ),
+          ),
+        ),
 
         // Right-side interaction column replaced with live interaction widget
         Positioned(
