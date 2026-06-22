@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Grant active API permissions to the workflow runner to delete old items
 permissions:
   actions: write
   contents: read
@@ -17,14 +18,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Proactive Artifact Quota Cleanup
+      - name: Automatic Storage Quota Purge
         uses: actions/github-script@v7
-        continue-on-error: true # Prevents the pipeline from stopping if there are no old artifacts to delete
+        continue-on-error: true # Keeps the pipeline moving if there are no old files to clean
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            console.log(`Searching for old NigerGram-debug artifacts to free storage...`);
+            console.log("Scanning repository storage for matching NigerGram-debug artifacts...");
             
             const response = await github.rest.actions.listArtifactsForRepo({
               owner: owner,
@@ -35,7 +36,7 @@ jobs:
             const artifacts = response.data.artifacts;
             for (const artifact of artifacts) {
               if (artifact.name === 'NigerGram-debug') {
-                console.log(`Deleting block: ${artifact.name} (ID: ${artifact.id})`);
+                console.log(`Force deleting artifact: ${artifact.name} (ID: ${artifact.id}) to clear space`);
                 await github.rest.actions.deleteArtifact({
                   owner: owner,
                   repo: repo,
@@ -43,7 +44,7 @@ jobs:
                 });
               }
             }
-            console.log(`Quota cleanup completed successfully.`);
+            console.log("Storage optimization step completed.");
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -96,4 +97,4 @@ jobs:
           name: NigerGram-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 1
-          overwrite: true # 👈 Safely replaces any matching instance without breaking the backend queue
+          overwrite: true # Forces upload-artifact v4 to safely overwrite files instead of crashing
