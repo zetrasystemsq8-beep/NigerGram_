@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -47,12 +49,74 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
   final InteractionRepository _repo = InteractionRepository();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _videoSub;
+
   @override
   void initState() {
     super.initState();
     _isLiked = widget.isLiked;
     _likeCount = widget.likeCount;
     _commentCount = widget.commentCount;
+
+    // Start a real-time listener for the current video so UI stays authoritative
+    _startVideoListener(widget.videoId);
+  }
+
+  @override
+  void didUpdateWidget(covariant VideoFeedViewInteractionButtons oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // If the active video changed, reset local state from incoming props and re-subscribe
+    if (oldWidget.videoId != widget.videoId) {
+      setState(() {
+        _isLiked = widget.isLiked;
+        _likeCount = widget.likeCount;
+        _commentCount = widget.commentCount;
+        _likePending = false;
+      });
+      _startVideoListener(widget.videoId);
+      return;
+    }
+
+    // If counts or like flag were updated by parent, reconcile
+    if (oldWidget.likeCount != widget.likeCount || oldWidget.commentCount != widget.commentCount || oldWidget.isLiked != widget.isLiked) {
+      setState(() {
+        _likeCount = widget.likeCount;
+        _commentCount = widget.commentCount;
+        _isLiked = widget.isLiked;
+      });
+    }
+  }
+
+  void _startVideoListener(String videoId) {
+    _stopVideoListener();
+    try {
+      _videoSub = _firestore.collection('videos').doc(videoId).snapshots().listen((doc) {
+        if (!mounted) return;
+        final data = doc.data();
+        if (data == null) return;
+
+        setState(() {
+          _likeCount = (data['likeCount'] as num?)?.toInt() ?? _likeCount;
+          _commentCount = (data['commentCount'] as num?)?.toInt() ?? _commentCount;
+
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser != null) {
+            final likes = (data['likes'] as List<dynamic>?)?.cast<String>();
+            if (likes != null) {
+              _isLiked = likes.contains(currentUser.uid);
+            }
+          }
+        });
+      });
+    } catch (_) {
+      // If listener setup fails, keep optimistic UI — no crash
+    }
+  }
+
+  void _stopVideoListener() {
+    _videoSub?.cancel();
+    _videoSub = null;
   }
 
   // --- BACKEND WIRED LIKE TRANSACTION ---
@@ -266,6 +330,12 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
     if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
     return count.toString();
+  }
+
+  @override
+  void dispose() {
+    _stopVideoListener();
+    super.dispose();
   }
 }
 
