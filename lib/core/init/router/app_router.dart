@@ -1,5 +1,3 @@
-// lib/core/init/router/app_router.dart
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:nigergram/core/init/router/custom_page_builder_widget.dart';
@@ -11,6 +9,10 @@ import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 import 'package:nigergram/features/upload/presentation/view/upload_page.dart';
 import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.dart';
 import 'package:nigergram/features/video_feed/presentation/view/discover_feed_view.dart';
+import 'package:nigergram/features/wallet/presentation/view/wallet_home_view.dart';
+import 'package:nigergram/features/wallet/presentation/view/fund_wallet_view.dart';
+import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
+import 'package:nigergram/features/wallet/presentation/view/creator_earnings_view.dart';
 // TODO: Ensure this import points to your actual VideoDetailView location
 // import 'package:nigergram/features/video_feed/presentation/view/video_detail_view.dart';
 import 'package:go_router/go_router.dart';
@@ -85,6 +87,27 @@ class AppRouter {
           );
         },
       ),
++      // Wallet routes
++      GoRoute(
++        path: '/wallet',
++        pageBuilder: (context, state) =>
++            customPageBuilderWidget(context, state, const WalletHomeView()),
++      ),
++      GoRoute(
++        path: '/wallet/fund',
++        pageBuilder: (context, state) =>
++            customPageBuilderWidget(context, state, const FundWalletView()),
++      ),
++      GoRoute(
++        path: '/wallet/withdraw',
++        pageBuilder: (context, state) =>
++            customPageBuilderWidget(context, state, const WithdrawView()),
++      ),
++      GoRoute(
++        path: '/wallet/earnings',
++        pageBuilder: (context, state) => customPageBuilderWidget(
++            context, state, const CreatorEarningsView()),
++      ),
     ],
   );
 }
