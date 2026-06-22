@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:video_player/video_player.dart';
 import 'video_feed_view_optimized_video_player.dart';
+import 'video_feed_view_interaction_buttons.dart';
 
 class VideoFeedViewItem extends StatelessWidget {
   final VideoEntity videoItem;
@@ -26,32 +27,29 @@ class VideoFeedViewItem extends StatelessWidget {
           ),
         ),
         const Positioned.fill(child: _DecorateBackgroundGradient()),
+
+        // Right-side interaction column replaced with live interaction widget
         Positioned(
           bottom: 100,
           right: 12,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildProfileIcon(videoItem.profileImageUrl),
-              const SizedBox(height: 20),
-              _buildInteractionButton(
-                Icons.favorite_rounded,
-                videoItem.likeCount.toString(),
-                color: const Color(0xFFFF0050),
-              ),
-              const SizedBox(height: 16),
-              _buildInteractionButton(
-                Icons.comment_rounded,
-                videoItem.commentCount.toString(),
-              ),
-              const SizedBox(height: 16),
-              _buildInteractionButton(
-                Icons.share_rounded,
-                videoItem.shareCount.toString(),
-              ),
-            ],
+          child: VideoFeedViewInteractionButtons(
+            videoId: videoItem.id,
+            isLiked: videoItem.isLiked ?? false,
+            likeCount: videoItem.likeCount,
+            commentCount: videoItem.commentCount,
+            shareCount: videoItem.shareCount,
+            isBookmarked: videoItem.isBookmarked ?? false,
+            creatorId: videoItem.creatorId,
+            creatorUsername: videoItem.username,
+            onShareTapped: () {
+              // Optionally implement platform share logic here
+            },
+            onBookmarkTapped: () {
+              // Optionally implement bookmark logic
+            },
           ),
         ),
+
         Positioned(
           bottom: 32,
           left: 16,
@@ -138,32 +136,6 @@ class VideoFeedViewItem extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _DecorateBackgroundGradient extends StatelessWidget {
-  const _DecorateBackgroundGradient();
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black54,
-              Colors.transparent,
-              Colors.transparent,
-              Colors.black54,
-              Colors.black87,
-            ],
-            stops: [0.0, 0.2, 0.6, 0.85, 1.0],
-          ),
-        ),
-      ),
     );
   }
 }
