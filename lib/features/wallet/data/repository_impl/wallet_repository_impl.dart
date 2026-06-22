@@ -62,14 +62,18 @@ class WalletRepositoryImpl implements WalletRepository {
       final fromSnap = await transaction.get(fromRef);
       final toSnap = await transaction.get(toRef);
 
-      final fromBalance = (fromSnap.data()?['balance'] as num?)?.toDouble() ?? 0.0;
+      // Safe casts to Map<String, dynamic>? before indexing
+      final fromData = fromSnap.data() as Map<String, dynamic>?;
+      final fromBalance = (fromData?['balance'] as num?)?.toDouble() ?? 0.0;
       if (fromBalance < amount) {
         throw Exception('Insufficient balance');
       }
 
       final newFromBalance = fromBalance - amount;
-      final toBalance = (toSnap.data()?['balance'] as num?)?.toDouble() ?? 0.0;
-      final toTotalEarned = (toSnap.data()?['totalEarned'] as num?)?.toDouble() ?? 0.0;
+
+      final toData = toSnap.data() as Map<String, dynamic>?;
+      final toBalance = (toData?['balance'] as num?)?.toDouble() ?? 0.0;
+      final toTotalEarned = (toData?['totalEarned'] as num?)?.toDouble() ?? 0.0;
       final newToBalance = toBalance + amount;
       final newToTotalEarned = toTotalEarned + amount;
 
@@ -113,9 +117,12 @@ class WalletRepositoryImpl implements WalletRepository {
     final ref = _wallets.doc(userId);
     await firestore.runTransaction((transaction) async {
       final snap = await transaction.get(ref);
-      final current = (snap.data()?['balance'] as num?)?.toDouble() ?? 0.0;
+
+      final snapData = snap.data() as Map<String, dynamic>?;
+      final current = (snapData?['balance'] as num?)?.toDouble() ?? 0.0;
       final newBalance = current + amount;
-      final totalEarned = (snap.data()?['totalEarned'] as num?)?.toDouble() ?? 0.0;
+      final totalEarned = (snapData?['totalEarned'] as num?)?.toDouble() ?? 0.0;
+
       transaction.set(ref, {
         'uid': userId,
         'balance': newBalance,
@@ -152,7 +159,10 @@ class WalletRepositoryImpl implements WalletRepository {
 
     await firestore.runTransaction((transaction) async {
       final snap = await transaction.get(ref);
-      final current = (snap.data()?['balance'] as num?)?.toDouble() ?? 0.0;
+
+      final snapData = snap.data() as Map<String, dynamic>?;
+      final current = (snapData?['balance'] as num?)?.toDouble() ?? 0.0;
+
       if (current < amount) {
         throw Exception('Insufficient balance');
       }
