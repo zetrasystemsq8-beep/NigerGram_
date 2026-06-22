@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
@@ -25,6 +26,17 @@ void main() async {
       },
     );
     debugPrint('✅ [STARTUP] Firebase initialized successfully');
+
+    // ✅ CRITICAL: Enable offline persistence to fix [cloud_firestore/unavailable] crashes
+    debugPrint('🟡 [STARTUP] Enabling Firestore offline persistence...');
+    await FirebaseFirestore.instance.disableNetwork();
+    await FirebaseFirestore.instance.enableNetwork();
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.cacheMaxBytes, // Unlimited cache for offline reads/writes
+      ssl: true,
+    );
+    debugPrint('✅ [STARTUP] Firestore offline persistence enabled - app will work offline');
   } on TimeoutException catch (e) {
     debugPrint('🔴 [STARTUP] Firebase initialization timed out: ${e.message}');
     debugPrint('⚠️ [STARTUP] Continuing anyway - Firebase may initialize later');

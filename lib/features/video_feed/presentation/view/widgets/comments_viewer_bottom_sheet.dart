@@ -21,10 +21,11 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
   final ScrollController _scrollController = ScrollController();
 
   // Pagination settings
-  static const int pageSize = 20;
+  static const int pageSize = 50;
   DocumentSnapshot? _lastDoc;
   bool _isLoadingMore = false;
   bool _hasMore = true;
+  bool _isPostingComment = false;
   final List<QueryDocumentSnapshot> _items = [];
 
   StreamSubscription<QuerySnapshot>? _realtimeSub;
@@ -54,44 +55,54 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
   Future<void> _loadInitial() async {
     if (!_hasMore) return;
     setState(() => _isLoadingMore = true);
-    final q = _firestore
-        .collection('videos')
-        .doc(widget.videoId)
-        .collection('comments')
-        .orderBy('timestamp', descending: true)
-        .limit(pageSize);
-    final snap = await q.get();
-    if (snap.docs.isNotEmpty) {
-      _items.clear();
-      _items.addAll(snap.docs);
-      _lastDoc = snap.docs.last;
-      _hasMore = snap.docs.length == pageSize;
-    } else {
+    try {
+      final q = _firestore
+          .collection('videos')
+          .doc(widget.videoId)
+          .collection('comments')
+          .orderBy('createdAt', descending: true)
+          .limit(pageSize);
+      final snap = await q.get();
+      if (snap.docs.isNotEmpty) {
+        _items.clear();
+        _items.addAll(snap.docs);
+        _lastDoc = snap.docs.last;
+        _hasMore = snap.docs.length == pageSize;
+      } else {
+        _hasMore = false;
+        _items.clear();
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to load initial comments: $e');
       _hasMore = false;
-      _items.clear();
     }
-    setState(() => _isLoadingMore = false);
+    if (mounted) setState(() => _isLoadingMore = false);
   }
 
   Future<void> _loadMore() async {
     if (!_hasMore || _isLoadingMore || _lastDoc == null) return;
     setState(() => _isLoadingMore = true);
-    final q = _firestore
-        .collection('videos')
-        .doc(widget.videoId)
-        .collection('comments')
-        .orderBy('timestamp', descending: true)
-        .startAfterDocument(_lastDoc!)
-        .limit(pageSize);
-    final snap = await q.get();
-    if (snap.docs.isNotEmpty) {
-      _items.addAll(snap.docs);
-      _lastDoc = snap.docs.last;
-      _hasMore = snap.docs.length == pageSize;
-    } else {
+    try {
+      final q = _firestore
+          .collection('videos')
+          .doc(widget.videoId)
+          .collection('comments')
+          .orderBy('createdAt', descending: true)
+          .startAfterDocument(_lastDoc!)
+          .limit(pageSize);
+      final snap = await q.get();
+      if (snap.docs.isNotEmpty) {
+        _items.addAll(snap.docs);
+        _lastDoc = snap.docs.last;
+        _hasMore = snap.docs.length == pageSize;
+      } else {
+        _hasMore = false;
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to load more comments: $e');
       _hasMore = false;
     }
-    setState(() => _isLoadingMore = false);
+    if (mounted) setState(() => _isLoadingMore = false);
   }
 
   void _subscribeRealtime() {
@@ -100,21 +111,23 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
         .collection('videos')
         .doc(widget.videoId)
         .collection('comments')
-        .orderBy('timestamp', descending: true)
+        .orderBy('createdAt', descending: true)
         .limit(200);
     _realtimeSub = coll.snapshots().listen(
       (snapshot) {
         // Replace local cache with new order (keeps realtime authoritative)
-        setState(() {
-          _items.clear();
-          _items.addAll(snapshot.docs);
-          if (_items.isNotEmpty) _lastDoc = _items.last;
-          _hasMore = snapshot.docs.length == pageSize;
-        });
+        if (mounted) {
+          setState(() {
+            _items.clear();
+            _items.addAll(snapshot.docs);
+            if (_items.isNotEmpty) _lastDoc = _items.last;
+            _hasMore = snapshot.docs.length >= pageSize;
+          });
+        }
       },
       onError: (e) {
         // Ignore realtime errors; UI still works with manual pagination
-        debugPrint('Realtime comments stream error: $e');
+        debugPrint('⚠️ Realtime comments stream error: $e');
       },
     );
   }
@@ -127,22 +140,37 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
       }
       return;
     }
+
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+
+    if (_isPostingComment) return;
+    setState(() => _isPostingComment = true);
 
     // Immediately clear input (optimistic UX)
     _controller.clear();
 
     try {
+      // Fetch user avatar from profile document if available
+      String? userAvatar;
+      try {
+        final userDoc = await _firestore.collection('users').doc(user.uid).get();
+        userAvatar = userDoc.data()?['profilePicUrl'] as String?;
+      } catch (_) {}
+
       await _interactionRepo.addComment(
         widget.videoId,
         user.uid,
-        user.displayName ?? user.email ?? 'User',
+        user.displayName ?? user.email?.split('@').first ?? 'User',
         text,
+        userAvatar: userAvatar,
       );
+
+      debugPrint('✅ Comment posted successfully');
+
       // Scroll to top to show latest (server timestamp ordering)
-      await Future.delayed(const Duration(milliseconds: 200));
-      if (_scrollController.hasClients) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (_scrollController.hasClients && mounted) {
         _scrollController.animateTo(
           0,
           duration: const Duration(milliseconds: 320),
@@ -150,9 +178,14 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
         );
       }
     } catch (e) {
+      debugPrint('❌ Failed to post comment: $e');
       if (mounted) {
+        // Re-add text to controller so user doesn't lose it
+        _controller.text = text;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to post comment: $e')));
       }
+    } finally {
+      if (mounted) setState(() => _isPostingComment = false);
     }
   }
 
@@ -208,27 +241,31 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
         }
         final doc = _items[index];
         final data = doc.data() as Map<String, dynamic>;
+        final userId = data['userId'] as String? ?? '';
         final username = data['username'] as String? ?? 'User';
+        final userAvatar = data['userAvatar'] as String? ?? '';
         final text = data['text'] as String? ?? '';
-        final ts = data['timestamp'] as Timestamp?;
+        final ts = data['createdAt'] as Timestamp?;
         final time = ts != null ? ts.toDate() : null;
 
         return ListTile(
           leading: CircleAvatar(
-            child: Text(username.isNotEmpty ? username[0].toUpperCase() : 'U'),
+            backgroundImage: userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+            child: userAvatar.isEmpty ? Text(username.isNotEmpty ? username[0].toUpperCase() : 'U') : null,
           ),
           title: Text(
             username,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(text),
+              const SizedBox(height: 4),
+              Text(text, style: const TextStyle(fontSize: 12)),
               if (time != null)
                 Text(
                   _formatTime(time),
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
                 ),
             ],
           ),
@@ -258,7 +295,8 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
               child: TextField(
                 controller: _controller,
                 textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _postComment(),
+                onSubmitted: (_) => _isPostingComment ? null : _postComment(),
+                enabled: !_isPostingComment,
                 decoration: InputDecoration(
                   hintText: 'Write a comment...',
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -276,8 +314,14 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
             ),
             const SizedBox(width: 8),
             IconButton(
-              icon: const Icon(Icons.send_rounded),
-              onPressed: _postComment,
+              icon: _isPostingComment
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send_rounded),
+              onPressed: _isPostingComment ? null : _postComment,
             ),
           ],
         ),

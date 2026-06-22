@@ -10,6 +10,7 @@ import 'package:nigergram/features/video_feed/presentation/view/widgets/comments
 import 'package:nigergram/features/wallet/presentation/widgets/tip_bottom_sheet.dart';
 
 /// Production-ready interaction stack with live Firestore & InteractionRepository backend wiring.
+/// Handles: Likes, Comments, Saves, Tags, Wallet, and Tips with full offline support.
 class VideoFeedViewInteractionButtons extends StatefulWidget {
   const VideoFeedViewInteractionButtons({
     required this.videoId,
@@ -42,9 +43,11 @@ class VideoFeedViewInteractionButtons extends StatefulWidget {
 
 class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteractionButtons> {
   late bool _isLiked;
+  late bool _isSaved;
   late int _likeCount;
   late int _commentCount;
   bool _likePending = false;
+  bool _savePending = false;
 
   final InteractionRepository _repo = InteractionRepository();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -55,6 +58,7 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
   void initState() {
     super.initState();
     _isLiked = widget.isLiked;
+    _isSaved = widget.isBookmarked;
     _likeCount = widget.likeCount;
     _commentCount = widget.commentCount;
 
@@ -70,20 +74,23 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     if (oldWidget.videoId != widget.videoId) {
       setState(() {
         _isLiked = widget.isLiked;
+        _isSaved = widget.isBookmarked;
         _likeCount = widget.likeCount;
         _commentCount = widget.commentCount;
         _likePending = false;
+        _savePending = false;
       });
       _startVideoListener(widget.videoId);
       return;
     }
 
     // If counts or like flag were updated by parent, reconcile
-    if (oldWidget.likeCount != widget.likeCount || oldWidget.commentCount != widget.commentCount || oldWidget.isLiked != widget.isLiked) {
+    if (oldWidget.likeCount != widget.likeCount || oldWidget.commentCount != widget.commentCount || oldWidget.isLiked != widget.isLiked || oldWidget.isBookmarked != widget.isBookmarked) {
       setState(() {
         _likeCount = widget.likeCount;
         _commentCount = widget.commentCount;
         _isLiked = widget.isLiked;
+        _isSaved = widget.isBookmarked;
       });
     }
   }
@@ -102,14 +109,25 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
 
           final currentUser = FirebaseAuth.instance.currentUser;
           if (currentUser != null) {
-            final likes = (data['likes'] as List<dynamic>?)?.cast<String>();
-            if (likes != null) {
-              _isLiked = likes.contains(currentUser.uid);
+            // Check if user ID is in likedBy array
+            final likedBy = (data['likedBy'] as List<dynamic>?)?.cast<String>();
+            if (likedBy != null) {
+              _isLiked = likedBy.contains(currentUser.uid);
+            }
+
+            // Check if user ID is in savedBy array
+            final savedBy = (data['savedBy'] as List<dynamic>?)?.cast<String>();
+            if (savedBy != null) {
+              _isSaved = savedBy.contains(currentUser.uid);
             }
           }
         });
+      }, onError: (e) {
+        debugPrint('❌ Video listener error: $e');
+        // Continue with optimistic UI — offline persistence will handle sync
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('❌ Failed to start video listener: $e');
       // If listener setup fails, keep optimistic UI — no crash
     }
   }
@@ -155,7 +173,9 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
           }
         });
       }
+      debugPrint('✅ Like toggled successfully for video ${widget.videoId}');
     } catch (e) {
+      debugPrint('❌ Like transaction failed: $e');
       // Revert UI automatically if backend transaction fails completely
       if (mounted) {
         setState(() {
@@ -164,11 +184,60 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
           if (_likeCount < 0) _likeCount = 0;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Backend connection failed: $e')),
+          SnackBar(content: Text('Like failed: $e')),
         );
       }
     } finally {
       _likePending = false;
+    }
+  }
+
+  // --- BACKEND WIRED SAVE TRANSACTION ---
+  Future<void> _handleSave() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to save videos')),
+      );
+      return;
+    }
+
+    if (_savePending) return; // Prevent spam taps
+    _savePending = true;
+
+    // 1. Optimistic UI update
+    setState(() {
+      _isSaved = !_isSaved;
+    });
+
+    try {
+      // 2. Execute real Firebase backend transaction
+      final newStatus = await _repo.toggleSave(widget.videoId, user.uid);
+
+      // 3. Reconcile with official Firestore state
+      final doc = await _firestore.collection('videos').doc(widget.videoId).get();
+      final savedBy = (doc.data()?['savedBy'] as List<dynamic>?)?.cast<String>() ?? [];
+
+      if (mounted) {
+        setState(() {
+          _isSaved = newStatus && savedBy.contains(user.uid);
+        });
+      }
+      debugPrint('✅ Save toggled successfully for video ${widget.videoId}');
+      if (widget.onBookmarkTapped != null) widget.onBookmarkTapped!();
+    } catch (e) {
+      debugPrint('❌ Save transaction failed: $e');
+      // Revert UI
+      if (mounted) {
+        setState(() {
+          _isSaved = !_isSaved;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e')),
+        );
+      }
+    } finally {
+      _savePending = false;
     }
   }
 
@@ -267,14 +336,12 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
         ),
         SizedBox(height: screenHeight * 0.02),
 
-        // Bookmark Button
+        // Save/Bookmark Button
         VideoFeedViewInteractionButton(
-          icon: widget.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+          icon: _isSaved ? Icons.bookmark : Icons.bookmark_border,
           label: 'Save',
-          iconColor: widget.isBookmarked ? Colors.amber : Colors.white,
-          onTap: () {
-            if (widget.onBookmarkTapped != null) widget.onBookmarkTapped!();
-          },
+          iconColor: _isSaved ? Colors.amber : Colors.white,
+          onTap: _handleSave,
         ),
         SizedBox(height: screenHeight * 0.02),
 
