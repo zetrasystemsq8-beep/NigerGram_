@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  actions: write
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,6 +16,34 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Proactive Artifact Quota Cleanup
+        uses: actions/github-script@v7
+        continue-on-error: true # Prevents the pipeline from stopping if there are no old artifacts to delete
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            console.log(`Searching for old NigerGram-debug artifacts to free storage...`);
+            
+            const response = await github.rest.actions.listArtifactsForRepo({
+              owner: owner,
+              repo: repo,
+              per_page: 100
+            });
+            
+            const artifacts = response.data.artifacts;
+            for (const artifact of artifacts) {
+              if (artifact.name === 'NigerGram-debug') {
+                console.log(`Deleting block: ${artifact.name} (ID: ${artifact.id})`);
+                await github.rest.actions.deleteArtifact({
+                  owner: owner,
+                  repo: repo,
+                  artifact_id: artifact.id,
+                });
+              }
+            }
+            console.log(`Quota cleanup completed successfully.`);
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -63,4 +95,5 @@ jobs:
         with:
           name: NigerGram-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 1 # 👈 Keeps your 200+ run logs forever, but deletes the heavy file in 24 hours to clear quota!
+          retention-days: 1
+          overwrite: true # 👈 Safely replaces any matching instance without breaking the backend queue
