@@ -33,8 +33,6 @@ void main() async {
     await FirebaseFirestore.instance.enableNetwork();
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
-      cacheSizeBytes: Settings.cacheMaxBytes, // Unlimited cache for offline reads/writes
-      ssl: true,
     );
     debugPrint('✅ [STARTUP] Firestore offline persistence enabled - app will work offline');
   } on TimeoutException catch (e) {
@@ -50,7 +48,7 @@ void main() async {
     debugPrint('🟡 [STARTUP] Initializing Supabase...');
     await Supabase.initialize(
       url: 'https://ssmwuihkafrulmvtiuam.supabase.co',
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzbXd1aWhrYWZydWxtdnRpdWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4Mjk2NjAsImV4cCI6MjA5NjQwNTY2MH0.e1PxmDW77ZhbonS-Z96SWA_sPyVGedzpZNZbJQz7pQo',
+      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzbXd1aWhrYWZydWxtdnRpdWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4Mjk2NjAsImV4cCI6MjA5NjQwNTY2MH0.e1PxmDW77ZhbonS[...]
     ).timeout(
       const Duration(seconds: 15),
       onTimeout: () {
