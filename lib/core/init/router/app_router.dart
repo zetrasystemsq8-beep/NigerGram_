@@ -87,27 +87,27 @@ class AppRouter {
           );
         },
       ),
-+      // Wallet routes
-+      GoRoute(
-+        path: '/wallet',
-+        pageBuilder: (context, state) =>
-+            customPageBuilderWidget(context, state, const WalletHomeView()),
-+      ),
-+      GoRoute(
-+        path: '/wallet/fund',
-+        pageBuilder: (context, state) =>
-+            customPageBuilderWidget(context, state, const FundWalletView()),
-+      ),
-+      GoRoute(
-+        path: '/wallet/withdraw',
-+        pageBuilder: (context, state) =>
-+            customPageBuilderWidget(context, state, const WithdrawView()),
-+      ),
-+      GoRoute(
-+        path: '/wallet/earnings',
-+        pageBuilder: (context, state) => customPageBuilderWidget(
-+            context, state, const CreatorEarningsView()),
-+      ),
+      // Wallet routes
+      GoRoute(
+        path: '/wallet',
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const WalletHomeView()),
+      ),
+      GoRoute(
+        path: '/wallet/fund',
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const FundWalletView()),
+      ),
+      GoRoute(
+        path: '/wallet/withdraw',
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const WithdrawView()),
+      ),
+      GoRoute(
+        path: '/wallet/earnings',
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const CreatorEarningsView()),
+      ),
     ],
   );
 }
