@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -62,7 +63,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     _manageControllerLifecycle(index, videos);
   }
 
-  /// ✅ FIXED: Added videos parameter to cleanly initialize controllers during lifecycle changes
   void _manageControllerLifecycle(int index, List<VideoEntity> videos) {
     // Play current focused item
     _getOrCreateController(index, videos)?.play();
@@ -131,23 +131,18 @@ class _VideoFeedViewState extends State<VideoFeedView> {
 
     debugPrint('🔔 Attaching view listener for videoId=$videoId at index $index');
 
-    // If view already reported for this video in session, skip
     if (_viewReported.contains(videoId)) return;
 
-    // Add listener to watch continuous play position
     Duration lastPosition = Duration.zero;
-    var consecutivePlayStart = DateTime.now();
 
     void listener() {
       if (!mounted) return;
       if (controller.value.isPlaying) {
         final pos = controller.value.position;
-        // If playback moved forward, update lastPosition
         if (pos > lastPosition) {
           lastPosition = pos;
         }
 
-        // If we've passed 3 seconds continuously, report view (once)
         if (pos.inSeconds >= 3 && !_viewReported.contains(videoId)) {
           _viewReported.add(videoId);
           debugPrint('👁️ Reporting view for $videoId');
@@ -159,17 +154,13 @@ class _VideoFeedViewState extends State<VideoFeedView> {
           });
         }
 
-        // Loop detection: if position is near duration (end), increment loop counter
         final duration = controller.value.duration ?? Duration.zero;
         if (duration.inMilliseconds > 0 && pos >= duration - const Duration(milliseconds: 150)) {
-          // small delay to allow loop restart
           Future.microtask(() async {
-            // Wait a tick for potential loop restart
             await Future.delayed(const Duration(milliseconds: 300));
             if (!mounted) return;
             final nowPos = controller.value.position;
             if (nowPos.inMilliseconds < 500) {
-              // loop restarted
               final current = (_loopCounts[videoId] ?? 0) + 1;
               _loopCounts[videoId] = current;
               debugPrint('🔁 Loop detected for $videoId — count: $current');
@@ -186,116 +177,147 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     }
 
     controller.addListener(listener);
-
-    // Ensure we remove the listener when the controller is disposed — reactive cleanup
-    // The controller is disposed by existing lifecycle code in _manageControllerLifecycle
   }
 
   @override
   Widget build(BuildContext context) {
+    // Get bottom padding layout constraint to safely clear navigation bar overlay heights
+    final bottomNavigationPadding = MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight;
+
     return BlocBuilder<VideoFeedCubit, VideoFeedState>(
       builder: (context, state) {
-        // LOADING STATE: Show spinner when fetching initial videos
+        // LOADING STATE: Show premium blur backdrop instead of raw black emptiness
         if (state.isLoading && state.videos.isEmpty) {
           return Scaffold(
-            backgroundColor: Colors.black,
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircularProgressIndicator(color: Colors.white),
-                  SizedBox(height: context.h(16)),
-                  Text(
-                    'Loading your feed...',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: context.fontSize(14),
-                    ),
+            backgroundColor: const Color(0xFF0F0F11),
+            body: Stack(
+              children: [
+                Positioned.fill(
+                  child: Container(color: const Color(0xFF16161A)),
+                ),
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(
+                        color: Color(0xFFFE2C55),
+                        strokeWidth: 3,
+                      ),
+                      SizedBox(height: context.h(20)),
+                      Text(
+                        'Assembling your personalized feed...',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: context.fontSize(14),
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           );
         }
 
-        // ERROR STATE: Show error message if fetch failed
+        // ERROR STATE: Custom recovery layout implementation
         if (!state.isSuccess && state.errorMessage.isNotEmpty) {
           return Scaffold(
-            backgroundColor: Colors.black,
+            backgroundColor: const Color(0xFF0F0F11),
             body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    color: Colors.red,
-                    size: context.sq(56),
-                  ),
-                  SizedBox(height: context.h(16)),
-                  Text(
-                    'Failed to load videos',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: context.fontSize(16),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: context.h(8)),
-                  Text(
-                    state.errorMessage,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: context.fontSize(13),
-                    ),
-                  ),
-                  SizedBox(height: context.h(24)),
-                  GestureDetector(
-                    onTap: () {
-                      context.read<VideoFeedCubit>().loadVideos();
-                    },
-                    child: Container(
-                      padding: context.paddingAll(12),
+              child: Padding(
+                padding: context.paddingHorizontal(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: context.paddingAll(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFE2C55),
-                        borderRadius: context.radiusAll(8),
+                        color: Colors.redAccent.withOpacity(0.1),
+                        shape: BoxShape.circle,
                       ),
-                      child: Text(
-                        'Retry',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: context.fontSize(14),
-                          fontWeight: FontWeight.bold,
+                      child: Icon(
+                        Icons.wifi_off_rounded,
+                        color: Colors.redAccent,
+                        size: context.sq(44),
+                      ),
+                    ),
+                    SizedBox(height: context.h(20)),
+                    Text(
+                      'Connection interrupted',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: context.fontSize(18),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: context.h(8)),
+                    Text(
+                      state.errorMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: context.fontSize(13),
+                        height: 1.4,
+                      ),
+                    ),
+                    SizedBox(height: context.h(28)),
+                    GestureDetector(
+                      onTap: () => context.read<VideoFeedCubit>().loadVideos(),
+                      child: Container(
+                        width: double.infinity,
+                        alignment: Alignment.center,
+                        padding: context.paddingVertical(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFE2C55),
+                          borderRadius: context.radiusAll(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFE2C55).withOpacity(0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            )
+                          ],
+                        ),
+                        child: Text(
+                          'Refresh Feed',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: context.fontSize(15),
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
         }
 
-        // EMPTY STATE: No videos found
+        // EMPTY STATE: Standard feedback interface
         if (state.videos.isEmpty) {
           return Scaffold(
-            backgroundColor: Colors.black,
+            backgroundColor: const Color(0xFF0F0F11),
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.video_library_outlined,
-                    color: Colors.white30,
+                    Icons.video_collection_rounded,
+                    color: Colors.white24,
                     size: context.sq(64),
                   ),
                   SizedBox(height: context.h(16)),
                   Text(
-                    'No videos available',
+                    'No videos uploaded yet',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: context.fontSize(16),
-                      fontWeight: FontWeight.bold,
+                      color: Colors.white60,
+                      fontSize: context.fontSize(15),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -304,22 +326,59 @@ class _VideoFeedViewState extends State<VideoFeedView> {
           );
         }
 
-        // SUCCESS STATE: Render video feed with PageView
+        // SUCCESS STATE: Premium TikTok/Douyin style interactive viewport engine
         return Scaffold(
           backgroundColor: Colors.black,
-          body: PageView.builder(
-            controller: _pageController,
-            scrollDirection: Axis.vertical,
-            onPageChanged: (index) => _onPageChanged(index, state.videos),
-            itemCount: state.videos.length,
-            itemBuilder: (context, index) {
-              final controller = _getOrCreateController(index, state.videos);
-              return VideoFeedViewItem(
-                key: ValueKey(state.videos[index].id),
-                videoItem: state.videos[index],
-                controller: controller,
-              );
-            },
+          body: Padding(
+            // Apply defensive layout bottom padding so descriptions are never hidden by the navbar
+            padding: EdgeInsets.only(bottom: bottomNavigationPadding),
+            child: PageView.builder(
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              onPageChanged: (index) => _onPageChanged(index, state.videos),
+              itemCount: state.videos.length,
+              itemBuilder: (context, index) {
+                final controller = _getOrCreateController(index, state.videos);
+                
+                // Return structured card element containing specialized layout spacing boundaries
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: VideoFeedViewItem(
+                        key: ValueKey(state.videos[index].id),
+                        videoItem: state.videos[index],
+                        controller: controller,
+                      ),
+                    ),
+                    
+                    // Shadow vignette to make text highly scannable on bright videos
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: context.h(180),
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withOpacity(0.15),
+                                Colors.black.withOpacity(0.50),
+                                Colors.black.withOpacity(0.85),
+                              ],
+                              stops: const [0.0, 0.3, 0.6, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         );
       },
