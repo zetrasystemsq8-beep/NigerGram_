@@ -238,4 +238,52 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
                         child: Icon(
                           _overlayIconData,
                           color: Colors.white,
-                          size:
+                          size: context.sq(50),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+          // Low-Data Buffering Spin Segment
+          if (_isBuffering)
+            Center(
+              child: SizedBox(
+                width: context.sq(36),
+                height: context.sq(36),
+                child: const CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              ),
+            ),
+            
+          // Connection Error State Layer
+          if (controller.value.hasError)
+            Container(
+              color: Colors.black87,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.wifi_off_rounded, color: Colors.white.withAlpha(140), size: context.sq(44)),
+                    SizedBox(height: context.h(12)),
+                    Text(
+                      "Check connection. Tap to retry.",
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(200),
+                        fontSize: context.fontSize(14),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
