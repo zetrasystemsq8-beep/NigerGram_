@@ -18,7 +18,7 @@ class VideoFeedViewItem extends StatelessWidget {
     required this.controller,
   });
 
-  /// ðŸ“¥ THE REAL-TIME NIGERGRAM COMMENT ENGINE MODAL
+  /// 📥 THE REAL-TIME NIGERGRAM COMMENT ENGINE MODAL
   void _openCommentsModalSheet(BuildContext context) {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
@@ -27,14 +27,12 @@ class VideoFeedViewItem extends StatelessWidget {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withOpacity(0.7),
       builder: (context) {
-        // Direct injection of our active database-connected sheet
-        return const CommentsViewerBottomSheet(videoId: '';) ?? 
-            CommentsViewerBottomSheet(videoId: videoItem.id);
+        return CommentsViewerBottomSheet(videoId: videoItem.id);
       },
     );
   }
 
-  /// ðŸ”— STREAMLINED LOW-DATA DISPATCH SHARE SYSTEM
+  /// 🔗 STREAMLINED LOW-DATA DISPATCH SHARE SYSTEM
   void _executePlatformShareAction(BuildContext context) {
     HapticFeedback.lightImpact();
     final String shareUrl = "https://nigergram.app/video/${videoItem.id}";
@@ -99,7 +97,6 @@ class VideoFeedViewItem extends StatelessWidget {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  // Standardized institutional profile route linking
                   context.push('/profile/${videoItem.creatorId}');
                 },
                 child: Text(
