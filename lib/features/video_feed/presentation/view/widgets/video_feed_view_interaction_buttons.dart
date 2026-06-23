@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/features/video_feed/repository/interaction_repository.dart';
 import 'package:go_router/go_router.dart';
-import 'package:nigergram/features/video_feed/presentation/view/widgets/comments_viewer_bottom_sheet.dart';
 import 'package:nigergram/features/wallet/presentation/widgets/tip_bottom_sheet.dart';
 
 /// ✅ PRODUCTION-READY: Interaction buttons with full backend wiring
@@ -19,6 +18,7 @@ class VideoFeedViewInteractionButtons extends StatefulWidget {
     required this.commentCount,
     required this.shareCount,
     this.isBookmarked = false,
+    this.onCommentTapped, // Added explicit functional hook parameter
     this.onShareTapped,
     this.onBookmarkTapped,
     this.creatorId,
@@ -32,6 +32,7 @@ class VideoFeedViewInteractionButtons extends StatefulWidget {
   final int commentCount;
   final int shareCount;
   final bool isBookmarked;
+  final VoidCallback? onCommentTapped; // Captured into class state
   final VoidCallback? onShareTapped;
   final VoidCallback? onBookmarkTapped;
   final String? creatorId;
@@ -114,7 +115,6 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     _videoSub = null;
   }
 
-  // ✅ LIKE - Backend wired transaction
   Future<void> _handleLike() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -161,7 +161,6 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     }
   }
 
-  // ✅ SAVE/BOOKMARK - Backend wired
   Future<void> _handleSave() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -186,7 +185,6 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     }
   }
 
-  // ✅ COMMENTS - Backend wired with real-time stream
   Future<void> _openComments() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -196,23 +194,13 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
       return;
     }
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => CommentsViewerBottomSheet(videoId: widget.videoId),
-    );
-
-    try {
-      final doc = await _firestore.collection('videos').doc(widget.videoId).get();
-      final newCount = (doc.data()?['commentCount'] as num?)?.toInt() ?? _commentCount;
-      if (mounted) {
-        setState(() => _commentCount = newCount);
-      }
-    } catch (_) {}
+    // Direct performance redirect pipeline back up to layout controller level
+    if (widget.onCommentTapped != null) {
+      widget.onCommentTapped!();
+      return;
+    }
   }
 
-  // ✅ TAGS - Backend wired tag discovery
   Future<void> _handleTagTap() async {
     try {
       final doc = await _firestore.collection('videos').doc(widget.videoId).get();
@@ -232,7 +220,6 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     }
   }
 
-  // ✅ NATIVE SHARE - Share to WhatsApp, Twitter, Copy Link, etc.
   Future<void> _handleShare() async {
     HapticFeedback.mediumImpact();
     
@@ -245,7 +232,6 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
       final description = data['description'] ?? 'Check out this video';
       final deepLink = 'nigergram://video/${widget.videoId}';
       
-      // Share options bottom sheet
       if (mounted) {
         await showModalBottomSheet(
           context: context,
@@ -257,7 +243,6 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
           ),
         );
         
-        // Increment share count
         await _firestore
             .collection('videos')
             .doc(widget.videoId)
@@ -302,7 +287,7 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
         ),
         SizedBox(height: screenHeight * 0.02),
 
-        // Share Button (NEW - Native share)
+        // Share Button
         VideoFeedViewInteractionButton(
           icon: Icons.reply_rounded,
           label: _formatCount(widget.shareCount),
@@ -408,7 +393,6 @@ class VideoFeedViewInteractionButton extends StatelessWidget {
   }
 }
 
-// ✅ NEW: Share options bottom sheet
 class ShareBottomSheet extends StatelessWidget {
   final String videoId;
   final String username;
@@ -427,7 +411,7 @@ class ShareBottomSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF1A1A1A),
+        color: Color(0xFF16161A),
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Padding(
@@ -437,7 +421,7 @@ class ShareBottomSheet extends StatelessWidget {
           children: [
             Text(
               'Share Video',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
             GridView.count(
@@ -455,7 +439,7 @@ class ShareBottomSheet extends StatelessWidget {
                   },
                 ),
                 _ShareOption(
-                  icon: Icons.mail_outline,
+                  icon: Icons.chat_bubble_outline_rounded,
                   label: 'Twitter',
                   color: const Color(0xFF1DA1F2),
                   onTap: () {
@@ -477,7 +461,7 @@ class ShareBottomSheet extends StatelessWidget {
                   },
                 ),
                 _ShareOption(
-                  icon: Icons.link,
+                  icon: Icons.more_horiz_rounded,
                   label: 'More',
                   color: Colors.grey,
                   onTap: () {
@@ -494,7 +478,6 @@ class ShareBottomSheet extends StatelessWidget {
 
   void _share(String platform, String message) {
     debugPrint('Sharing to $platform: $message');
-    // TODO: Implement native share using platform channels
   }
 }
 
@@ -521,7 +504,7 @@ class _ShareOption extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 24),
@@ -529,7 +512,7 @@ class _ShareOption extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
-            style: const TextStyle(color: Colors.white, fontSize: 12),
+            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
             textAlign: TextAlign.center,
           ),
         ],
