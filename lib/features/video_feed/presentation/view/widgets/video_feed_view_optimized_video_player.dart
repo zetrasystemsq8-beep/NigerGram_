@@ -1,3 +1,4 @@
+// lib/features/video_feed/presentation/view/widgets/video_feed_view_optimized_video_player.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nigergram/core/design_system/colors.dart';
@@ -45,8 +46,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     _currentVideoId = widget.videoId;
     _applyLowDataOptimization();
     _addControllerListener();
-    
-    // AUTO-PLAY FIX: Ensure the video starts immediately if initialized
     _ensureAutoplay();
   }
 
@@ -128,7 +127,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
 
-    // ✅ FIXED: Only show loading spinner during buffering, not on initial load
     bool shouldShowBuffering = isBuffering && isPlaying;
 
     if (_isBuffering != shouldShowBuffering || _isPlaying != isPlaying) {
@@ -157,7 +155,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
         controller.play();
         _overlayIconData = Icons.play_arrow_rounded;
       }
-      // ✅ FIXED: Only show overlay on manual interaction
       _showPlayIconOverlay = true;
     });
 
@@ -190,19 +187,17 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       );
     }
 
-    // ✅ FIXED: GestureDetector with proper behavior
     return GestureDetector(
       onTap: _handleSingleTapToggle,
       onDoubleTap: () {
-        // Double-tap to like feature (will be connected to backend)
         HapticFeedback.mediumImpact();
-        // Future: Trigger double-tap like animation
       },
-      behavior: HitTestBehavior.opaque, // ✅ CRITICAL: Allows center tap to work
+      behavior: HitTestBehavior.opaque,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          SizedBox.expand(
+          // Hardware Accelerated Media View Box
+          Positioned.fill(
             child: FittedBox(
               key: _playerKey,
               fit: BoxFit.cover,
@@ -214,7 +209,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             ),
           ),
 
-          // ✅ FIXED: The icon only appears when _showPlayIconOverlay is true (manually triggered)
+          // Scale and Fade Animation Play/Pause Overlay Engine
           if (_showPlayIconOverlay)
             IgnorePointer(
               child: AnimatedBuilder(
@@ -243,51 +238,4 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
                         child: Icon(
                           _overlayIconData,
                           color: Colors.white,
-                          size: context.sq(50),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-          // ✅ FIXED: Show loading spinner only during buffering while playing
-          if (_isBuffering)
-            Center(
-              child: SizedBox(
-                width: context.sq(36),
-                height: context.sq(36),
-                child: const CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2.5,
-                ),
-              ),
-            ),
-            
-          if (controller.value.hasError)
-            Container(
-              color: Colors.black87,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.wifi_off_rounded, color: Colors.white.withAlpha(140), size: context.sq(44)),
-                    SizedBox(height: context.h(12)),
-                    Text(
-                      "Check connection. Tap to retry.",
-                      style: TextStyle(
-                        color: Colors.white.withAlpha(200),
-                        fontSize: context.fontSize(14),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
+                          size:
