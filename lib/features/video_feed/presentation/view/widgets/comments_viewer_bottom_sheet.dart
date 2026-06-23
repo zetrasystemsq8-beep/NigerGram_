@@ -143,14 +143,9 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
 
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-
     if (_isPostingComment) return;
     
-    if (mounted) {
-      setState(() {
-        _isPostingComment = true;
-      });
-    }
+    if (mounted) setState(() => _isPostingComment = true);
 
     try {
       String? userAvatar;
@@ -168,10 +163,9 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
           }
         }
       } catch (e) {
-        debugPrint('Profile profile parsing exception on comments node fetch: $e');
+        debugPrint('Profile fetch exception inside comment node: $e');
       }
 
-      // Safeguard username formatting
       if (!usernameFallback.startsWith('@') && usernameFallback != 'NigerGram User') {
         usernameFallback = '@$usernameFallback';
       }
@@ -184,11 +178,7 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
         userAvatar: userAvatar,
       );
 
-      debugPrint('✅ Comment posted successfully');
-      
-      if (mounted) {
-        _controller.clear();
-      }
+      if (mounted) _controller.clear();
 
       await Future.delayed(const Duration(milliseconds: 150));
       if (_scrollController.hasClients && mounted) {
@@ -199,63 +189,66 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
         );
       }
     } catch (e) {
-      debugPrint('❌ Critical post error: $e');
+      debugPrint('❌ Post error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to post comment: $e'), backgroundColor: const Color(0xFFFF0050)),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isPostingComment = false;
-        });
-      }
+      if (mounted) setState(() => _isPostingComment = false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final bottomInset = mediaQuery.viewInsets.bottom;
+  String _formatTime(DateTime t) {
+    final diff = DateTime.now().difference(t);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    return '${diff.inDays}d';
+  }
 
+  Widget _buildInputArea() {
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F0F12),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(bottom: bottomInset),
-          child: FractionallySizedBox(
-            heightFactor: 0.85,
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+      color: const Color(0xFF0F0F12),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _isPostingComment ? null : _postComment(),
+              enabled: !_isPostingComment,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Write a comment...',
+                hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                isDense: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Comments', 
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-                const SizedBox(height: 12),
-                const Divider(height: 1, color: Colors.white10),
-                Expanded(
-                  child: _buildCommentsList(),
-                ),
-                const Divider(height: 1, color: Colors.white10),
-                _buildInputArea(),
-              ],
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.04),
+              ),
+              minLines: 1,
+              maxLines: 4,
             ),
           ),
-        ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: _isPostingComment
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(color: Color(0xFFFF0050), strokeWidth: 2),
+                  )
+                : const Icon(Icons.send_rounded, color: Color(0xFFFF0050)),
+            onPressed: _isPostingComment ? null : _postComment,
+          ),
+        ],
       ),
     );
   }
@@ -336,4 +329,49 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
     );
   }
 
-  String _formatTime(DateTime
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final bottomInset = mediaQuery.viewInsets.bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F0F12),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: FractionallySizedBox(
+            heightFactor: 0.85,
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Comments', 
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: Colors.white10),
+                Expanded(
+                  child: _buildCommentsList(),
+                ),
+                const Divider(height: 1, color: Colors.white10),
+                _buildInputArea(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
