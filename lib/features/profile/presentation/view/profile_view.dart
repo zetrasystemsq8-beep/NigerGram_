@@ -624,7 +624,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.74), // Fixed non-existent Colors.black74 cleanly here
+                        color: Colors.black.withOpacity(0.74), // Clean non-existent color fix
                       ),
                       child: const Icon(Icons.share_rounded, color: Colors.greenAccent, size: 12),
                     ),
@@ -802,7 +802,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
           if (_isUploadingContent)
             Positioned.fill(
               child: Container(
-                color: Colors.black74,
+                color: Colors.black.withOpacity(0.74), // Cleaned line 805 compilation breakdown bug
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
