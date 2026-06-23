@@ -35,6 +35,10 @@ dependencies:
   path_provider: ^2.0.14
   http: ^1.2.2
   url_launcher: ^6.1.10
+  
+  # Structural Additions Required by profile_view.dart
+  cached_network_image: ^3.4.1
+  share_plus: ^9.0.0
 
 dev_dependencies:
   flutter_test:
