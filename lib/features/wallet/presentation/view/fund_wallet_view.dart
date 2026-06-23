@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:nigergram/core/services/monnify_service.dart';
@@ -29,25 +28,26 @@ class _FundWalletViewState extends State<FundWalletView> {
   Future<void> _startFunding() async {
     final amount = double.tryParse(_amountController.text) ?? 0.0;
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid amount')),
+      );
       return;
     }
     setState(() => _isLoading = true);
 
     try {
-      // Use authenticated user's email when available; fallback to a placeholder
       final user = FirebaseAuth.instance.currentUser;
       final customerEmail = user?.email ?? 'user@example.com';
       final customerName = user?.displayName ?? 'NigerGram User';
 
-      // Pass required Monnify params including customerName and customerEmail
       final init = await _monnify.initTransaction(
         amount: amount,
         customerEmail: customerEmail,
         customerName: customerName,
       );
+      
       final checkoutUrl = init['checkoutUrl'] as String?;
-      final transactionReference = init['reference'] as String?;
+      final transactionReference = init['transactionReference'] as String?;
 
       if (checkoutUrl != null) {
         final uri = Uri.parse(checkoutUrl);
@@ -60,31 +60,42 @@ class _FundWalletViewState extends State<FundWalletView> {
           if (paid) {
             await _walletCubit.fundWallet(amount: amount);
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wallet funded successfully')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Wallet funded successfully')),
+              );
               Navigator.of(context).pop();
             }
           } else {
-            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment not confirmed')));
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Payment verification timeout or not confirmed')),
+              );
+            }
           }
         }
       } else {
-        throw Exception('Failed to obtain checkout url');
+        throw Exception('Failed to obtain sandbox checkout verification gateway URL');
       }
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Funding failed: $e')));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Funding failed: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // NOTE: queryTransaction expects a single positional reference parameter in this Monnify wrapper
   Future<bool> _pollUntilPaid(String reference, {Duration timeout = const Duration(minutes: 2)}) async {
     final end = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(end)) {
       try {
         final res = await _monnify.queryTransaction(reference);
-        final status = (res['status'] as String?) ?? '';
-        if (status.toLowerCase() == 'paid' || status.toLowerCase() == 'success') return true;
+        final status = (res['paymentStatus'] as String?) ?? (res['status'] as String?) ?? '';
+        if (status.toUpperCase() == 'PAID' || status.toUpperCase() == 'SUCCESS') {
+          return true;
+        }
       } catch (_) {}
       await Future.delayed(const Duration(seconds: 5));
     }
@@ -94,20 +105,48 @@ class _FundWalletViewState extends State<FundWalletView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Fund Wallet')),
+      backgroundColor: const Color(0xFF121212),
+      appBar: AppBar(
+        title: const Text('Fund Wallet', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextField(
               controller: _amountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Amount (₦)', border: OutlineInputBorder()),
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'Amount (₦)',
+                labelStyle: TextStyle(color: Colors.grey),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.greenAccent),
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _isLoading ? null : _startFunding,
-              child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Pay via Monnify'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.greenAccent,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: _isLoading 
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                  )
+                : const Text('Pay via Monnify Sandbox', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
