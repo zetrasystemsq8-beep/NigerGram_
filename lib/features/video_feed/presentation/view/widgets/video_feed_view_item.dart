@@ -1,9 +1,12 @@
 // lib/features/video_feed/presentation/view/widgets/video_feed_view_item.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:video_player/video_player.dart';
 import 'video_feed_view_optimized_video_player.dart';
 import 'video_feed_view_interaction_buttons.dart';
+import 'comments_viewer_bottom_sheet.dart';
 
 class VideoFeedViewItem extends StatelessWidget {
   final VideoEntity videoItem;
@@ -15,123 +18,40 @@ class VideoFeedViewItem extends StatelessWidget {
     required this.controller,
   });
 
-  /// 📥 THE TIKTOK-STYLE COMMENT SHEET SYSTEM
+  /// ðŸ“¥ THE REAL-TIME NIGERGRAM COMMENT ENGINE MODAL
   void _openCommentsModalSheet(BuildContext context) {
+    HapticFeedback.mediumImpact();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true, 
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withOpacity(0.7),
       builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.65,
-          minChildSize: 0.40,
-          maxChildSize: 0.90,
-          expand: false,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFF16161A),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  Container(
-                    width: 40,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2.5),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  Text(
-                    'Comments (${videoItem.commentCount})',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(color: Colors.white12, height: 1),
-                  
-                  Expanded(
-                    child: ListView.builder(
-                      controller: scrollController,
-                      itemCount: videoItem.commentCount > 0 ? videoItem.commentCount : 1,
-                      itemBuilder: (context, index) {
-                        if (videoItem.commentCount == 0) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 64.0),
-                              child: Text(
-                                'Be the first to share your thoughts!',
-                                style: TextStyle(color: Colors.grey, fontSize: 14),
-                              ),
-                            ),
-                          );
-                        }
-                        return ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: Color(0xFFFE2C55),
-                            child: Icon(Icons.person, color: Colors.white),
-                          ),
-                          title: Text(
-                            'NigerGram Fan $index',
-                            style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: const Text(
-                            'This content is completely elite! Massive respect 🇳🇬🚀',
-                            style: TextStyle(color: Colors.white, fontSize: 14),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: 16,
-                      right: 16,
-                      bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-                      top: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
-                            decoration: InputDecoration(
-                              hintText: 'Add a premium comment...',
-                              hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-                              fillColor: const Color(0xFF26262B),
-                              filled: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(24),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.send_rounded, color: Color(0xFFFE2C55)),
-                          onPressed: () {},
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
+        // Direct injection of our active database-connected sheet
+        return const CommentsViewerBottomSheet(videoId: '';) ?? 
+            CommentsViewerBottomSheet(videoId: videoItem.id);
       },
     );
+  }
+
+  /// ðŸ”— STREAMLINED LOW-DATA DISPATCH SHARE SYSTEM
+  void _executePlatformShareAction(BuildContext context) {
+    HapticFeedback.lightImpact();
+    final String shareUrl = "https://nigergram.app/video/${videoItem.id}";
+    final String shareText = "Check out @${videoItem.username} on NigerGram: $shareUrl";
+
+    try {
+      Clipboard.setData(ClipboardData(text: shareText));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Video payload link secured to clipboard workspace!'),
+          backgroundColor: Colors.blueAccent,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Share bridge invocation error: $e');
+    }
   }
 
   @override
@@ -155,12 +75,12 @@ class VideoFeedViewItem extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black38,
+                    Colors.black45,
                     Colors.transparent,
                     Colors.transparent,
-                    Colors.black54,
+                    Colors.black87,
                   ],
-                  stops: [0.0, 0.2, 0.7, 1.0],
+                  stops: [0.0, 0.2, 0.65, 1.0],
                 ),
               ),
             ),
@@ -178,7 +98,9 @@ class VideoFeedViewItem extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: () {
-                  debugPrint('Navigate to profile of user: ${videoItem.username}');
+                  HapticFeedback.lightImpact();
+                  // Standardized institutional profile route linking
+                  context.push('/profile/${videoItem.creatorId}');
                 },
                 child: Text(
                   '@${videoItem.username}',
@@ -197,7 +119,7 @@ class VideoFeedViewItem extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFFE4E6EB), // Fixed duplication and syntax error cleanly here
+                  color: Color(0xFFE4E6EB),
                   fontSize: 14,
                   height: 1.3,
                   shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
@@ -221,11 +143,10 @@ class VideoFeedViewItem extends StatelessWidget {
             creatorId: videoItem.creatorId,
             creatorUsername: videoItem.username,
             onCommentTapped: () => _openCommentsModalSheet(context),
-            onShareTapped: () {
-              debugPrint('Native distribution sheet initialization triggered');
-            },
+            onShareTapped: () => _executePlatformShareAction(context),
             onBookmarkTapped: () {
-              debugPrint('Persisted compilation collection updated');
+              HapticFeedback.selectionClick();
+              debugPrint('Persisted compilation collection updated dynamically for: ${videoItem.id}');
             },
           ),
         ),
