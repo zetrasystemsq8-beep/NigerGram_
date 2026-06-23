@@ -19,12 +19,9 @@ class InteractionRepository {
       final likeSnap = await tx.get(likeRef);
       final videoSnap = await tx.get(videoRef);
 
-      // Get current like count for syncing
-      int currentLikes = 0;
       List<dynamic> likedBy = [];
       if (videoSnap.exists) {
-        currentLikes = (videoSnap.data()?['likeCount'] as num?)?.toInt() ?? 0;
-        likedBy = (videoSnap.data()?['likedBy'] as List<dynamic>?) ?? [];
+        likedBy = List.from((videoSnap.data()?['likedBy'] as List<dynamic>?) ?? []);
       }
 
       if (likeSnap.exists) {
@@ -42,7 +39,9 @@ class InteractionRepository {
           'userId': userId,
           'timestamp': FieldValue.serverTimestamp(),
         });
-        likedBy.add(userId);
+        if (!likedBy.contains(userId)) {
+          likedBy.add(userId);
+        }
         tx.update(videoRef, {
           'likeCount': FieldValue.increment(1),
           'likedBy': likedBy,
@@ -65,7 +64,7 @@ class InteractionRepository {
 
       List<dynamic> savedBy = [];
       if (videoSnap.exists) {
-        savedBy = (videoSnap.data()?['savedBy'] as List<dynamic>?) ?? [];
+        savedBy = List.from((videoSnap.data()?['savedBy'] as List<dynamic>?) ?? []);
       }
 
       if (saveSnap.exists) {
@@ -80,7 +79,9 @@ class InteractionRepository {
           'userId': userId,
           'timestamp': FieldValue.serverTimestamp(),
         });
-        savedBy.add(userId);
+        if (!savedBy.contains(userId)) {
+          savedBy.add(userId);
+        }
         tx.update(videoRef, {'savedBy': savedBy});
         return true;
       }
@@ -103,22 +104,28 @@ class InteractionRepository {
     // Create a new document with auto-generated ID
     final newDoc = commentsRef.doc();
 
+    // Use absolute pre-calculated deterministic time blocks inside atomic transactions
     final commentData = {
       'id': newDoc.id,
       'userId': userId,
       'username': username,
       'userAvatar': userAvatar ?? '',
       'text': text,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': Timestamp.now(), // Fixed transaction pipeline token hanging
       'likes': 0,
     };
 
     await _firestore.runTransaction((tx) async {
+      final videoSnap = await tx.get(videoRef);
+      if (!videoSnap.exists) {
+        throw Exception("Target video structural metadata registry node does not exist.");
+      }
+      
       tx.set(newDoc, commentData);
       tx.update(videoRef, {'commentCount': FieldValue.increment(1)});
     });
 
-    return newDoc.id; // Return comment ID for potential future operations
+    return newDoc.id;
   }
 
   /// Get a stream of comments for a video, ordered by timestamp descending.
@@ -159,6 +166,7 @@ class InteractionRepository {
   Future<bool> isVideoLiked(String videoId, String userId) async {
     try {
       final doc = await _firestore.collection('videos').doc(videoId).get();
+      if (!doc.exists) return false;
       final likedBy = (doc.data()?['likedBy'] as List<dynamic>?) ?? [];
       return likedBy.contains(userId);
     } catch (_) {
@@ -171,6 +179,7 @@ class InteractionRepository {
   Future<bool> isVideoSaved(String videoId, String userId) async {
     try {
       final doc = await _firestore.collection('videos').doc(videoId).get();
+      if (!doc.exists) return false;
       final savedBy = (doc.data()?['savedBy'] as List<dynamic>?) ?? [];
       return savedBy.contains(userId);
     } catch (_) {
