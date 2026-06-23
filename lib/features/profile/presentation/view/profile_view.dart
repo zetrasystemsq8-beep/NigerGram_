@@ -218,10 +218,10 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
       await uploadTask;
       final String downloadUrl = await videoRef.getDownloadURL();
 
-      // Institutional fallback thumbnail architecture mapping
       const String fallbackThumbnail = 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500&q=60';
 
       await FirebaseFirestore.instance.collection('videos').doc(videoId).set({
+        'videoId': videoId,
         'userId': currentAuthUser.uid,
         'videoUrl': downloadUrl,
         'thumbnailUrl': fallbackThumbnail,
@@ -291,18 +291,25 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'displayName': name.trim(),
-        'username': username.trim().toLowerCase(),
-        'bio': bio.trim(),
-        'instagramLink': insta.trim(),
-        'youtubeLink': youtube.trim(),
-      });
-      await _loadProfileWorkspace();
-    } catch (e) {
-      rethrow;
+    // Use a multi-field merge patch update to protect existing analytics metrics
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'displayName': name.trim(),
+      'username': username.trim().toLowerCase(),
+      'bio': bio.trim(),
+      'instagramLink': insta.trim(),
+      'youtubeLink': youtube.trim(),
+    }, SetOptions(merge: true));
+
+    await _loadProfileWorkspace();
+  }
+
+  String _formatMetrics(int num) {
+    if (num >= 1000000) {
+      return '${(num / 1000000).toStringAsFixed(1)}M';
+    } else if (num >= 1000) {
+      return '${(num / 1000).toStringAsFixed(1)}K';
     }
+    return num.toString();
   }
 
   void _showCreatorAnalyticsOverlay() {
@@ -402,9 +409,9 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
       isScrollControlled: true,
       backgroundColor: const Color(0xFF0F0F11),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) {
+      builder: (modalContext) {
         return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 20),
+          padding: EdgeInsets.only(bottom: MediaQuery.of(modalContext).viewInsets.bottom, left: 24, right: 24, top: 20),
           child: Form(
             key: formKey,
             child: SingleChildScrollView(
@@ -427,21 +434,40 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                   TextFormField(controller: youtubeController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('YouTube Channel Link Sub-path')),
                   const SizedBox(height: 20),
                   StatefulBuilder(
-                    builder: (context, setModalState) {
+                    builder: (statefulContext, setModalState) {
                       return ElevatedButton(
                         onPressed: isSaving ? null : () async {
                           if (formKey.currentState!.validate()) {
                             setModalState(() => isSaving = true);
                             try {
-                              await _updateProfileWorkspaceData(nameController.text, usernameController.text, bioController.text, instaController.text, youtubeController.text);
-                              if (context.mounted) Navigator.pop(context);
+                              await _updateProfileWorkspaceData(
+                                nameController.text, 
+                                usernameController.text, 
+                                bioController.text, 
+                                instaController.text, 
+                                youtubeController.text
+                              );
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                              }
                             } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Sync Error: $e'), backgroundColor: Colors.red),
+                                );
+                              }
                               setModalState(() => isSaving = false);
                             }
                           }
                         },
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF0050), padding: const EdgeInsets.symmetric(vertical: 14)),
-                        child: isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Synchronize Profiles', style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF0050), 
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: isSaving 
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                            : const Text('Synchronize Profiles', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       );
                     },
                   ),
@@ -501,331 +527,88 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
       fillColor: Colors.white.withOpacity(0.02),
       enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white10), borderRadius: BorderRadius.circular(8)),
       focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFFFF0050)), borderRadius: BorderRadius.circular(8)),
+      errorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
+      focusedErrorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.red), borderRadius: BorderRadius.circular(8)),
     );
   }
 
-  String _formatMetrics(int number) {
-    if (number >= 1000000) return '${(number / 1000000).toStringAsFixed(1)}M';
-    if (number >= 1000) return '${(number / 1000).toStringAsFixed(1)}K';
-    return number.toString();
-  }
+  void _executePlatformShareAction(String platform, String videoId) {
+    HapticFeedback.lightImpact();
+    final String shareUrl = "https://nigergram.app/video/$videoId";
+    final String shareText = "Check out this video on NigerGram: $shareUrl";
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(backgroundColor: Colors.black, body: Center(child: CircularProgressIndicator(color: Color(0xFFFF0050))));
+    try {
+      if (platform == 'whatsapp') {
+        Clipboard.setData(ClipboardData(text: shareText));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Link copied! Redirecting to WhatsApp...'), backgroundColor: Colors.green),
+        );
+      } else {
+        Clipboard.setData(ClipboardData(text: shareText));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Video link copied to clipboard workspace!'), backgroundColor: Colors.blue),
+        );
+      }
+    } catch (e) {
+      debugPrint('Share channel invocation mismatch: $e');
     }
-
-    final username = _userData?['username'] ?? 'nigergram_creator';
-    final displayName = _userData?['displayName'] ?? 'NigerGram Creator';
-    final bio = _userData?['bio'] ?? 'Naija Space Content Engine';
-    final profilePicUrl = _userData?['profilePicUrl'];
-    final coverUrl = _userData?['coverUrl'];
-    final followers = _userData?['followers'] ?? 0;
-    final following = _userData?['following'] ?? 0;
-    final totalLikes = _userData?['totalLikes'] ?? 0;
-    final instagramLink = _userData?['instagramLink'] ?? '';
-    final youtubeLink = _userData?['youtubeLink'] ?? '';
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (_isUploadingContent)
-              Container(
-                color: const Color(0xFFFF0050).withOpacity(0.2),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(color: Color(0xFFFF0050), strokeWidth: 2),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Pushing high-fidelity components: ${(_uploadProgress * 100).toStringAsFixed(0)}%',
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: RefreshIndicator(
-                color: const Color(0xFFFF0050),
-                onRefresh: _loadProfileWorkspace,
-                child: NestedScrollView(
-                  controller: _scrollController,
-                  headerSliverBuilder: (context, innerBoxIsScrolled) {
-                    return [
-                      SliverToBoxAdapter(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Interactive Cover Art Canvas Section
-                            GestureDetector(
-                              onTap: _isCurrentUser ? _updateCoverArtImage : null,
-                              child: Container(
-                                height: 130,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade900,
-                                  image: coverUrl != null
-                                      ? DecorationImage(image: NetworkImage(coverUrl), fit: BoxFit.cover)
-                                      : null,
-                                ),
-                                child: coverUrl == null && _isCurrentUser
-                                    ? const Center(
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.add_a_photo_rounded, color: Colors.white38, size: 16),
-                                            SizedBox(width: 8),
-                                            Text('Upload Cover Art Branding', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                            ),
-                            // Profile Structural Meta-data Alignment layout
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                              child: Column(
-                                children: [
-                                  Transform.translate(
-                                    offset: const Offset(0, -40),
-                                    child: Stack(
-                                      alignment: Alignment.bottomRight,
-                                      children: [
-                                        Container(
-                                          width: 90,
-                                          height: 90,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.black, width: 4),
-                                            boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 8)],
-                                          ),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(45),
-                                            child: profilePicUrl != null
-                                                ? Image.network(profilePicUrl, fit: BoxFit.cover, errorBuilder: (context, e, s) => _buildPlaceholderAvatar())
-                                                : _buildPlaceholderAvatar(),
-                                          ),
-                                        ),
-                                        if (_isCurrentUser)
-                                          GestureDetector(
-                                            onTap: _showAdvancedEditSheet,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(6),
-                                              decoration: const BoxDecoration(color: Color(0xFFFF0050), shape: BoxShape.circle),
-                                              child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  Transform.translate(
-                                    offset: const Offset(0, -24),
-                                    child: Column(
-                                      children: [
-                                        Text(displayName, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
-                                        const SizedBox(height: 4),
-                                        Text('@$username', style: const TextStyle(color: Colors.white60, fontSize: 13)),
-                                        const SizedBox(height: 12),
-                                        
-                                        // Social Linking Infrastructure Hook Layer
-                                        if (instagramLink.isNotEmpty || youtubeLink.isNotEmpty)
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              if (instagramLink.isNotEmpty)
-                                                Padding(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                                                  child: Chip(
-                                                    backgroundColor: Colors.white.withOpacity(0.04),
-                                                    avatar: const Icon(Icons.link_rounded, color: Colors.pinkAccent, size: 14),
-                                                    label: Text(instagramLink, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                                                  ),
-                                                ),
-                                              if (youtubeLink.isNotEmpty)
-                                                Padding(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                                                  child: Chip(
-                                                    backgroundColor: Colors.white.withOpacity(0.04),
-                                                    avatar: const Icon(Icons.play_circle_fill_rounded, color: Colors.red, size: 14),
-                                                    label: Text(youtubeLink, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            _buildStatMetric(_formatMetrics(following), 'Following'),
-                                            _buildVerticalDivider(),
-                                            _buildStatMetric(_formatMetrics(followers), 'Followers'),
-                                            _buildVerticalDivider(),
-                                            _buildStatMetric(_formatMetrics(totalLikes), 'Likes'),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(bio, style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4), textAlign: TextAlign.center),
-                                        const SizedBox(height: 20),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: GestureDetector(
-                                                onTap: _isCurrentUser ? _showAdvancedEditSheet : () {},
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(vertical: 11),
-                                                  decoration: BoxDecoration(
-                                                    color: _isCurrentUser ? Colors.white.withOpacity(0.05) : const Color(0xFFFF0050),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(color: _isCurrentUser ? Colors.white12 : Colors.transparent),
-                                                  ),
-                                                  child: Center(
-                                                    child: Text(
-                                                      _isCurrentUser ? 'Edit Profile' : 'Follow Base',
-                                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            if (_isCurrentUser) ...[
-                                              const SizedBox(width: 8),
-                                              GestureDetector(
-                                                onTap: _showCreatorAnalyticsOverlay,
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(10),
-                                                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white12)),
-                                                  child: const Icon(Icons.analytics_outlined, color: Colors.white, size: 18),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              GestureDetector(
-                                                onTap: _showMediaPostActionSheet,
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(10),
-                                                  decoration: BoxDecoration(color: const Color(0xFFFF0050).withOpacity(0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFFF0050).withOpacity(0.3))),
-                                                  child: const Icon(Icons.add_a_photo_rounded, color: Color(0xFFFF0050), size: 18),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SliverPersistentHeader(
-                        pinned: true,
-                        delegate: _SliverAppBarDelegate(
-                          TabBar(
-                            controller: _tabController,
-                            indicatorColor: Colors.white,
-                            labelColor: Colors.white,
-                            unselectedLabelColor: Colors.white38,
-                            tabs: _isCurrentUser
-                                ? const [
-                                    Tab(icon: Icon(Icons.grid_on_rounded, size: 18)),
-                                    Tab(icon: Icon(Icons.lock_outline_rounded, size: 18)),
-                                    Tab(icon: Icon(Icons.bookmark_border_rounded, size: 18)),
-                                    Tab(icon: Icon(Icons.favorite_border_rounded, size: 18)),
-                                  ]
-                                : const [
-                                    Tab(icon: Icon(Icons.grid_on_rounded, size: 18)),
-                                    Tab(icon: Icon(Icons.favorite_border_rounded, size: 18)),
-                                  ],
-                          ),
-                        ),
-                      ),
-                    ];
-                  },
-                  body: TabBarView(
-                    controller: _tabController,
-                    children: _isCurrentUser
-                        ? [
-                            _buildVideoGrid(_userVideos, true),
-                            _buildVideoGrid(_privateVideos, false),
-                            _buildVideoGrid(_bookmarkedVideos, false),
-                            _buildVideoGrid(_likedVideos, false),
-                          ]
-                        : [
-                            _buildVideoGrid(_userVideos, false),
-                            _buildVideoGrid(_likedVideos, false),
-                          ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
-  Widget _buildVideoGrid(List<QueryDocumentSnapshot> videoDocs, bool attachPaginationEngine) {
-    if (videoDocs.isEmpty) {
+  Widget _buildVideoGrid(List<QueryDocumentSnapshot> videos) {
+    if (videos.isEmpty) {
       return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.video_library_rounded, color: Colors.white24, size: 40),
-            SizedBox(height: 12),
-            Text('No Creations Tracked', style: TextStyle(color: Colors.white38, fontSize: 13)),
-          ],
-        ),
+        child: Text('No content nodes cached in this matrix.', style: TextStyle(color: Colors.white38, fontSize: 13)),
       );
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.all(1),
-      itemCount: videoDocs.length + (attachPaginationEngine && _isLoadingMore ? 1 : 0),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 1.5, mainAxisSpacing: 1.5, childAspectRatio: 0.72),
+      padding: const EdgeInsets.all(4),
+      itemCount: videos.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 4,
+        mainAxisSpacing: 4,
+        childAspectRatio: 0.75,
+      ),
       itemBuilder: (context, index) {
-        if (index == videoDocs.length) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFFFF0050)));
-        }
-
-        final video = videoDocs[index].data() as Map<String, dynamic>;
-        final String? thumbnailUrl = video['thumbnailUrl'];
-        final int likes = video['likeCount'] ?? 0;
-        final String videoId = videoDocs[index].id;
+        final data = videos[index].data() as Map<String, dynamic>;
+        final thumb = data['thumbnailUrl'] ?? '';
+        final videoId = data['videoId'] ?? '';
 
         return GestureDetector(
-          onTap: () => context.push('/video-detail/$videoId'),
+          onTap: () => context.push('/video-player/$videoId'),
           child: Container(
-            color: const Color(0xFF0F0F12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.02),
+              borderRadius: BorderRadius.circular(4),
+              image: thumb.isNotEmpty ? DecorationImage(image: NetworkImage(thumb), fit: BoxFit.cover) : null,
+            ),
             child: Stack(
-              fit: StackFit.expand,
               children: [
-                thumbnailUrl != null
-                    ? Image.network(thumbnailUrl, fit: BoxFit.cover, cacheWidth: 150, errorBuilder: (c, e, s) => _buildPlaceholderThumbnailGrid())
-                    : _buildPlaceholderThumbnailGrid(),
-                Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black87], stops: [0.7, 1.0]),
+                Positioned(
+                  bottom: 4,
+                  left: 4,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 14),
+                      const SizedBox(width: 2),
+                      Text(
+                        _formatMetrics(data['viewCount'] ?? 0),
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
                 ),
                 Positioned(
-                  bottom: 8,
-                  left: 8,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.favorite_rounded, color: Color(0xFFFF0050), size: 12),
-                      const SizedBox(width: 4),
-                      Text(_formatMetrics(likes), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ],
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () => _executePlatformShareAction('whatsapp', videoId),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
+                      child: const Icon(Icons.share_rounded, color: Colors.greenAccent, size: 12),
+                    ),
                   ),
                 ),
               ],
@@ -836,21 +619,230 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildPlaceholderAvatar() => Container(color: Colors.grey.shade900, child: const Icon(Icons.person_rounded, color: Colors.white38));
-  Widget _buildPlaceholderThumbnailGrid() => Container(color: const Color(0xFF151518), child: const Icon(Icons.play_arrow_rounded, color: Colors.white12));
-  Widget _buildStatMetric(String count, String label) => Column(children: [Text(count, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)), const SizedBox(height: 2), Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11))]);
-  Widget _buildVerticalDivider() => Container(height: 12, width: 1, color: Colors.white12, margin: const EdgeInsets.symmetric(horizontal: 16));
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF09090B),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFFFF0050))),
+      );
+    }
+
+    final String displayName = _userData?['displayName'] ?? 'NigerGram Creator';
+    final String username = '@${_userData?['username'] ?? 'username'}';
+    final String bio = _userData?['bio'] ?? 'No biography written yet.';
+    final String coverUrl = _userData?['coverUrl'] ?? '';
+    final String profilePic = _userData?['profilePicUrl'] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF09090B),
+      body: Stack(
+        children: [
+          NestedScrollView(
+            controller: _scrollController,
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverAppBar(
+                  expandedHeight: 180,
+                  pinned: true,
+                  backgroundColor: const Color(0xFF09090B),
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: GestureDetector(
+                      onTap: _isCurrentUser ? _updateCoverArtImage : null,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          coverUrl.isNotEmpty
+                              ? Image.network(coverUrl, fit: BoxFit.cover)
+                              : Container(
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [Color(0xFF1E1E24), Color(0xFF09090B)],
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                    ),
+                                  ),
+                                ),
+                          if (_isCurrentUser)
+                            const Positioned(
+                              top: 40,
+                              right: 16,
+                              child: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Colors.black45,
+                                child: Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Transform.translate(
+                          offset: const Offset(0, -40),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              CircleAvatar(
+                                radius: 44,
+                                backgroundColor: const Color(0xFF09090B),
+                                child: CircleAvatar(radius: 40, backgroundImage: NetworkImage(profilePic)),
+                              ),
+                              const Spacer(),
+                              if (_isCurrentUser) ...[
+                                IconButton(
+                                  icon: const Icon(Icons.analytics_rounded, color: Colors.white70),
+                                  onPressed: _showCreatorAnalyticsOverlay,
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: _showAdvancedEditSheet,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white.withOpacity(0.06),
+                                    side: const BorderSide(color: Colors.white10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  child: const Text('Edit Profile', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        Transform.translate(
+                          offset: const Offset(0, -24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(displayName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 2),
+                              Text(username, style: const TextStyle(color: Color(0xFFFF0050), fontSize: 14, fontWeight: FontWeight.w500)),
+                              const SizedBox(height: 12),
+                              Text(bio, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13, height: 1.4)),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  _buildCounterStat(_formatMetrics(_userData?['following'] ?? 0), 'Following'),
+                                  const SizedBox(width: 24),
+                                  _buildCounterStat(_formatMetrics(_userData?['followers'] ?? 0), 'Followers'),
+                                  const SizedBox(width: 24),
+                                  _buildCounterStat(_formatMetrics(_userData?['totalLikes'] ?? 0), 'Likes'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _SliverAppBarDelegate(
+                    TabBar(
+                      controller: _tabController,
+                      indicatorColor: const Color(0xFFFF0050),
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white38,
+                      tabs: _isCurrentUser
+                          ? const [
+                              Tab(icon: Icon(Icons.grid_on_rounded, size: 20)),
+                              Tab(icon: Icon(Icons.lock_outline_rounded, size: 20)),
+                              Tab(icon: Icon(Icons.bookmark_outline_rounded, size: 20)),
+                              Tab(icon: Icon(Icons.favorite_border_rounded, size: 20)),
+                            ]
+                          : const [
+                              Tab(icon: Icon(Icons.grid_on_rounded, size: 20)),
+                              Tab(icon: Icon(Icons.favorite_border_rounded, size: 20)),
+                            ],
+                    ),
+                  ),
+                ),
+              ];
+            },
+            body: TabBarView(
+              controller: _tabController,
+              children: _isCurrentUser
+                  ? [
+                      _buildVideoGrid(_userVideos),
+                      _buildVideoGrid(_privateVideos),
+                      _buildVideoGrid(_bookmarkedVideos),
+                      _buildVideoGrid(_likedVideos),
+                    ]
+                  : [
+                      _buildVideoGrid(_userVideos),
+                      _buildVideoGrid(_likedVideos),
+                    ],
+            ),
+          ),
+          if (_isUploadingContent)
+            Container(
+              color: Colors.black74,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 48.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      LinearProgressIndicator(value: _uploadProgress, color: const Color(0xFFFF0050), backgroundColor: Colors.white10),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Pushing high-fidelity payload... ${( _uploadProgress * 100).toStringAsFixed(0)}%',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      floatingActionButton: _isCurrentUser
+          ? FloatingActionButton(
+              onPressed: _showMediaPostActionSheet,
+              backgroundColor: const Color(0xFFFF0050),
+              child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildCounterStat(String value, String label) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+      ],
+    );
+  }
 }
 
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  _SliverAppBarDelegate(this._tabBar);
   final TabBar _tabBar;
+  _SliverAppBarDelegate(this._tabBar);
+
   @override
   double get minExtent => _tabBar.preferredSize.height;
   @override
   double get maxExtent => _tabBar.preferredSize.height;
+
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => Container(color: Colors.black, child: _tabBar);
+  Widget build(BuildContext context, double shrinkOffset, bool overrides) {
+    return Container(
+      color: const Color(0xFF09090B),
+      child: _tabBar,
+    );
+  }
+
   @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
+  }
 }
