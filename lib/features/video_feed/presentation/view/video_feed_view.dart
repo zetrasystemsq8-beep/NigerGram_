@@ -1,3 +1,4 @@
+// lib/features/video_feed/presentation/view/video_feed_view.dart
 import 'dart:async';
 import 'dart:ui';
 
@@ -22,6 +23,7 @@ class VideoFeedView extends StatefulWidget {
 class _VideoFeedViewState extends State<VideoFeedView> {
   late PageController _pageController;
   final Map<int, VideoPlayerController> _controllers = {};
+  final Map<int, VoidCallback> _activeListeners = {};
   int _focusedIndex = 0;
 
   /// Track reported view increments so we only increment once per session per video
@@ -40,12 +42,23 @@ class _VideoFeedViewState extends State<VideoFeedView> {
   @override
   void dispose() {
     _pageController.dispose();
-    for (var controller in _controllers.values) {
-      controller.removeListener(() {});
-      controller.dispose();
+    _clearAndDisposeAllControllers();
+    super.dispose();
+  }
+
+  void _clearAndDisposeAllControllers() {
+    for (var index in _controllers.keys) {
+      final controller = _controllers[index];
+      final listener = _activeListeners[index];
+      if (controller != null) {
+        if (listener != null) {
+          controller.removeListener(listener);
+        }
+        controller.dispose();
+      }
     }
     _controllers.clear();
-    super.dispose();
+    _activeListeners.clear();
   }
 
   void _onPageChanged(int index, List<VideoEntity> videos) {
@@ -74,6 +87,11 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     // Aggressively dispose distant players to save cellular data and RAM
     _controllers.removeWhere((key, controller) {
       if ((key - index).abs() > 1) {
+        final listener = _activeListeners[key];
+        if (listener != null) {
+          controller.removeListener(listener);
+          _activeListeners.remove(key);
+        }
         controller.dispose();
         return true;
       }
@@ -129,13 +147,18 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     final controller = _controllers[index];
     if (controller == null) return;
 
-    debugPrint('🔔 Attaching view listener for videoId=$videoId at index $index');
+    // Remove old listener on this slot if it exists before assigning a new one
+    final oldListener = _activeListeners[index];
+    if (oldListener != null) {
+      controller.removeListener(oldListener);
+      _activeListeners.remove(index);
+    }
 
-    if (_viewReported.contains(videoId)) return;
+    debugPrint('🔔 Attaching clean view listener for videoId=$videoId at index $index');
 
     Duration lastPosition = Duration.zero;
 
-    void listener() {
+    void currentListener() {
       if (!mounted) return;
       if (controller.value.isPlaying) {
         final pos = controller.value.position;
@@ -154,7 +177,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
           });
         }
 
-        final duration = controller.value.duration ?? Duration.zero;
+        final duration = controller.value.duration;
         if (duration.inMilliseconds > 0 && pos >= duration - const Duration(milliseconds: 150)) {
           Future.microtask(() async {
             await Future.delayed(const Duration(milliseconds: 300));
@@ -176,17 +199,16 @@ class _VideoFeedViewState extends State<VideoFeedView> {
       }
     }
 
-    controller.addListener(listener);
+    _activeListeners[index] = currentListener;
+    controller.addListener(currentListener);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Get bottom padding layout constraint to safely clear navigation bar overlay heights
     final bottomNavigationPadding = MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight;
 
     return BlocBuilder<VideoFeedCubit, VideoFeedState>(
       builder: (context, state) {
-        // LOADING STATE: Show premium blur backdrop instead of raw black emptiness
         if (state.isLoading && state.videos.isEmpty) {
           return Scaffold(
             backgroundColor: const Color(0xFF0F0F11),
@@ -221,7 +243,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
           );
         }
 
-        // ERROR STATE: Custom recovery layout implementation
         if (!state.isSuccess && state.errorMessage.isNotEmpty) {
           return Scaffold(
             backgroundColor: const Color(0xFF0F0F11),
@@ -298,7 +319,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
           );
         }
 
-        // EMPTY STATE: Standard feedback interface
         if (state.videos.isEmpty) {
           return Scaffold(
             backgroundColor: const Color(0xFF0F0F11),
@@ -326,11 +346,9 @@ class _VideoFeedViewState extends State<VideoFeedView> {
           );
         }
 
-        // SUCCESS STATE: Premium TikTok/Douyin style interactive viewport engine
         return Scaffold(
           backgroundColor: Colors.black,
           body: Padding(
-            // Apply defensive layout bottom padding so descriptions are never hidden by the navbar
             padding: EdgeInsets.only(bottom: bottomNavigationPadding),
             child: PageView.builder(
               controller: _pageController,
@@ -340,7 +358,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
               itemBuilder: (context, index) {
                 final controller = _getOrCreateController(index, state.videos);
                 
-                // Return structured card element containing specialized layout spacing boundaries
                 return Stack(
                   children: [
                     Positioned.fill(
@@ -351,7 +368,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
                       ),
                     ),
                     
-                    // Shadow vignette to make text highly scannable on bright videos
                     Positioned(
                       left: 0,
                       right: 0,
