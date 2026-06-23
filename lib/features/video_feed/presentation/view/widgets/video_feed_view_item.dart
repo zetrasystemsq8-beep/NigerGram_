@@ -16,30 +16,26 @@ class VideoFeedViewItem extends StatelessWidget {
   });
 
   /// 📥 THE TIKTOK-STYLE COMMENT SHEET SYSTEM
-  /// In an interview: Explain that we use a Modal Bottom Sheet with an explicit
-  /// [isScrollControlled: true] parameter so it can dynamically cover 65% of the 
-  /// screen without pushing the underlying video view off the navigation stack.
   void _openCommentsModalSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true, 
-      backgroundColor: Colors.transparent, // Allows custom rounded corner clipping
-      barrierColor: Colors.black.withOpacity(0.5), // Elegant dim overlay
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.5),
       builder: (context) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.65, // Opens at exactly 65% screen height
-          minChildSize: 0.40,     // Minimum drag collapse threshold
-          maxChildSize: 0.90,     // Allows dragging almost to top screen edge
+          initialChildSize: 0.65,
+          minChildSize: 0.40,
+          maxChildSize: 0.90,
           expand: false,
           builder: (context, scrollController) {
             return Container(
               decoration: const BoxDecoration(
-                color: Color(0xFF16161A), // Institutional dark grey hex theme
+                color: Color(0xFF16161A),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
                 children: [
-                  // Premium Grabber Bar indicator indicator
                   const SizedBox(height: 12),
                   Container(
                     width: 40,
@@ -51,7 +47,6 @@ class VideoFeedViewItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Header Title Component
                   Text(
                     'Comments (${videoItem.commentCount})',
                     style: const TextStyle(
@@ -63,7 +58,6 @@ class VideoFeedViewItem extends StatelessWidget {
                   const SizedBox(height: 12),
                   const Divider(color: Colors.white12, height: 1),
                   
-                  // Core Comments List (Using placeholder for now)
                   Expanded(
                     child: ListView.builder(
                       controller: scrollController,
@@ -98,7 +92,6 @@ class VideoFeedViewItem extends StatelessWidget {
                     ),
                   ),
                   
-                  // Bottom Text Field Input Area Base
                   Padding(
                     padding: EdgeInsets.only(
                       left: 16,
@@ -127,9 +120,7 @@ class VideoFeedViewItem extends StatelessWidget {
                         const SizedBox(width: 8),
                         IconButton(
                           icon: const Icon(Icons.send_rounded, color: Color(0xFFFE2C55)),
-                          onPressed: () {
-                            // Logic placeholder to attach database insertion pipeline
-                          },
+                          onPressed: () {},
                         ),
                       ],
                     ),
@@ -176,7 +167,7 @@ class VideoFeedViewItem extends StatelessWidget {
           ),
         ),
 
-        // LAYER 3: Interactive Left-Side Metadata Panel (Elevated to bottom: 16)
+        // LAYER 3: Interactive Left-Side Metadata Panel
         Positioned(
           bottom: 16,
           left: 16,
@@ -206,8 +197,7 @@ class VideoFeedViewItem extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Colors.whiteECEF,
-                  color: Color(0xFFE4E6EB),
+                  color: Color(0xFFE4E6EB), // Fixed duplication and syntax error cleanly here
                   fontSize: 14,
                   height: 1.3,
                   shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
@@ -219,7 +209,7 @@ class VideoFeedViewItem extends StatelessWidget {
 
         // LAYER 4: Right-Side Floating Actions Dock Interceptor
         Positioned(
-          bottom: 40, // Shifted upward so it sits elegantly higher than the navigation bar boundaries
+          bottom: 40,
           right: 12,
           child: VideoFeedViewInteractionButtons(
             videoId: videoItem.id,
@@ -230,7 +220,7 @@ class VideoFeedViewItem extends StatelessWidget {
             isBookmarked: videoItem.isBookmarked ?? false,
             creatorId: videoItem.creatorId,
             creatorUsername: videoItem.username,
-            onCommentTapped: () => _openCommentsModalSheet(context), // Seamless sheet redirect trigger
+            onCommentTapped: () => _openCommentsModalSheet(context),
             onShareTapped: () {
               debugPrint('Native distribution sheet initialization triggered');
             },
