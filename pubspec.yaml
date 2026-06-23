@@ -36,9 +36,9 @@ dependencies:
   http: ^1.2.2
   url_launcher: ^6.1.10
   
-  # Structural Additions Required by profile_view.dart
+  # Structural Additions (Aligned versions to resolve the web package conflict)
   cached_network_image: ^3.4.1
-  share_plus: ^9.0.0
+  share_plus: ^10.1.0
 
 dev_dependencies:
   flutter_test:
