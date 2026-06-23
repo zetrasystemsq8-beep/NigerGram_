@@ -291,7 +291,6 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Use a multi-field merge patch update to protect existing analytics metrics
     await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
       'displayName': name.trim(),
       'username': username.trim().toLowerCase(),
@@ -554,6 +553,24 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
     }
   }
 
+  Widget _buildCounterStat(String numericCount, String descriptorLabel) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          numericCount,
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: -0.2),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          descriptorLabel,
+          style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w400),
+        ),
+      ],
+    );
+  }
+
   Widget _buildVideoGrid(List<QueryDocumentSnapshot> videos) {
     if (videos.isEmpty) {
       return const Center(
@@ -606,7 +623,9 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                     onTap: () => _executePlatformShareAction('whatsapp', videoId),
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.74), // Fixed non-existent Colors.black74 cleanly here
+                      ),
                       child: const Icon(Icons.share_rounded, color: Colors.greenAccent, size: 12),
                     ),
                   ),
@@ -781,19 +800,18 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
             ),
           ),
           if (_isUploadingContent)
-            Container(
-              color: Colors.black74,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 48.0),
+            Positioned.fill(
+              child: Container(
+                color: Colors.black74,
+                child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      LinearProgressIndicator(value: _uploadProgress, color: const Color(0xFFFF0050), backgroundColor: Colors.white10),
+                      const CircularProgressIndicator(color: Color(0xFFFF0050)),
                       const SizedBox(height: 16),
                       Text(
-                        'Pushing high-fidelity payload... ${( _uploadProgress * 100).toStringAsFixed(0)}%',
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        'Uploading Media Content Core Link: ${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ],
                   ),
@@ -806,26 +824,16 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
           ? FloatingActionButton(
               onPressed: _showMediaPostActionSheet,
               backgroundColor: const Color(0xFFFF0050),
-              child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+              child: const Icon(Icons.add, color: Colors.white),
             )
           : null,
-    );
-  }
-
-  Widget _buildCounterStat(String value, String label) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
-      ],
     );
   }
 }
 
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar _tabBar;
+
   _SliverAppBarDelegate(this._tabBar);
 
   @override
@@ -834,7 +842,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => _tabBar.preferredSize.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overrides) {
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       color: const Color(0xFF09090B),
       child: _tabBar,
