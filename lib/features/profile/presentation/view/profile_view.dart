@@ -197,7 +197,6 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
       final String videoId = FirebaseFirestore.instance.collection('videos').doc().id;
       final File fileToUpload = File(videoFile.path);
 
-      // Low-Data Safe compression/size evaluation mock anchor
       final Reference videoRef = FirebaseStorage.instance
           .ref()
           .child('users/${currentAuthUser.uid}/videos/$videoId.mp4');
@@ -309,7 +308,6 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
   void _showCreatorAnalyticsOverlay() {
     HapticFeedback.mediumImpact();
     
-    // Aggregation math evaluation matrices
     int videoCount = _userVideos.length + _privateVideos.length;
     int bookmarkCount = _bookmarkedVideos.length;
     int rawLikes = _userData?['totalLikes'] ?? 0;
@@ -405,32 +403,32 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
       backgroundColor: const Color(0xFF0F0F11),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 20),
-              child: Form(
-                key: formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
-                      const SizedBox(height: 24),
-                      const Text('Institutional Profile Sync', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
-                      TextFormField(controller: nameController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('Display Name'), validator: (v) => v!.isEmpty ? 'Field mandated' : null),
-                      const SizedBox(height: 12),
-                      TextFormField(controller: usernameController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('Username Handle')),
-                      const SizedBox(height: 12),
-                      TextFormField(controller: bioController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('Creator Biography'), maxLines: 2),
-                      const SizedBox(height: 12),
-                      TextFormField(controller: instaController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('Instagram Link Sub-path')),
-                      const SizedBox(height: 12),
-                      TextFormField(controller: youtubeController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('YouTube Channel Link Sub-path')),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 20),
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 24),
+                  const Text('Institutional Profile Sync', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  TextFormField(controller: nameController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('Display Name'), validator: (v) => v!.isEmpty ? 'Field mandated' : null),
+                  const SizedBox(height: 12),
+                  TextFormField(controller: usernameController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('Username Handle')),
+                  const SizedBox(height: 12),
+                  TextFormField(controller: bioController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('Creator Biography'), maxLines: 2),
+                  const SizedBox(height: 12),
+                  TextFormField(controller: instaController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('Instagram Link Sub-path')),
+                  const SizedBox(height: 12),
+                  TextFormField(controller: youtubeController, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: _buildInputDecoration('YouTube Channel Link Sub-path')),
+                  const SizedBox(height: 20),
+                  StatefulBuilder(
+                    builder: (context, setModalState) {
+                      return ElevatedButton(
                         onPressed: isSaving ? null : () async {
                           if (formKey.currentState!.validate()) {
                             setModalState(() => isSaving = true);
@@ -443,15 +441,15 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                           }
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF0050), padding: const EdgeInsets.symmetric(vertical: 14)),
-                        child: isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Synchronize Profiles', style: TextStyle(color: Colors.white)),
-                      ),
-                      const SizedBox(height: 32),
-                    ],
+                        child: isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Synchronize Profiles', style: TextStyle(color: Colors.white)),
+                      );
+                    },
                   ),
-                ),
+                  const SizedBox(height: 32),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
@@ -583,9 +581,9 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                                         child: Row(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
-                                            Icon(Icons.add_a_photo_rounded, color: Colors.white34, size: 16),
+                                            Icon(Icons.add_a_photo_rounded, color: Colors.white38, size: 16),
                                             SizedBox(width: 8),
-                                            Text('Upload Cover Art Branding', style: TextStyle(color: Colors.white34, fontSize: 11, fontWeight: FontWeight.bold)),
+                                            Text('Upload Cover Art Branding', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
                                           ],
                                         ),
                                       )
@@ -691,7 +689,7 @@ class _ProfileViewState extends State<ProfileView> with SingleTickerProviderStat
                                                   ),
                                                   child: Center(
                                                     child: Text(
-                                                      _isCurrentUser ? 'Edit Profile Profile' : 'Follow Base',
+                                                      _isCurrentUser ? 'Edit Profile' : 'Follow Base',
                                                       style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                                     ),
                                                   ),
