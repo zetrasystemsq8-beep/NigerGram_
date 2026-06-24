@@ -1,4 +1,3 @@
-// lib/features/wallet/presentation/view/wallet_home_view.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -328,6 +327,10 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                         final isCredit = tx.type == 'credit';
                         final amount = tx.amount;
 
+                        // 👈 FIXED: No more 'description' field
+                        // Using 'type' to show transaction name
+                        final transactionName = isCredit ? 'Wallet Funding' : 'Withdrawal';
+
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.all(14),
@@ -360,7 +363,7 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      tx.description ?? 'Transaction',
+                                      transactionName, // 👈 FIXED: No more description
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w500,
