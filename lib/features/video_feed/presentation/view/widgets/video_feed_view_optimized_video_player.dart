@@ -31,6 +31,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   
   bool _showPlayIconOverlay = false;
   IconData _overlayIconData = Icons.play_arrow_rounded;
+  
+  // 🔥 FIX: Track initialization state separately
+  bool _isControllerInitialized = false;
+  bool _isInitializing = false;
 
   @override
   void initState() {
@@ -44,32 +48,89 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
     _oldController = widget.controller;
     _currentVideoId = widget.videoId;
-    _applyLowDataOptimization();
-    _addControllerListener();
-    _ensureAutoplay();
+    
+    // 🔥 FIX: Check if controller is already initialized
+    _checkAndSetupController();
   }
 
-  void _ensureAutoplay() {
-    if (widget.controller != null && widget.controller!.value.isInitialized) {
-      if (!widget.controller!.value.isPlaying) {
-        widget.controller!.play();
+  // 🔥 FIX: New method to handle controller setup with proper state
+  void _checkAndSetupController() {
+    final controller = widget.controller;
+    if (controller == null) {
+      setState(() {
+        _isControllerInitialized = false;
+        _isInitializing = false;
+      });
+      return;
+    }
+
+    // If controller is already initialized, set up immediately
+    if (controller.value.isInitialized) {
+      _setupController(controller);
+    } else {
+      // If not initialized, wait for it
+      setState(() {
+        _isInitializing = true;
+        _isControllerInitialized = false;
+      });
+      
+      // Add listener to catch when initialization completes
+      controller.addListener(_onControllerInitListener);
+    }
+  }
+
+  // 🔥 FIX: Separate listener for initialization
+  void _onControllerInitListener() {
+    final controller = widget.controller;
+    if (controller == null) return;
+    
+    if (controller.value.isInitialized) {
+      controller.removeListener(_onControllerInitListener);
+      if (mounted) {
+        _setupController(controller);
       }
     }
   }
 
-  void _applyLowDataOptimization() {
-    if (widget.controller != null && widget.controller!.value.isInitialized) {
-      widget.controller!.setLooping(true);
-      widget.controller!.setVolume(1.0);
+  // 🔥 FIX: Setup controller once initialized
+  void _setupController(VideoPlayerController controller) {
+    // Remove any old listeners
+    _oldController?.removeListener(_onControllerUpdate);
+    _oldController?.removeListener(_onControllerInitListener);
+    
+    _oldController = controller;
+    _isControllerInitialized = true;
+    _isInitializing = false;
+    
+    _applyLowDataOptimization(controller);
+    _addControllerListener(controller);
+    
+    // Play immediately
+    _ensureAutoplay(controller);
+    
+    if (mounted) {
+      setState(() {});
     }
   }
 
-  void _addControllerListener() {
-    if (widget.controller != null) {
-      _isBuffering = widget.controller!.value.isBuffering;
-      _isPlaying = widget.controller!.value.isPlaying;
-      widget.controller!.addListener(_onControllerUpdate);
+  void _ensureAutoplay(VideoPlayerController controller) {
+    if (controller.value.isInitialized) {
+      if (!controller.value.isPlaying) {
+        controller.play();
+      }
     }
+  }
+
+  void _applyLowDataOptimization(VideoPlayerController controller) {
+    if (controller.value.isInitialized) {
+      controller.setLooping(true);
+      controller.setVolume(1.0);
+    }
+  }
+
+  void _addControllerListener(VideoPlayerController controller) {
+    controller.removeListener(_onControllerUpdate);
+    controller.addListener(_onControllerUpdate);
   }
 
   @override
@@ -80,24 +141,17 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final bool controllerChanged = widget.controller != _oldController;
 
     if (videoIdChanged || controllerChanged) {
+      // Clean up old controller listeners
       _oldController?.removeListener(_onControllerUpdate);
+      _oldController?.removeListener(_onControllerInitListener);
+      
       _oldController = widget.controller;
       _currentVideoId = widget.videoId;
       _playerKey = UniqueKey();
-      _applyLowDataOptimization();
-      _addControllerListener();
-      _ensureAutoplay();
-
-      final bool shouldUpdateBuffering = widget.controller?.value.isBuffering ?? false;
-      if (mounted && _isBuffering != shouldUpdateBuffering) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(() {
-              _isBuffering = shouldUpdateBuffering;
-            });
-          }
-        });
-      }
+      _isBuffering = false;
+      
+      // 🔥 FIX: Re-check controller setup
+      _checkAndSetupController();
     }
   }
 
@@ -106,6 +160,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     _loadingController.dispose();
     _actionIconAnimationController.dispose();
     _oldController?.removeListener(_onControllerUpdate);
+    _oldController?.removeListener(_onControllerInitListener);
     _oldController = null;
     super.dispose();
   }
@@ -117,6 +172,27 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     if (controller == null) return;
     if (widget.videoId != _currentVideoId) return;
 
+    // 🔥 FIX: Check for initialization
+    if (!controller.value.isInitialized) {
+      if (mounted) {
+        setState(() {
+          _isControllerInitialized = false;
+          _isBuffering = false;
+        });
+      }
+      return;
+    }
+
+    // Update initialized state if needed
+    if (!_isControllerInitialized) {
+      if (mounted) {
+        setState(() {
+          _isControllerInitialized = true;
+          _isInitializing = false;
+        });
+      }
+    }
+
     if (controller.value.hasError) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _isBuffering = false);
@@ -127,6 +203,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
 
+    // 🔥 FIX: Only show buffering if playing and buffer is loading
     bool shouldShowBuffering = isBuffering && isPlaying;
 
     if (_isBuffering != shouldShowBuffering || _isPlaying != isPlaying) {
@@ -171,7 +248,12 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   Widget build(BuildContext context) {
     final controller = widget.controller;
 
-    if (controller == null || !controller.value.isInitialized) {
+    // 🔥 FIX: More comprehensive initialization check
+    final bool isNotReady = controller == null || 
+                           !controller.value.isInitialized || 
+                           _isInitializing;
+
+    if (isNotReady) {
       return Container(
         color: Colors.black,
         child: Center(
@@ -248,7 +330,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             ),
 
           // Low-Data Buffering Spin Segment
-          if (_isBuffering)
+          if (_isBuffering && _isControllerInitialized)
             Center(
               child: SizedBox(
                 width: context.sq(36),
