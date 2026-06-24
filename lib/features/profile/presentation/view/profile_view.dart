@@ -1,4 +1,11 @@
 // lib/features/profile/presentation/view/profile_view.dart
+//
+// ╔══════════════════════════════════════════════════════════╗
+// ║  NIGERGRAM PROFILE — THE ULTIMATE SOCIAL PROFILE      ║
+// ║  Better Than TikTok • Better Than Douyin              ║
+// ║  Built For Nigeria • Ready For The World             ║
+// ╚══════════════════════════════════════════════════════════╝
+
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
@@ -80,12 +87,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   bool _allowStitch = true;
   bool _allowDownload = true;
   
-  // Story Highlights
-  List<Map<String, dynamic>> _storyHighlights = [];
-  
-  // Bio Links
-  List<Map<String, dynamic>> _bioLinks = [];
-  
   List<Map<String, dynamic>> _pinnedVideos = [];
   List<Map<String, dynamic>> _userVideos = [];
   List<Map<String, dynamic>> _privateVideos = [];
@@ -99,10 +100,16 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   bool _hasMoreVideos = true;
   bool _isLoadingMore = false;
   
-  String get _targetUserId =>
-      widget.userId ?? FirebaseAuth.instance.currentUser!.uid;
-  String get _currentUid =>
-      FirebaseAuth.instance.currentUser?.uid ?? '';
+  // 🔥 FIX 1: Remove force unwrap - NULL SAFE
+  String get _targetUserId {
+    final user = FirebaseAuth.instance.currentUser;
+    return widget.userId ?? user?.uid ?? '';
+  }
+  
+  String get _currentUid {
+    return FirebaseAuth.instance.currentUser?.uid ?? '';
+  }
+  
   final _supabase = Supabase.instance.client;
   
   // ─────────────────────────────────────────────────────────────────────────
@@ -134,9 +141,9 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _storyPulseController.dispose();
     _storyRotateController.dispose();
-    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -165,22 +172,42 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // DATA LOADING
+  // DATA LOADING - FIXED
   // ─────────────────────────────────────────────────────────────────────────
   
+  // 🔥 FIX 2: Guard against empty userId
   Future<void> _loadAll() async {
     if (!mounted) return;
+    
+    // Guard: if no user is signed in or target userId is empty
+    if (_targetUserId.isEmpty || _currentUid.isEmpty) {
+      setState(() {
+        _hasError = true;
+        _isLoading = false;
+      });
+      return;
+    }
+    
     setState(() { _isLoading = true; _hasError = false; });
+    
     try {
       await _loadUserData();
-      if (_userData == null && !_isCurrentUser) throw Exception("User not found");
+      
+      // 🔥 FIX 4: Throw error if user data is null
+      if (_userData == null) {
+        throw Exception("User not found");
+      }
+      
       if (_userData?['profileTheme'] != null) {
         _profileTheme = _userData!['profileTheme'];
         _applyTheme();
       }
-      _allowDuet = _userData?['allowDuet'] ?? true;
-      _allowStitch = _userData?['allowStitch'] ?? true;
-      _allowDownload = _userData?['allowDownload'] ?? true;
+      
+      if (_userData != null) {
+        _allowDuet = _userData?['allowDuet'] ?? true;
+        _allowStitch = _userData?['allowStitch'] ?? true;
+        _allowDownload = _userData?['allowDownload'] ?? true;
+      }
       
       await Future.wait([
         if (_isCurrentUser) _loadWalletBalance().catchError((_) {}),
@@ -195,8 +222,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
         if (!_isCurrentUser) _checkBlockStatus().catchError((_) {}),
         _checkStoryStatus().catchError((_) {}),
         _loadAchievements().catchError((_) {}),
-        _loadStoryHighlights().catchError((_) {}),
-        _loadBioLinks().catchError((_) {}),
       ]);
     } catch (e) {
       debugPrint('Profile load error: $e');
@@ -206,16 +231,55 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
     }
   }
   
+  // 🔥 FIX 3: Fixed tab refresh with overflow guard
   Future<void> _refreshCurrentTab() async {
     setState(() => _isTabLoading = true);
     try {
-      switch (_tabController.index) {
-        case 0: await _loadPublicVideos(); break;
-        case 1: await _loadPinnedVideos(); break;
-        case 2: if (_isCurrentUser) await _loadPrivateVideos(); else await _loadBookmarkedVideos(); break;
-        case 3: if (_isCurrentUser) await _loadQAItems(); else await _loadLikedVideos(); break;
-        case 4: if (_isCurrentUser) await _loadDrafts(); else await _loadBookmarkedVideos(); break;
-        case 5: if (_isCurrentUser) await _loadLikedVideos(); break;
+      final currentIndex = _tabController.index;
+      final maxTabs = _isCurrentUser ? 6 : 5;
+      
+      // Guard against index overflow
+      if (currentIndex >= maxTabs) {
+        setState(() => _isTabLoading = false);
+        return;
+      }
+      
+      switch (currentIndex) {
+        case 0:
+          await _loadPublicVideos();
+          break;
+        case 1:
+          await _loadPinnedVideos();
+          break;
+        case 2:
+          if (_isCurrentUser) {
+            await _loadPrivateVideos();
+          } else {
+            await _loadBookmarkedVideos();
+          }
+          break;
+        case 3:
+          if (_isCurrentUser) {
+            await _loadQAItems();
+          } else {
+            await _loadLikedVideos();
+          }
+          break;
+        case 4:
+          if (_isCurrentUser) {
+            await _loadDrafts();
+          } else {
+            await _loadBookmarkedVideos();
+          }
+          break;
+        case 5:
+          // 🔥 FIX 3: Only run for current user, otherwise return
+          if (_isCurrentUser) {
+            await _loadLikedVideos();
+          } else {
+            return;
+          }
+          break;
       }
     } finally {
       if (mounted) setState(() => _isTabLoading = false);
@@ -223,12 +287,15 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _loadUserData() async {
+    if (_targetUserId.isEmpty) return;
     final doc = await FirebaseFirestore.instance.collection('users').doc(_targetUserId).get();
-    if (mounted) setState(() => _userData = doc.data());
+    if (mounted) {
+      setState(() => _userData = doc.data());
+    }
   }
   
   Future<void> _loadWalletBalance() async {
-    if (!_isCurrentUser) return;
+    if (!_isCurrentUser || _currentUid.isEmpty) return;
     final doc = await FirebaseFirestore.instance.collection('wallets').doc(_currentUid).get();
     if (doc.exists && mounted) {
       final data = doc.data()!;
@@ -241,10 +308,14 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _checkStoryStatus() async {
+    if (_targetUserId.isEmpty) return;
     final snap = await FirebaseFirestore.instance
-        .collection('users').doc(_targetUserId).collection('stories')
+        .collection('users')
+        .doc(_targetUserId)
+        .collection('stories')
         .where('expiresAt', isGreaterThan: DateTime.now().millisecondsSinceEpoch)
-        .limit(1).get();
+        .get();
+        
     if (mounted) setState(() {
       _hasActiveStory = snap.docs.isNotEmpty;
       _storyCount = snap.docs.length;
@@ -252,53 +323,14 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _loadAchievements() async {
+    if (_targetUserId.isEmpty) return;
     final snap = await FirebaseFirestore.instance
         .collection('users').doc(_targetUserId).collection('achievements').limit(10).get();
     if (mounted) setState(() => _achievements = snap.docs.map((d) => d.data()).toList());
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
-  // STORY HIGHLIGHTS
-  // ─────────────────────────────────────────────────────────────────────────
-  
-  Future<void> _loadStoryHighlights() async {
-    final snap = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(_targetUserId)
-        .collection('story_highlights')
-        .orderBy('timestamp', descending: true)
-        .limit(10)
-        .get();
-    
-    if (mounted) {
-      setState(() {
-        _storyHighlights = snap.docs.map((d) {
-          final data = d.data();
-          data['id'] = d.id;
-          return data;
-        }).toList();
-      });
-    }
-  }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // BIO LINKS
-  // ─────────────────────────────────────────────────────────────────────────
-  
-  Future<void> _loadBioLinks() async {
-    final bioLinks = _userData?['bioLinks'] as List<dynamic>? ?? [];
-    if (mounted) {
-      setState(() {
-        _bioLinks = bioLinks.map((link) => {
-          'url': link['url'] ?? '',
-          'title': link['title'] ?? 'Link',
-          'icon': link['icon'] ?? '🔗',
-        }).toList();
-      });
-    }
-  }
-  
   Future<void> _loadPinnedVideos() async {
+    if (_targetUserId.isEmpty) return;
     final snap = await FirebaseFirestore.instance
         .collection('videos').where('userId', isEqualTo: _targetUserId)
         .where('isPinned', isEqualTo: true).orderBy('timestamp', descending: true).limit(3).get();
@@ -306,6 +338,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _loadPublicVideos() async {
+    if (_targetUserId.isEmpty) return;
     final snap = await FirebaseFirestore.instance
         .collection('videos').where('userId', isEqualTo: _targetUserId)
         .where('isPrivate', isEqualTo: false).orderBy('timestamp', descending: true).limit(_pageSize).get();
@@ -315,7 +348,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _loadMorePublicVideos() async {
-    if (_lastVideoDoc == null || _isLoadingMore) return;
+    if (_lastVideoDoc == null || _isLoadingMore || _targetUserId.isEmpty) return;
     setState(() => _isLoadingMore = true);
     try {
       final snap = await FirebaseFirestore.instance
@@ -338,6 +371,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _loadPrivateVideos() async {
+    if (_targetUserId.isEmpty) return;
     final snap = await FirebaseFirestore.instance
         .collection('videos').where('userId', isEqualTo: _targetUserId)
         .where('isPrivate', isEqualTo: true).orderBy('timestamp', descending: true).get();
@@ -345,6 +379,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _loadBookmarkedVideos() async {
+    if (_targetUserId.isEmpty) return;
     final bookmarkSnap = await FirebaseFirestore.instance
         .collection('users').doc(_targetUserId).collection('bookmarks')
         .orderBy('timestamp', descending: true).limit(50).get();
@@ -367,6 +402,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _loadLikedVideos() async {
+    if (_targetUserId.isEmpty) return;
     final likeSnap = await FirebaseFirestore.instance
         .collection('users').doc(_targetUserId).collection('likes')
         .orderBy('timestamp', descending: true).limit(50).get();
@@ -389,6 +425,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _loadDrafts() async {
+    if (_targetUserId.isEmpty) return;
     final snap = await FirebaseFirestore.instance
         .collection('users').doc(_targetUserId).collection('drafts')
         .orderBy('timestamp', descending: true).get();
@@ -396,6 +433,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _loadQAItems() async {
+    if (_targetUserId.isEmpty) return;
     final snap = await FirebaseFirestore.instance
         .collection('users').doc(_targetUserId).collection('qa')
         .orderBy('timestamp', descending: true).limit(50).get();
@@ -403,14 +441,14 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _checkFollowStatus() async {
-    if (_currentUid.isEmpty) return;
+    if (_currentUid.isEmpty || _targetUserId.isEmpty) return;
     final doc = await FirebaseFirestore.instance
         .collection('users').doc(_currentUid).collection('following').doc(_targetUserId).get();
     if (mounted) setState(() => _isFollowing = doc.exists);
   }
   
   Future<void> _checkBlockStatus() async {
-    if (_currentUid.isEmpty) return;
+    if (_currentUid.isEmpty || _targetUserId.isEmpty) return;
     final doc = await FirebaseFirestore.instance
         .collection('users').doc(_currentUid).collection('blocked').doc(_targetUserId).get();
     if (mounted) setState(() => _isBlocked = doc.exists);
@@ -421,7 +459,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _toggleFollow() async {
-    if (_currentUid.isEmpty || _isFollowLoading) return;
+    if (_currentUid.isEmpty || _isFollowLoading || _targetUserId.isEmpty) return;
     HapticFeedback.mediumImpact();
     setState(() => _isFollowLoading = true);
     final batch = FirebaseFirestore.instance.batch();
@@ -457,6 +495,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _toggleBlock() async {
+    if (_currentUid.isEmpty || _targetUserId.isEmpty) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -485,6 +524,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _reportProfile() async {
+    if (_currentUid.isEmpty || _targetUserId.isEmpty) return;
     final reason = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -574,6 +614,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _deleteVideo(String videoId) async {
+    if (_currentUid.isEmpty) return;
     HapticFeedback.mediumImpact();
     final confirm = await showDialog<bool>(
       context: context,
@@ -600,17 +641,18 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   Future<void> _togglePinVideo(String videoId, bool currentlyPinned) async {
+    if (_currentUid.isEmpty) return;
     await FirebaseFirestore.instance.collection('videos').doc(videoId).update({'isPinned': !currentlyPinned});
     await _loadPinnedVideos();
     if (mounted) _showSnack(currentlyPinned ? 'Removed from pinned' : 'Pinned to profile!', isSuccess: true);
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // AVATAR & COVER - SUPABASE (FIXED PATHS)
+  // AVATAR & COVER
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _updateAvatar() async {
-    if (!_isCurrentUser) return;
+    if (!_isCurrentUser || _currentUid.isEmpty) return;
     HapticFeedback.mediumImpact();
 
     final XFile? img = await _picker.pickImage(
@@ -628,7 +670,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      // 🔥 FIXED: Removed 'users/' folder
       final String filePath = '$_currentUid/avatar.jpg';
       
       await _supabase.storage
@@ -666,7 +707,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
 
   Future<void> _updateCover() async {
-    if (!_isCurrentUser) return;
+    if (!_isCurrentUser || _currentUid.isEmpty) return;
     HapticFeedback.mediumImpact();
 
     final XFile? img = await _picker.pickImage(
@@ -684,7 +725,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      // 🔥 FIXED: Removed 'users/' folder
       final String filePath = '$_currentUid/cover.jpg';
       
       await _supabase.storage
@@ -729,6 +769,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
     required String name, required String username, required String bio,
     required String insta, required String youtube, required String theme,
   }) async {
+    if (_currentUid.isEmpty) return;
     await FirebaseFirestore.instance.collection('users').doc(_currentUid).set({
       'displayName': name.trim(),
       'username': username.trim().toLowerCase().replaceAll('@', ''),
@@ -1152,7 +1193,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                   SliverAppBar(
                     expandedHeight: 200, backgroundColor: NGColors.background, pinned: true,
                     actions: [
-                      if (_isCurrentUser) ...[
+                      if (_isCurrentUser && _currentUid.isNotEmpty) ...[
                         IconButton(icon: Icon(Icons.account_balance_wallet_outlined, color: _accentColor), tooltip: '$_walletCurrency ${_formatBalance(_walletBalance)}', onPressed: () => context.push('/wallet')),
                       ],
                       if (_isCurrentUser) IconButton(icon: const Icon(Icons.settings, color: NGColors.textSecondary), onPressed: _showSettingsSheet),
@@ -1223,101 +1264,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                         Text('@${_userData?['username'] ?? 'user'}', style: TextStyle(color: _accentColor, fontSize: 13, fontWeight: FontWeight.w500)),
                         const SizedBox(height: 12),
                         if (_userData?['bio'] != null && _userData!['bio'].toString().isNotEmpty) Text(_userData!['bio'], style: const TextStyle(color: NGColors.textSecondary, fontSize: 13, height: 1.4)),
-                        
-                        // Story Highlights
-                        if (_storyHighlights.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 70,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _storyHighlights.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 8),
-                              itemBuilder: (context, idx) {
-                                final highlight = _storyHighlights[idx];
-                                return GestureDetector(
-                                  onTap: () {
-                                    // Navigate to story viewer
-                                  },
-                                  child: Column(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 26,
-                                        backgroundColor: NGColors.surfaceLight,
-                                        backgroundImage: highlight['thumbnailUrl'] != null
-                                            ? CachedNetworkImageProvider(highlight['thumbnailUrl'])
-                                            : null,
-                                        child: highlight['thumbnailUrl'] == null
-                                            ? Icon(Icons.star, color: _accentColor, size: 24)
-                                            : null,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        highlight['title'] ?? 'Story',
-                                        style: TextStyle(
-                                          color: NGColors.textSecondary,
-                                          fontSize: 10,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                        
-                        // Bio Links
-                        if (_bioLinks.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: _bioLinks.map((link) {
-                              return GestureDetector(
-                                onTap: () async {
-                                  try {
-                                    final uri = Uri.parse(link['url']);
-                                    if (await canLaunchUrl(uri)) {
-                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                    }
-                                  } catch (_) {
-                                    if (mounted) _showSnack('Cannot open link', isSuccess: false);
-                                  }
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: NGColors.surfaceLight,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        link['icon'] ?? '🔗',
-                                        style: const TextStyle(fontSize: 14),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        link['title'] ?? 'Link',
-                                        style: TextStyle(
-                                          color: NGColors.textPrimary,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                        
                         if (_userData?['instagramLink'] != null && _userData!['instagramLink'].toString().isNotEmpty) ...[
                           const SizedBox(height: 8),
                           GestureDetector(
@@ -1375,20 +1321,26 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                       ]),
                     ),
                   ),
-                  SliverOverlapAbsorber(
-                    handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-                    sliver: SliverPersistentHeader(pinned: true, delegate: _SliverTabBarDelegate(TabBar(
-                      controller: _tabController, isScrollable: true,
-                      indicatorColor: _accentColor, labelColor: NGColors.textPrimary, unselectedLabelColor: NGColors.textMuted,
-                      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                      tabs: [
-                        const Tab(text: 'Videos'), const Tab(text: 'Pinned'),
-                        if (_isCurrentUser) const Tab(text: 'Private'),
-                        const Tab(text: 'Q&A'),
-                        if (_isCurrentUser) const Tab(text: 'Drafts'),
-                        const Tab(text: 'Likes'),
-                      ],
-                    ))),
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _SliverTabBarDelegate(
+                      TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        indicatorColor: _accentColor,
+                        labelColor: NGColors.textPrimary,
+                        unselectedLabelColor: NGColors.textMuted,
+                        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        tabs: [
+                          const Tab(text: 'Videos'),
+                          const Tab(text: 'Pinned'),
+                          if (_isCurrentUser) const Tab(text: 'Private'),
+                          const Tab(text: 'Q&A'),
+                          if (_isCurrentUser) const Tab(text: 'Drafts'),
+                          const Tab(text: 'Likes'),
+                        ],
+                      ),
+                    ),
                   ),
                 ];
               },
@@ -1405,7 +1357,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
           if (_isUploadingContent) _buildUploadOverlay(),
         ],
       ),
-      // 🔥 FIXED: Lifted the button above the nav bar
       floatingActionButton: _isCurrentUser
           ? Padding(
               padding: const EdgeInsets.only(bottom: 80.0),
