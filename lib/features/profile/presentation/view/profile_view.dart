@@ -638,7 +638,6 @@ class _ProfileViewState extends State<ProfileView>
     final formKey = GlobalKey<FormState>();
     bool saving = false;
     
-    // FIX: Use ValueNotifier for selectedTheme so StatefulBuilder can update it
     final ValueNotifier<String> selectedTheme = ValueNotifier(_profileTheme);
     
     showModalBottomSheet(
@@ -667,9 +666,51 @@ class _ProfileViewState extends State<ProfileView>
                     const SizedBox(height: 12),
                     TextFormField(controller: bioCtrl, style: const TextStyle(color: NGColors.textPrimary, fontSize: 14), decoration: _inputDeco('Bio'), maxLines: 3),
                     const SizedBox(height: 12),
-                    TextFormField(controller: instaCtrl, style: const TextStyle(color: NGColors.textPrimary, fontSize: 14), decoration: _inputDeco('Instagram URL')),
+                    // FIX: Updated Instagram field with validation
+                    TextFormField(
+                      controller: instaCtrl,
+                      style: const TextStyle(color: NGColors.textPrimary, fontSize: 14),
+                      decoration: _inputDeco('Instagram (username or URL)'),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return null;
+                        final trimmed = value.trim();
+                        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                          try {
+                            Uri.parse(trimmed);
+                            return null;
+                          } catch (_) {
+                            return 'Invalid URL format';
+                          }
+                        }
+                        if (RegExp(r'^[a-zA-Z0-9_.]+$').hasMatch(trimmed)) {
+                          return null;
+                        }
+                        return 'Enter a valid username or URL';
+                      },
+                    ),
                     const SizedBox(height: 12),
-                    TextFormField(controller: ytCtrl, style: const TextStyle(color: NGColors.textPrimary, fontSize: 14), decoration: _inputDeco('YouTube URL')),
+                    // FIX: Updated YouTube field with validation
+                    TextFormField(
+                      controller: ytCtrl,
+                      style: const TextStyle(color: NGColors.textPrimary, fontSize: 14),
+                      decoration: _inputDeco('YouTube (URL or channel handle)'),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return null;
+                        final trimmed = value.trim();
+                        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                          try {
+                            Uri.parse(trimmed);
+                            return null;
+                          } catch (_) {
+                            return 'Invalid URL format';
+                          }
+                        }
+                        if (RegExp(r'^@?[a-zA-Z0-9_-]+$').hasMatch(trimmed)) {
+                          return null;
+                        }
+                        return 'Enter a valid YouTube URL or handle';
+                      },
+                    ),
                     const SizedBox(height: 16),
                     const Text('Profile Theme', style: TextStyle(color: NGColors.textSecondary, fontSize: 13)),
                     const SizedBox(height: 8),
@@ -910,9 +951,84 @@ class _ProfileViewState extends State<ProfileView>
     return amount.toStringAsFixed(0);
   }
   
+  // ─────────────────────────────────────────────────────────────────────────
+  // SOCIAL LINKS - FIXED
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  /// Safely format and open social media links
   Future<void> _openSocialLink(String url) async {
-    final uri = Uri.parse(url.startsWith('http') ? url : 'https://$url');
-    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (url.trim().isEmpty) return;
+    
+    final String formattedUrl = _formatSocialLink(url);
+    
+    try {
+      final uri = Uri.parse(formattedUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          _showSnack('Cannot open link: $url', isSuccess: false);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error opening social link: $e');
+      if (mounted) {
+        _showSnack('Invalid link format', isSuccess: false);
+      }
+    }
+  }
+  
+  /// Format social media links properly with platform detection
+  String _formatSocialLink(String url) {
+    String trimmed = url.trim();
+    
+    if (trimmed.isEmpty) return trimmed;
+    
+    // Already has protocol
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    
+    // Remove @ prefix for handles
+    if (trimmed.startsWith('@')) {
+      trimmed = trimmed.substring(1);
+    }
+    
+    // Detect platform from URL or handle
+    // Instagram
+    if (trimmed.contains('instagram.com') || trimmed.contains('ig.me')) {
+      return _ensureProtocol(trimmed);
+    }
+    // YouTube
+    if (trimmed.contains('youtube.com') || trimmed.contains('youtu.be') ||
+        trimmed.contains('/@') || trimmed.contains('/c/') || trimmed.contains('/channel/')) {
+      return _ensureProtocol(trimmed);
+    }
+    // Twitter/X
+    if (trimmed.contains('twitter.com') || trimmed.contains('x.com')) {
+      return _ensureProtocol(trimmed);
+    }
+    // TikTok
+    if (trimmed.contains('tiktok.com')) {
+      return _ensureProtocol(trimmed);
+    }
+    
+    // Handle simple username (letters, numbers, underscores, dots)
+    if (RegExp(r'^[a-zA-Z0-9_.]+$').hasMatch(trimmed)) {
+      // Default to Instagram for simple usernames
+      return 'https://instagram.com/$trimmed';
+    }
+    
+    // Default: add https://
+    return _ensureProtocol(trimmed);
+  }
+  
+  /// Ensure URL has a protocol
+  String _ensureProtocol(String url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return 'https://$url';
   }
   
   // ─────────────────────────────────────────────────────────────────────────
@@ -1036,13 +1152,32 @@ class _ProfileViewState extends State<ProfileView>
                         Text('@${_userData?['username'] ?? 'user'}', style: TextStyle(color: _accentColor, fontSize: 13, fontWeight: FontWeight.w500)),
                         const SizedBox(height: 12),
                         if (_userData?['bio'] != null && _userData!['bio'].toString().isNotEmpty) Text(_userData!['bio'], style: const TextStyle(color: NGColors.textSecondary, fontSize: 13, height: 1.4)),
+                        // FIX: Updated social links display with safe opening
                         if (_userData?['instagramLink'] != null && _userData!['instagramLink'].toString().isNotEmpty) ...[
                           const SizedBox(height: 8),
-                          GestureDetector(onTap: () => _openSocialLink(_userData!['instagramLink']), child: const Row(children: [Icon(Icons.camera_alt_outlined, color: Colors.pinkAccent, size: 16), SizedBox(width: 6), Text('Instagram', style: TextStyle(color: Colors.pinkAccent, fontSize: 13))])),
+                          GestureDetector(
+                            onTap: () => _openSocialLink(_userData!['instagramLink']),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.camera_alt_outlined, color: Colors.pinkAccent, size: 16),
+                                SizedBox(width: 6),
+                                Text('Instagram', style: TextStyle(color: Colors.pinkAccent, fontSize: 13)),
+                              ],
+                            ),
+                          ),
                         ],
                         if (_userData?['youtubeLink'] != null && _userData!['youtubeLink'].toString().isNotEmpty) ...[
                           const SizedBox(height: 4),
-                          GestureDetector(onTap: () => _openSocialLink(_userData!['youtubeLink']), child: const Row(children: [Icon(Icons.play_circle_outline, color: Colors.red, size: 16), SizedBox(width: 6), Text('YouTube', style: TextStyle(color: Colors.red, fontSize: 13))])),
+                          GestureDetector(
+                            onTap: () => _openSocialLink(_userData!['youtubeLink']),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.play_circle_outline, color: Colors.red, size: 16),
+                                SizedBox(width: 6),
+                                Text('YouTube', style: TextStyle(color: Colors.red, fontSize: 13)),
+                              ],
+                            ),
+                          ),
                         ],
                         if (_achievements.isNotEmpty) ...[
                           const SizedBox(height: 12),
