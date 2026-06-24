@@ -1,7 +1,8 @@
-
+// lib/features/wallet/presentation/view/wallet_home_view.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_state.dart';
@@ -17,12 +18,19 @@ class WalletHomeView extends StatefulWidget {
 
 class _WalletHomeViewState extends State<WalletHomeView> {
   late final WalletCubit _walletCubit;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
     _walletCubit = getIt<WalletCubit>();
     _walletCubit.refresh();
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _isRefreshing = true);
+    await _walletCubit.refresh();
+    setState(() => _isRefreshing = false);
   }
 
   String _formatBalance(double amount) {
@@ -66,8 +74,17 @@ class _WalletHomeViewState extends State<WalletHomeView> {
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => _walletCubit.refresh(),
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Color(0xFFFF0050),
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.refresh_rounded),
+            onPressed: _isRefreshing ? null : _refresh,
             color: Colors.white,
           ),
         ],
@@ -124,7 +141,7 @@ class _WalletHomeViewState extends State<WalletHomeView> {
 
           return RefreshIndicator(
             color: const Color(0xFFFF0050),
-            onRefresh: () => _walletCubit.refresh(),
+            onRefresh: _refresh,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
