@@ -20,7 +20,7 @@
 //
 // DEPENDENCIES NEEDED IN pubspec.yaml:
 //   supabase_flutter: ^2.x.x
-//   share_plus: ^9.x.x
+//   share_plus: ^10.x.x
 //   cached_network_image: ^3.x.x
 //   image_picker: ^1.x.x
 //   cloud_firestore: ^5.x.x
@@ -92,9 +92,9 @@ class _ProfileViewState extends State<ProfileView>
   // â”€â”€ Supabase â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   final _supabase = Supabase.instance.client;
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // LIFECYCLE
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   @override
   void initState() {
@@ -124,9 +124,9 @@ class _ProfileViewState extends State<ProfileView>
     }
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // DATA LOADING
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // DATA LOADING & ATOMIC ISOLATION
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> _loadAll() async {
     if (!mounted) return;
@@ -134,17 +134,26 @@ class _ProfileViewState extends State<ProfileView>
       _isLoading = true;
       _hasError = false;
     });
+
     try {
+      // Step 1: Ensure critical core structural data profile resolves first
+      await _loadUserData();
+      
+      if (_userData == null && !_isCurrentUser) {
+        throw Exception("Target structural data payload resolved as void node context");
+      }
+
+      // Step 2: Fire parallel arrays using isolated sub-catchers so zero drops can crash compilation
       await Future.wait([
-        _loadUserData(),
-        _loadPublicVideos(),
-        if (_isCurrentUser) _loadPrivateVideos(),
-        if (_isCurrentUser) _loadBookmarkedVideos(),
-        _loadLikedVideos(),
-        if (!_isCurrentUser) _checkFollowStatus(),
+        _loadPublicVideos().catchError((e) => debugPrint('Isolated structural node fault public_vids: $e')),
+        if (_isCurrentUser) _loadPrivateVideos().catchError((e) => debugPrint('Isolated structural node fault private_vids: $e')),
+        if (_isCurrentUser) _loadBookmarkedVideos().catchError((e) => debugPrint('Isolated structural node fault bookmark_vids: $e')),
+        _loadLikedVideos().catchError((e) => debugPrint('Isolated structural node fault liked_vids: $e')),
+        if (!_isCurrentUser) _checkFollowStatus().catchError((e) => debugPrint('Isolated structural node fault follow_status: $e')),
       ]);
+
     } catch (e) {
-      debugPrint('Profile load error: $e');
+      debugPrint('Profile structural cluster load crash: $e');
       if (mounted) setState(() => _hasError = true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -180,7 +189,7 @@ class _ProfileViewState extends State<ProfileView>
   }
 
   Future<void> _loadMorePublicVideos() async {
-    if (_lastVideoDoc == null) return;
+    if (_lastVideoDoc == null || _isLoadingMore) return;
     setState(() => _isLoadingMore = true);
     try {
       final snap = await FirebaseFirestore.instance
@@ -206,6 +215,7 @@ class _ProfileViewState extends State<ProfileView>
         });
       }
     } catch (e) {
+      debugPrint('Pagination block streaming fault: $e');
       if (mounted) setState(() => _isLoadingMore = false);
     }
   }
@@ -223,7 +233,6 @@ class _ProfileViewState extends State<ProfileView>
     }
   }
 
-  // FIXED: Bookmarks fetches full video documents, not just refs
   Future<void> _loadBookmarkedVideos() async {
     final bookmarkSnap = await FirebaseFirestore.instance
         .collection('users')
@@ -241,7 +250,6 @@ class _ProfileViewState extends State<ProfileView>
     final videoIds =
         bookmarkSnap.docs.map((d) => d.id).toList();
 
-    // Firestore whereIn limit is 30 per query
     final chunks = <List<String>>[];
     for (var i = 0; i < videoIds.length; i += 30) {
       chunks.add(videoIds.sublist(
@@ -260,7 +268,6 @@ class _ProfileViewState extends State<ProfileView>
     if (mounted) setState(() => _bookmarkedVideos = videos);
   }
 
-  // FIXED: Likes fetches full video documents, not just refs
   Future<void> _loadLikedVideos() async {
     final likeSnap = await FirebaseFirestore.instance
         .collection('users')
@@ -306,9 +313,9 @@ class _ProfileViewState extends State<ProfileView>
     if (mounted) setState(() => _isFollowing = doc.exists);
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // FOLLOW / UNFOLLOW
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // FOLLOW / UNFOLLOW INTERACTION TRAPS
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> _toggleFollow() async {
     if (_currentUid.isEmpty || _isFollowLoading) return;
@@ -337,34 +344,29 @@ class _ProfileViewState extends State<ProfileView>
       if (_isFollowing) {
         batch.delete(followingRef);
         batch.delete(followerRef);
-        batch.update(targetUserRef,
-            {'followers': FieldValue.increment(-1)});
-        batch.update(currentUserRef,
-            {'following': FieldValue.increment(-1)});
+        batch.update(targetUserRef, {'followers': FieldValue.increment(-1)});
+        batch.update(currentUserRef, {'following': FieldValue.increment(-1)});
       } else {
         final now = FieldValue.serverTimestamp();
         batch.set(followingRef, {'timestamp': now});
         batch.set(followerRef, {'timestamp': now});
-        batch.update(targetUserRef,
-            {'followers': FieldValue.increment(1)});
-        batch.update(currentUserRef,
-            {'following': FieldValue.increment(1)});
+        batch.update(targetUserRef, {'followers': FieldValue.increment(1)});
+        batch.update(currentUserRef, {'following': FieldValue.increment(1)});
       }
       await batch.commit();
 
-      // Refresh follower count in UI
       await _loadUserData();
       if (mounted) setState(() => _isFollowing = !_isFollowing);
     } catch (e) {
-      debugPrint('Follow toggle error: $e');
+      debugPrint('Follow matrix replication fault: $e');
     } finally {
       if (mounted) setState(() => _isFollowLoading = false);
     }
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // VIDEO UPLOAD â†’ SUPABASE
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // VIDEO UPLOAD ENGINE
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> _pickAndUploadVideo(bool makePrivate) async {
     if (_currentUid.isEmpty) return;
@@ -379,23 +381,21 @@ class _ProfileViewState extends State<ProfileView>
     setState(() {
       _isUploadingContent = true;
       _uploadProgress = 0.05;
-      _uploadLabel = 'Preparing upload...';
+      _uploadLabel = 'Preparing upload deployment...';
     });
 
     try {
       final String videoId =
           FirebaseFirestore.instance.collection('videos').doc().id;
-      final String storagePath =
-          'videos/$_currentUid/$videoId.mp4';
+      final String storagePath = 'videos/$_currentUid/$videoId.mp4';
       final File file = File(videoFile.path);
       final int fileSize = await file.length();
 
       setState(() {
-        _uploadLabel = 'Uploading to Supabase...';
+        _uploadLabel = 'Uploading payload matrix to Supabase...';
         _uploadProgress = 0.1;
       });
 
-      // Upload to Supabase Storage
       await _supabase.storage.from('nigergram-videos').uploadBinary(
         storagePath,
         await file.readAsBytes(),
@@ -407,7 +407,7 @@ class _ProfileViewState extends State<ProfileView>
 
       setState(() {
         _uploadProgress = 0.85;
-        _uploadLabel = 'Generating public URL...';
+        _uploadLabel = 'Generating secure asset CDN route...';
       });
 
       final String videoUrl = _supabase.storage
@@ -416,10 +416,9 @@ class _ProfileViewState extends State<ProfileView>
 
       setState(() {
         _uploadProgress = 0.92;
-        _uploadLabel = 'Saving to database...';
+        _uploadLabel = 'Saving to database infrastructure...';
       });
 
-      // Save metadata to Firestore
       await FirebaseFirestore.instance
           .collection('videos')
           .doc(videoId)
@@ -427,7 +426,7 @@ class _ProfileViewState extends State<ProfileView>
         'videoId': videoId,
         'userId': _currentUid,
         'videoUrl': videoUrl,
-        'thumbnailUrl': '',   // Set by a Cloud Function or manual upload
+        'thumbnailUrl': '',   
         'isPrivate': makePrivate,
         'likeCount': 0,
         'commentCount': 0,
@@ -437,7 +436,6 @@ class _ProfileViewState extends State<ProfileView>
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // Update user's video count
       await FirebaseFirestore.instance
           .collection('users')
           .doc(_currentUid)
@@ -445,7 +443,7 @@ class _ProfileViewState extends State<ProfileView>
 
       setState(() {
         _uploadProgress = 1.0;
-        _uploadLabel = 'Done!';
+        _uploadLabel = 'Deployment Synced!';
       });
 
       await Future.delayed(const Duration(milliseconds: 400));
@@ -460,7 +458,7 @@ class _ProfileViewState extends State<ProfileView>
         );
       }
     } catch (e) {
-      debugPrint('Supabase upload error: $e');
+      debugPrint('Supabase interface synchronization upload fault: $e');
       if (mounted) {
         _showSnack('Upload failed: ${e.toString()}', isSuccess: false);
       }
@@ -475,9 +473,9 @@ class _ProfileViewState extends State<ProfileView>
     }
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // IMAGE UPLOADS â†’ FIREBASE STORAGE (small files, fine here)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // AVATAR & BANNER WORKSPACE CONFIGURATION
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> _updateAvatar() async {
     if (!_isCurrentUser) return;
@@ -492,7 +490,7 @@ class _ProfileViewState extends State<ProfileView>
 
     setState(() {
       _isUploadingContent = true;
-      _uploadLabel = 'Updating profile photo...';
+      _uploadLabel = 'Updating display matrix identity avatar...';
       _uploadProgress = 0.3;
     });
 
@@ -536,7 +534,7 @@ class _ProfileViewState extends State<ProfileView>
 
     setState(() {
       _isUploadingContent = true;
-      _uploadLabel = 'Updating cover banner...';
+      _uploadLabel = 'Updating platform cover banner...';
       _uploadProgress = 0.3;
     });
 
@@ -567,9 +565,9 @@ class _ProfileViewState extends State<ProfileView>
     }
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // EDIT PROFILE
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // PROFILE META DATA COMPILATION
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> _saveProfile({
     required String name,
@@ -611,8 +609,7 @@ class _ProfileViewState extends State<ProfileView>
       isScrollControlled: true,
       backgroundColor: const Color(0xFF0F0F12),
       shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(24))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
         return StatefulBuilder(builder: (ctx, setSheet) {
           return Padding(
@@ -639,7 +636,7 @@ class _ProfileViewState extends State<ProfileView>
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text('Edit Profile',
+                    const Text('Edit Profile Workspace',
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -647,49 +644,41 @@ class _ProfileViewState extends State<ProfileView>
                     const SizedBox(height: 20),
                     TextFormField(
                       controller: nameCtrl,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 14),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
                       decoration: _inputDeco('Display Name'),
-                      validator: (v) =>
-                          v!.trim().isEmpty ? 'Required' : null,
+                      validator: (v) => v!.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: userCtrl,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 14),
-                      decoration: _inputDeco('Username'),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: _inputDeco('Username Handle'),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: bioCtrl,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 14),
-                      decoration: _inputDeco('Bio'),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: _inputDeco('Bio Description'),
                       maxLines: 3,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: instaCtrl,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 14),
-                      decoration: _inputDeco('Instagram URL (optional)'),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: _inputDeco('Instagram URL Profile Link'),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: ytCtrl,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 14),
-                      decoration:
-                          _inputDeco('YouTube URL (optional)'),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: _inputDeco('YouTube URL Channel Link'),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: saving
                           ? null
                           : () async {
-                              if (!formKey.currentState!.validate())
-                                return;
+                              if (!formKey.currentState!.validate()) return;
                               setSheet(() => saving = true);
                               try {
                                 await _saveProfile(
@@ -703,15 +692,13 @@ class _ProfileViewState extends State<ProfileView>
                               } catch (e) {
                                 setSheet(() => saving = false);
                                 if (ctx.mounted) {
-                                  _showSnack('Save failed',
-                                      isSuccess: false);
+                                  _showSnack('Save matrix synchronizer failed', isSuccess: false);
                                 }
                               }
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFF0050),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
                       ),
@@ -721,7 +708,7 @@ class _ProfileViewState extends State<ProfileView>
                               height: 20,
                               child: CircularProgressIndicator(
                                   color: Colors.white, strokeWidth: 2))
-                          : const Text('Save Changes',
+                          : const Text('Save Portfolio Changes',
                               style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -738,9 +725,9 @@ class _ProfileViewState extends State<ProfileView>
     );
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // UPLOAD ACTION SHEET
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // RENDERING & INTERFACE BUILDING MATRICES
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   void _showUploadSheet() {
     HapticFeedback.mediumImpact();
@@ -748,8 +735,7 @@ class _ProfileViewState extends State<ProfileView>
       context: context,
       backgroundColor: const Color(0xFF0F0F12),
       shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -759,11 +745,10 @@ class _ProfileViewState extends State<ProfileView>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2)),
+                  color: Colors.white24, borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 16),
-            const Text('Post a Video',
+            const Text('Publish Creative Media',
                 style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -772,13 +757,11 @@ class _ProfileViewState extends State<ProfileView>
             ListTile(
               leading: const CircleAvatar(
                 backgroundColor: Color(0xFF1A1A22),
-                child:
-                    Icon(Icons.public_rounded, color: Colors.greenAccent),
+                child: Icon(Icons.public_rounded, color: Colors.greenAccent),
               ),
-              title: const Text('Public',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600)),
-              subtitle: const Text('Visible to everyone',
+              title: const Text('Public Feed Allocation',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              subtitle: const Text('Visible to global ecosystem nodes',
                   style: TextStyle(color: Colors.white38, fontSize: 12)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -788,13 +771,11 @@ class _ProfileViewState extends State<ProfileView>
             ListTile(
               leading: const CircleAvatar(
                 backgroundColor: Color(0xFF1A1A22),
-                child: Icon(Icons.lock_outline_rounded,
-                    color: Color(0xFFFF0050)),
+                child: Icon(Icons.lock_outline_rounded, color: Color(0xFFFF0050)),
               ),
-              title: const Text('Private',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600)),
-              subtitle: const Text('Only visible to you',
+              title: const Text('Private Storage Allocation',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              subtitle: const Text('Visible only inside your local device credentials',
                   style: TextStyle(color: Colors.white38, fontSize: 12)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -808,18 +789,13 @@ class _ProfileViewState extends State<ProfileView>
     );
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // ANALYTICS SHEET
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
   void _showAnalytics() {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0F0F12),
       shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(24))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
         return Padding(
           padding: const EdgeInsets.all(24),
@@ -832,16 +808,14 @@ class _ProfileViewState extends State<ProfileView>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(2))),
+                        color: Colors.white24, borderRadius: BorderRadius.circular(2))),
               ),
               const SizedBox(height: 20),
               const Row(
                 children: [
-                  Icon(Icons.analytics_rounded,
-                      color: Color(0xFFFF0050), size: 22),
+                  Icon(Icons.analytics_rounded, color: Color(0xFFFF0050), size: 22),
                   SizedBox(width: 8),
-                  Text('Creator Analytics',
+                  Text('Ecosystem Vector Analytics',
                       style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -849,25 +823,9 @@ class _ProfileViewState extends State<ProfileView>
                 ],
               ),
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  _analyticsCard(
-                    '${_userVideos.length + _privateVideos.length}',
-                    'Videos',
-                    Icons.video_collection_rounded,
-                  ),
-                  _analyticsCard(
-                    _formatCount(_userData?['totalLikes'] ?? 0),
-                    'Total Likes',
-                    Icons.favorite_rounded,
-                  ),
-                  _analyticsCard(
-                    '${_bookmarkedVideos.length}',
-                    'Bookmarks',
-                    Icons.bookmark_rounded,
-                  ),
-                ],
-              ),
+              _buildAnalyticsMetricRow('Total Video Deployments', '${_userData?['videoCount'] ?? 0}'),
+              _buildAnalyticsMetricRow('Ecosystem Followers', '${_userData?['followers'] ?? 0}'),
+              _buildAnalyticsMetricRow('Ecosystem Outbound Following', '${_userData?['following'] ?? 0}'),
               const SizedBox(height: 24),
             ],
           ),
@@ -876,815 +834,381 @@ class _ProfileViewState extends State<ProfileView>
     );
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // SHARE
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-  void _shareVideo(String videoId) {
-    HapticFeedback.lightImpact();
-    Share.share(
-      'Watch this on NigerGram ðŸŽ¬\nhttps://nigergram.app/video/$videoId',
-      subject: 'NigerGram Video',
+  Widget _buildAnalyticsMetricRow(String label, String balance) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 14)),
+          Text(balance, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // HELPERS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-  String _formatCount(int n) {
-    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
-    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
-    return n.toString();
-  }
-
-  void _showSnack(String msg, {required bool isSuccess}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(
-        children: [
-          Icon(
-            isSuccess ? Icons.check_circle_rounded : Icons.error_rounded,
-            color: Colors.white,
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(msg,
-                  style: const TextStyle(color: Colors.white))),
-        ],
-      ),
-      backgroundColor:
-          isSuccess ? const Color(0xFF1DB954) : const Color(0xFFFF0050),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
-  }
-
-  InputDecoration _inputDeco(String label) => InputDecoration(
-        labelText: label,
-        labelStyle:
-            const TextStyle(color: Colors.white38, fontSize: 12),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.04),
-        enabledBorder: OutlineInputBorder(
-            borderSide: const BorderSide(color: Colors.white10),
-            borderRadius: BorderRadius.circular(10)),
-        focusedBorder: OutlineInputBorder(
-            borderSide:
-                const BorderSide(color: Color(0xFFFF0050), width: 1.5),
-            borderRadius: BorderRadius.circular(10)),
-        errorBorder: OutlineInputBorder(
-            borderSide: const BorderSide(color: Colors.redAccent),
-            borderRadius: BorderRadius.circular(10)),
-        focusedErrorBorder: OutlineInputBorder(
-            borderSide: const BorderSide(color: Colors.red),
-            borderRadius: BorderRadius.circular(10)),
-      );
-
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // WIDGETS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-  Widget _analyticsCard(String count, String label, IconData icon) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding:
-            const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
+  InputDecoration _inputDeco(String hint) {
+    return InputDecoration(
+      labelText: hint,
+      labelStyle: const TextStyle(color: Colors.white38),
+      filled: true,
+      fillColor: const Color(0xFF16161E),
+      enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white10),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: Colors.white54, size: 20),
-            const SizedBox(height: 8),
-            Text(count,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white38, fontSize: 10),
-                textAlign: TextAlign.center),
-          ],
-        ),
+          borderSide: const BorderSide(color: Colors.white12)),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFFF0050))),
+    );
+  }
+
+  void _showSnack(String contentText, {required bool isSuccess}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(contentText, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+        backgroundColor: isSuccess ? Colors.green : const Color(0xFFFF0050),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
 
-  Widget _statCol(String count, String label) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(count,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.3)),
-          const SizedBox(height: 3),
-          Text(label,
-              style: const TextStyle(
-                  color: Colors.white38, fontSize: 11)),
-        ],
-      );
-
-  Widget _statDivider() => Container(
-      width: 1, height: 16, color: Colors.white12,
-      margin: const EdgeInsets.symmetric(horizontal: 20));
-
-  Widget _videoGrid(List<Map<String, dynamic>> videos,
-      {bool showEmpty = true}) {
-    if (videos.isEmpty && showEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.video_library_outlined,
-                color: Colors.white12, size: 48),
-            const SizedBox(height: 12),
-            const Text('No videos yet',
-                style: TextStyle(color: Colors.white24, fontSize: 13)),
-          ],
-        ),
-      );
-    }
-
-    return GridView.builder(
-      padding: const EdgeInsets.all(2),
-      itemCount: videos.length + (_isLoadingMore ? 3 : 0),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 2,
-        mainAxisSpacing: 2,
-        childAspectRatio: 0.75,
-      ),
-      itemBuilder: (ctx, i) {
-        if (i >= videos.length) {
-          return Container(
-            color: Colors.white.withOpacity(0.03),
-            child: const Center(
-                child: CircularProgressIndicator(
-                    color: Color(0xFFFF0050), strokeWidth: 1.5)),
-          );
-        }
-
-        final data = videos[i];
-        final thumb = (data['thumbnailUrl'] as String?) ?? '';
-        final videoId = (data['videoId'] as String?) ?? '';
-        final views = (data['viewCount'] as int?) ?? 0;
-        final isPrivate = (data['isPrivate'] as bool?) ?? false;
-
-        return GestureDetector(
-          onTap: () => context.push('/video-player/$videoId'),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Thumbnail
-              thumb.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: thumb,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(
-                          color: Colors.white.withOpacity(0.04)),
-                      errorWidget: (_, __, ___) => Container(
-                        color: Colors.white.withOpacity(0.04),
-                        child: const Icon(Icons.video_library,
-                            color: Colors.white12),
-                      ),
-                    )
-                  : Container(
-                      color: Colors.white.withOpacity(0.04),
-                      child: const Icon(Icons.play_circle_outline,
-                          color: Colors.white10, size: 30),
-                    ),
-
-              // Gradient overlay
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.6),
-                      ],
-                      stops: const [0.5, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-
-              // View count
-              Positioned(
-                bottom: 5,
-                left: 5,
-                child: Row(
-                  children: [
-                    const Icon(Icons.play_arrow_rounded,
-                        color: Colors.white, size: 13),
-                    const SizedBox(width: 2),
-                    Text(_formatCount(views),
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-
-              // Private badge
-              if (isPrivate)
-                Positioned(
-                  top: 5,
-                  left: 5,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Icon(Icons.lock_outline,
-                        color: Colors.white70, size: 10),
-                  ),
-                ),
-
-              // Share button
-              Positioned(
-                bottom: 5,
-                right: 5,
-                child: GestureDetector(
-                  onTap: () => _shareVideo(videoId),
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.share_rounded,
-                        color: Colors.white, size: 11),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // BUILD
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // CORE LAYOUT MATRIX RENDERER
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Color(0xFF09090B),
-        body: Center(
-            child: CircularProgressIndicator(
-                color: Color(0xFFFF0050))),
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator(color: Color(0xFFFF0050))),
       );
     }
 
     if (_hasError) {
       return Scaffold(
-        backgroundColor: const Color(0xFF09090B),
+        backgroundColor: Colors.black,
         body: Center(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.wifi_off_rounded,
-                  color: Colors.white24, size: 48),
-              const SizedBox(height: 12),
-              const Text('Failed to load profile',
-                  style:
-                      TextStyle(color: Colors.white54, fontSize: 14)),
-              const SizedBox(height: 20),
+              const Icon(Icons.wifi_off_rounded, color: Colors.white24, size: 64),
+              const SizedBox(height: 16),
+              const Text('Failed to load profile parameters', style: TextStyle(color: Colors.white54, fontSize: 15)),
+              const SizedBox(height: 24),
               ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF0050)),
                 onPressed: _loadAll,
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF0050)),
-                child: const Text('Retry',
-                    style: TextStyle(color: Colors.white)),
-              ),
+                child: const Text('Retry Execution Loop', style: TextStyle(color: Colors.white)),
+              )
             ],
           ),
         ),
       );
     }
 
-    final displayName =
-        (_userData?['displayName'] as String?) ?? 'NigerGram User';
-    final username =
-        '@${(_userData?['username'] as String?) ?? 'username'}';
-    final bio = (_userData?['bio'] as String?) ?? '';
-    final coverUrl = (_userData?['coverUrl'] as String?) ?? '';
-    final profilePic = (_userData?['profilePicUrl'] as String?) ?? '';
-    final isVerified = (_userData?['isVerified'] as bool?) ?? false;
-    final instaLink =
-        (_userData?['instagramLink'] as String?) ?? '';
-    final ytLink = (_userData?['youtubeLink'] as String?) ?? '';
-    final followers = (_userData?['followers'] as int?) ?? 0;
-    final following = (_userData?['following'] as int?) ?? 0;
-    final totalLikes = (_userData?['totalLikes'] as int?) ?? 0;
-
     return Scaffold(
-      backgroundColor: const Color(0xFF09090B),
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // â”€â”€ Main scrollable content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           RefreshIndicator(
             color: const Color(0xFFFF0050),
-            backgroundColor: const Color(0xFF1A1A22),
+            backgroundColor: const Color(0xFF121216),
             onRefresh: _loadAll,
             child: NestedScrollView(
               controller: _scrollController,
-              headerSliverBuilder: (ctx, innerScrolled) => [
-                // â”€â”€ Cover / AppBar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                SliverAppBar(
-                  expandedHeight: 180,
-                  pinned: true,
-                  backgroundColor: const Color(0xFF09090B),
-                  elevation: 0,
-                  leading: widget.userId != null
-                      ? IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                              color: Colors.white, size: 18),
-                          onPressed: () => context.pop(),
-                        )
-                      : null,
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: GestureDetector(
-                      onTap: _isCurrentUser ? _updateCover : null,
-                      child: Stack(
-                        fit: StackFit.expand,
+              headerSliverBuilder: (context, innerBoxIsScrolled) {
+                return [
+                  SliverAppBar(
+                    expandedHeight: 180,
+                    backgroundColor: Colors.black,
+                    pinned: true,
+                    actions: [
+                      if (_isCurrentUser)
+                        IconButton(
+                          icon: const Icon(Icons.analytics_outlined, color: Colors.white),
+                          onPressed: _showAnalytics,
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.share_outlined, color: Colors.white),
+                        onPressed: () {
+                          Share.share('Check out this NigerGram Profile channel: https://nigergram.app/profile/$_targetUserId');
+                        },
+                      )
+                    ],
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: GestureDetector(
+                        onTap: _updateCover,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            _userData?['coverUrl'] != null && _userData!['coverUrl'].toString().isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: _userData!['coverUrl'],
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => Container(color: const Color(0xFF121216)),
+                                    errorWidget: (context, url, error) => Container(color: const Color(0xFF121216)),
+                                  )
+                                : Container(color: const Color(0xFF161620)),
+                            Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Colors.black54, Colors.transparent, Colors.black],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          coverUrl.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: coverUrl,
-                                  fit: BoxFit.cover,
-                                )
-                              : Container(
-                                  decoration: const BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Color(0xFF1C1C28),
-                                        Color(0xFF09090B),
-                                      ],
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                    ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              GestureDetector(
+                                onTap: _updateAvatar,
+                                child: CircleAvatar(
+                                  radius: 46,
+                                  backgroundColor: Colors.black,
+                                  child: CircleAvatar(
+                                    radius: 43,
+                                    backgroundColor: const Color(0xFF16161F),
+                                    backgroundImage: _userData?['profilePicUrl'] != null && _userData!['profilePicUrl'].toString().isNotEmpty
+                                        ? CachedNetworkImageProvider(_userData!['profilePicUrl'])
+                                        : null,
+                                    child: _userData?['profilePicUrl'] == null || _userData!['profilePicUrl'].toString().isEmpty
+                                        ? const Icon(Icons.person_outline, size: 36, color: Colors.white30)
+                                        : null,
                                   ),
                                 ),
-                          // dark scrim
-                          Container(color: Colors.black26),
-                          if (_isCurrentUser)
-                            const Positioned(
-                              top: 48,
-                              right: 16,
-                              child: CircleAvatar(
-                                radius: 15,
-                                backgroundColor: Colors.black54,
-                                child: Icon(Icons.camera_alt_rounded,
-                                    color: Colors.white, size: 14),
                               ),
-                            ),
+                              const Spacer(),
+                              if (_isCurrentUser)
+                                OutlinedButton(
+                                  onPressed: _showEditSheet,
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Colors.white24),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  ),
+                                  child: const Text('Edit Workspace Profile', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                                )
+                              else
+                                ElevatedButton(
+                                  onPressed: _toggleFollow,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _isFollowing ? const Color(0xFF1C1C24) : const Color(0xFFFF0050),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                                  ),
+                                  child: _isFollowLoading
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                      : Text(_isFollowing ? 'Following' : 'Follow Node', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Text(_userData?['displayName'] ?? 'NigerGram Identity Creator', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                              if (_userData?['isVerified'] == true) ...[
+                                const SizedBox(width: 6),
+                                const Icon(Icons.verified_rounded, color: Colors.blueAccent, size: 18),
+                              ]
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text('@${_userData?['username'] ?? 'identity_node'}', style: const TextStyle(color: Color(0xFFFF0050), fontSize: 13, fontWeight: FontWeight.w500)),
+                          const SizedBox(height: 12),
+                          Text(_userData?['bio'] ?? 'No configuration bio descriptor declared inside this network interface vector.', style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4)),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              _buildStatisticNode('${_userData?['following'] ?? 0}', 'Following'),
+                              _buildStatisticSpacer(),
+                              _buildStatisticNode('${_userData?['followers'] ?? 0}', 'Followers'),
+                              _buildStatisticSpacer(),
+                              _buildStatisticNode('${_userData?['likes'] ?? 0}', 'Likes'),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
                         ],
                       ),
                     ),
                   ),
-                ),
-
-                // â”€â”€ Profile info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Avatar row
-                        Transform.translate(
-                          offset: const Offset(0, -44),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              // Avatar
-                              GestureDetector(
-                                onTap: _isCurrentUser
-                                    ? _updateAvatar
-                                    : null,
-                                child: Stack(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 46,
-                                      backgroundColor:
-                                          const Color(0xFF09090B),
-                                      child: CircleAvatar(
-                                        radius: 42,
-                                        backgroundColor:
-                                            const Color(0xFF1A1A22),
-                                        backgroundImage:
-                                            profilePic.isNotEmpty
-                                                ? CachedNetworkImageProvider(
-                                                    profilePic)
-                                                : null,
-                                        child: profilePic.isEmpty
-                                            ? const Icon(Icons.person,
-                                                color: Colors.white24,
-                                                size: 36)
-                                            : null,
-                                      ),
-                                    ),
-                                    if (_isCurrentUser)
-                                      Positioned(
-                                        bottom: 2,
-                                        right: 2,
-                                        child: Container(
-                                          padding:
-                                              const EdgeInsets.all(5),
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFFFF0050),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                              Icons.camera_alt_rounded,
-                                              color: Colors.white,
-                                              size: 12),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-
-                              const Spacer(),
-
-                              // Buttons
-                              if (_isCurrentUser) ...[
-                                IconButton(
-                                  onPressed: _showAnalytics,
-                                  icon: const Icon(
-                                      Icons.analytics_outlined,
-                                      color: Colors.white54,
-                                      size: 22),
-                                  tooltip: 'Analytics',
-                                ),
-                                const SizedBox(width: 4),
-                                _outlineBtn(
-                                    label: 'Edit Profile',
-                                    onTap: _showEditSheet),
-                              ] else ...[
-                                // Follow / Unfollow
-                                _followBtn(
-                                    isFollowing: _isFollowing,
-                                    isLoading: _isFollowLoading,
-                                    onTap: _toggleFollow),
-                                const SizedBox(width: 8),
-                                // Message (route to DMs)
-                                _outlineBtn(
-                                  label: 'Message',
-                                  onTap: () => context.push(
-                                      '/chat/$_targetUserId'),
-                                ),
-                              ],
-                            ],
-                          ),
+                  SliverOverlapAbsorber(
+                    handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+                    sliver: SliverPersistentHeader(
+                      pinned: true,
+                      delegate: _SliverAppBarTabBarDelegate(
+                        TabBar(
+                          controller: _tabController,
+                          indicatorColor: const Color(0xFFFF0050),
+                          labelColor: Colors.white,
+                          unselectedLabelColor: Colors.white38,
+                          labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          tabs: [
+                            const Tab(icon: Icon(Icons.grid_on_rounded)),
+                            if (_isCurrentUser) const Tab(icon: Icon(Icons.lock_outline_rounded)),
+                            const Tab(icon: Icon(Icons.bookmark_outline_rounded)),
+                            const Tab(icon: Icon(Icons.favorite_outline_rounded)),
+                          ],
                         ),
-
-                        // Name + verified + username
-                        Transform.translate(
-                          offset: const Offset(0, -28),
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      displayName,
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 21,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: -0.3),
-                                    ),
-                                  ),
-                                  if (isVerified) ...[
-                                    const SizedBox(width: 6),
-                                    const Icon(
-                                        Icons.verified_rounded,
-                                        color: Color(0xFFFF0050),
-                                        size: 18),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Text(username,
-                                  style: const TextStyle(
-                                      color: Color(0xFFFF0050),
-                                      fontSize: 13,
-                                      fontWeight:
-                                          FontWeight.w500)),
-                              if (bio.isNotEmpty) ...[
-                                const SizedBox(height: 10),
-                                Text(bio,
-                                    style: TextStyle(
-                                        color: Colors.white
-                                            .withOpacity(0.7),
-                                        fontSize: 13,
-                                        height: 1.45)),
-                              ],
-
-                              // Social links
-                              if (instaLink.isNotEmpty ||
-                                  ytLink.isNotEmpty) ...[
-                                const SizedBox(height: 10),
-                                Wrap(
-                                  spacing: 12,
-                                  children: [
-                                    if (instaLink.isNotEmpty)
-                                      _socialChip(
-                                          Icons.camera_alt_outlined,
-                                          'Instagram',
-                                          const Color(0xFFE1306C)),
-                                    if (ytLink.isNotEmpty)
-                                      _socialChip(
-                                          Icons.play_circle_outline,
-                                          'YouTube',
-                                          const Color(0xFFFF0000)),
-                                  ],
-                                ),
-                              ],
-
-                              const SizedBox(height: 18),
-
-                              // Stats row
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.start,
-                                children: [
-                                  _statCol(_formatCount(following),
-                                      'Following'),
-                                  _statDivider(),
-                                  _statCol(_formatCount(followers),
-                                      'Followers'),
-                                  _statDivider(),
-                                  _statCol(_formatCount(totalLikes),
-                                      'Likes'),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-
-                // â”€â”€ Tab bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _TabBarDelegate(
-                    TabBar(
-                      controller: _tabController,
-                      indicatorColor: const Color(0xFFFF0050),
-                      indicatorWeight: 2,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white30,
-                      tabs: _isCurrentUser
-                          ? const [
-                              Tab(
-                                  icon: Icon(Icons.grid_on_rounded,
-                                      size: 20)),
-                              Tab(
-                                  icon: Icon(
-                                      Icons.lock_outline_rounded,
-                                      size: 20)),
-                              Tab(
-                                  icon: Icon(
-                                      Icons.bookmark_outline_rounded,
-                                      size: 20)),
-                              Tab(
-                                  icon: Icon(
-                                      Icons.favorite_border_rounded,
-                                      size: 20)),
-                            ]
-                          : const [
-                              Tab(
-                                  icon: Icon(Icons.grid_on_rounded,
-                                      size: 20)),
-                              Tab(
-                                  icon: Icon(
-                                      Icons.favorite_border_rounded,
-                                      size: 20)),
-                            ],
-                    ),
-                  ),
-                ),
-              ],
-
-              // â”€â”€ Tab content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                  )
+                ];
+              },
               body: TabBarView(
                 controller: _tabController,
-                children: _isCurrentUser
-                    ? [
-                        _videoGrid(_userVideos),
-                        _videoGrid(_privateVideos),
-                        _videoGrid(_bookmarkedVideos),
-                        _videoGrid(_likedVideos),
-                      ]
-                    : [
-                        _videoGrid(_userVideos),
-                        _videoGrid(_likedVideos),
-                      ],
+                children: [
+                  _buildVideoGridMatrix(_userVideos),
+                  if (_isCurrentUser) _buildVideoGridMatrix(_privateVideos),
+                  _buildVideoGridMatrix(_bookmarkedVideos),
+                  _buildVideoGridMatrix(_likedVideos),
+                ],
               ),
             ),
           ),
-
-          // â”€â”€ Upload progress overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          if (_isUploadingContent)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withOpacity(0.88),
-                child: Center(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 40),
-                    padding: const EdgeInsets.all(28),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A22),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.cloud_upload_outlined,
-                            color: Color(0xFFFF0050), size: 40),
-                        const SizedBox(height: 16),
-                        Text(
-                          _uploadLabel,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: _uploadProgress,
-                            backgroundColor: Colors.white12,
-                            valueColor:
-                                const AlwaysStoppedAnimation<Color>(
-                                    Color(0xFFFF0050)),
-                            minHeight: 6,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${(_uploadProgress * 100).toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                              color: Colors.white54, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          if (_isUploadingContent) _buildFloatingStatusMatrixOverlay(),
         ],
       ),
-
-      // â”€â”€ FAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       floatingActionButton: _isCurrentUser
           ? FloatingActionButton(
-              onPressed: _showUploadSheet,
               backgroundColor: const Color(0xFFFF0050),
-              shape: const CircleBorder(),
-              child: const Icon(Icons.add_rounded,
-                  color: Colors.white, size: 28),
+              child: const Icon(Icons.add, color: Colors.white, size: 28),
+              onPressed: _showUploadSheet,
             )
           : null,
     );
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // SMALL UI BUILDERS
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-  Widget _outlineBtn(
-      {required String label, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white12),
-        ),
-        child: Text(label,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600)),
-      ),
+  Widget _buildStatisticNode(String val, String title) {
+    return Row(
+      children: [
+        Text(val, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+        const SizedBox(width: 4),
+        Text(title, style: const TextStyle(color: Colors.white38, fontSize: 13)),
+      ],
     );
   }
 
-  Widget _followBtn({
-    required bool isFollowing,
-    required bool isLoading,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-        decoration: BoxDecoration(
-          color: isFollowing
-              ? Colors.white.withOpacity(0.05)
-              : const Color(0xFFFF0050),
-          borderRadius: BorderRadius.circular(8),
-          border: isFollowing
-              ? Border.all(color: Colors.white12)
-              : null,
-        ),
-        child: isLoading
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2))
-            : Text(
-                isFollowing ? 'Following' : 'Follow',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold),
+  Widget _buildStatisticSpacer() => const Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text('|', style: TextStyle(color: Colors.white12)));
+
+  Widget _buildVideoGridMatrix(List<Map<String, dynamic>> mediaCollection) {
+    if (mediaCollection.isEmpty) {
+      return const Center(child: Text('No content nodes cached in this matrix.', style: TextStyle(color: Colors.white38, fontSize: 13)));
+    }
+
+    return SafeArea(
+      top: false,
+      bottom: false,
+      child: Builder(
+        builder: (context) {
+          return CustomScrollView(
+            key: PageStorageKey<String>(mediaCollection.toString()),
+            slivers: [
+              SliverOverlapInjector(handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context)),
+              SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  childAspectRatio: 9 / 14,
+                  crossAxisSpacing: 2,
+                  mainAxisSpacing: 2,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, idx) {
+                    final targetItem = mediaCollection[idx];
+                    return GestureDetector(
+                      onTap: () {
+                        // Media navigation route
+                      },
+                      child: Container(
+                        color: const Color(0xFF0F0F14),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            targetItem['thumbnailUrl'] != null && targetItem['thumbnailUrl'].toString().isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: targetItem['thumbnailUrl'],
+                                    fit: BoxFit.cover,
+                                  )
+                                : const Center(child: Icon(Icons.play_circle_outline, color: Colors.white24, size: 28)),
+                            Positioned(
+                              left: 6,
+                              bottom: 6,
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 14),
+                                  const SizedBox(width: 2),
+                                  Text('${targetItem['viewCount'] ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  childCount: mediaCollection.length,
+                ),
               ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _socialChip(IconData icon, String label, Color color) {
+  Widget _buildFloatingStatusMatrixOverlay() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 13),
-          const SizedBox(width: 5),
-          Text(label,
-              style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600)),
-        ],
+      color: Colors.black70,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: Color(0xFFFF0050)),
+              const SizedBox(height: 24),
+              Text(_uploadLabel, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              LinearProgressIndicator(value: _uploadProgress, color: const Color(0xFFFF0050), backgroundColor: Colors.white12),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// TAB BAR DELEGATE
+// CUSTOM TABBAR DELEGATE UTILITY
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-class _TabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar _tabBar;
-  const _TabBarDelegate(this._tabBar);
+class _SliverAppBarTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar subTabBar;
+  _SliverAppBarTabBarDelegate(this.subTabBar);
 
   @override
-  double get minExtent => _tabBar.preferredSize.height;
+  double get minExtent => subTabBar.preferredSize.height;
   @override
-  double get maxExtent => _tabBar.preferredSize.height;
+  double get maxExtent => subTabBar.preferredSize.height;
 
   @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: const Color(0xFF09090B),
-      child: _tabBar,
-    );
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(color: Colors.black, child: subTabBar);
   }
 
   @override
-  bool shouldRebuild(_TabBarDelegate old) => false;
+  bool shouldRebuild(_SliverAppBarTabBarDelegate oldDelegate) => false;
 }
