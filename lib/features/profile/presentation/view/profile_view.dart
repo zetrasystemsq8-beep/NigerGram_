@@ -706,7 +706,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      final String filePath = 'users/$_currentUid/avatar.jpg';
+      final String filePath = '$_currentUid/avatar.jpg';
       
       await _supabase.storage
           .from('images')
