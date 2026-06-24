@@ -55,7 +55,7 @@ class ProfileView extends StatefulWidget {
 }
 
 class _ProfileViewState extends State<ProfileView>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   
   late TabController _tabController;
   final ScrollController _scrollController = ScrollController();
