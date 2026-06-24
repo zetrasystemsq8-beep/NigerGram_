@@ -32,6 +32,9 @@ class _VideoFeedViewState extends State<VideoFeedView> {
   /// Track loop counts per video in-session to report loopCount increments
   final Map<String, int> _loopCounts = {};
 
+  // 🔥 FIX: Track initialization status per index
+  final Map<int, bool> _initializationStatus = {};
+
   @override
   void initState() {
     super.initState();
@@ -59,6 +62,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     }
     _controllers.clear();
     _activeListeners.clear();
+    _initializationStatus.clear();
   }
 
   void _onPageChanged(int index, List<VideoEntity> videos) {
@@ -93,6 +97,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
           _activeListeners.remove(key);
         }
         controller.dispose();
+        _initializationStatus.remove(key);
         return true;
       }
       return false;
@@ -122,7 +127,14 @@ class _VideoFeedViewState extends State<VideoFeedView> {
 
   VideoPlayerController? _getOrCreateController(int index, List<VideoEntity> videos) {
     if (index < 0 || index >= videos.length) return null;
-    if (_controllers.containsKey(index)) return _controllers[index];
+    
+    // Return existing controller if we have one
+    if (_controllers.containsKey(index)) {
+      return _controllers[index];
+    }
+
+    // 🔥 FIX: Mark as initializing
+    _initializationStatus[index] = false;
 
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(videos[index].videoUrl),
@@ -130,14 +142,32 @@ class _VideoFeedViewState extends State<VideoFeedView> {
 
     _controllers[index] = controller;
 
+    // 🔥 FIX: Proper initialization with state updates
     controller.initialize().then((_) {
-      if (mounted && index == _focusedIndex) {
-        controller.setLooping(true);
+      if (!mounted) return;
+      
+      // Only proceed if this controller is still the one for this index
+      if (_controllers[index] != controller) return;
+      
+      debugPrint('✅ Video initialized for index $index: ${videos[index].id}');
+      
+      controller.setLooping(true);
+      _initializationStatus[index] = true;
+      
+      // If this is the focused index, play automatically
+      if (index == _focusedIndex) {
         controller.play();
-        setState(() {});
       }
+      
+      // 🔥 FIX: Force rebuild to update UI
+      setState(() {});
+      
     }).catchError((error) {
       debugPrint('❌ Video initialization failed for index $index: $error');
+      if (mounted) {
+        _initializationStatus[index] = false;
+        setState(() {});
+      }
     });
 
     return controller;
@@ -356,15 +386,25 @@ class _VideoFeedViewState extends State<VideoFeedView> {
               onPageChanged: (index) => _onPageChanged(index, state.videos),
               itemCount: state.videos.length,
               itemBuilder: (context, index) {
-                final controller = _getOrCreateController(index, state.videos);
+                // 🔥 FIX: Get or create controller, but we need to rebuild when initialized
+                final controller = _controllers[index];
+                final isInitialized = _initializationStatus[index] ?? false;
+                
+                // 🔥 FIX: If controller doesn't exist yet, create it
+                if (controller == null) {
+                  _getOrCreateController(index, state.videos);
+                }
+                
+                // 🔥 FIX: Always use the latest controller from the map
+                final currentController = _controllers[index];
                 
                 return Stack(
                   children: [
                     Positioned.fill(
                       child: VideoFeedViewItem(
-                        key: ValueKey(state.videos[index].id),
+                        key: ValueKey('${state.videos[index].id}_${isInitialized ? 'init' : 'loading'}'),
                         videoItem: state.videos[index],
-                        controller: controller,
+                        controller: currentController,
                       ),
                     ),
                     
