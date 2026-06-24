@@ -80,10 +80,10 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   bool _allowStitch = true;
   bool _allowDownload = true;
   
-  // NEW: Story Highlights
+  // Story Highlights
   List<Map<String, dynamic>> _storyHighlights = [];
   
-  // NEW: Bio Links
+  // Bio Links
   List<Map<String, dynamic>> _bioLinks = [];
   
   List<Map<String, dynamic>> _pinnedVideos = [];
@@ -165,7 +165,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // DATA LOADING - UPDATED with Highlights & Bio Links
+  // DATA LOADING
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _loadAll() async {
@@ -195,9 +195,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
         if (!_isCurrentUser) _checkBlockStatus().catchError((_) {}),
         _checkStoryStatus().catchError((_) {}),
         _loadAchievements().catchError((_) {}),
-        // NEW: Load story highlights
         _loadStoryHighlights().catchError((_) {}),
-        // NEW: Load bio links from user data
         _loadBioLinks().catchError((_) {}),
       ]);
     } catch (e) {
@@ -207,123 +205,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       if (mounted) setState(() => _isLoading = false);
     }
   }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // NEW: STORY HIGHLIGHTS
-  // ─────────────────────────────────────────────────────────────────────────
-  
-  Future<void> _loadStoryHighlights() async {
-    final snap = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(_targetUserId)
-        .collection('story_highlights')
-        .orderBy('timestamp', descending: true)
-        .limit(10)
-        .get();
-    
-    if (mounted) {
-      setState(() {
-        _storyHighlights = snap.docs.map((d) => d.data()).toList();
-      });
-    }
-  }
-  
-  Future<void> _addStoryHighlight(String storyId, String thumbnailUrl, String title) async {
-    if (!_isCurrentUser) return;
-    
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUid)
-          .collection('story_highlights')
-          .add({
-        'storyId': storyId,
-        'thumbnailUrl': thumbnailUrl,
-        'title': title,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-      await _loadStoryHighlights();
-      if (mounted) _showSnack('Story added to highlights!', isSuccess: true);
-    } catch (e) {
-      if (mounted) _showSnack('Failed to add highlight', isSuccess: false);
-    }
-  }
-  
-  Future<void> _removeStoryHighlight(String highlightId) async {
-    if (!_isCurrentUser) return;
-    
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUid)
-          .collection('story_highlights')
-          .doc(highlightId)
-          .delete();
-      await _loadStoryHighlights();
-      if (mounted) _showSnack('Highlight removed', isSuccess: true);
-    } catch (e) {
-      if (mounted) _showSnack('Failed to remove highlight', isSuccess: false);
-    }
-  }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // NEW: BIO LINKS
-  // ─────────────────────────────────────────────────────────────────────────
-  
-  Future<void> _loadBioLinks() async {
-    // Bio links are stored in the user document
-    final bioLinks = _userData?['bioLinks'] as List<dynamic>? ?? [];
-    if (mounted) {
-      setState(() {
-        _bioLinks = bioLinks.map((link) => {
-          'url': link['url'] ?? '',
-          'title': link['title'] ?? 'Link',
-          'icon': link['icon'] ?? '🌐',
-        }).toList();
-      });
-    }
-  }
-  
-  Future<void> _addBioLink(String url, String title, String icon) async {
-    if (!_isCurrentUser) return;
-    
-    try {
-      final newLink = {'url': url, 'title': title, 'icon': icon};
-      final updatedLinks = List<Map<String, dynamic>>.from(_bioLinks)..add(newLink);
-      
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUid)
-          .update({'bioLinks': updatedLinks});
-      
-      await _loadBioLinks();
-      if (mounted) _showSnack('Link added to bio!', isSuccess: true);
-    } catch (e) {
-      if (mounted) _showSnack('Failed to add link', isSuccess: false);
-    }
-  }
-  
-  Future<void> _removeBioLink(int index) async {
-    if (!_isCurrentUser) return;
-    
-    try {
-      final updatedLinks = List<Map<String, dynamic>>.from(_bioLinks)..removeAt(index);
-      
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUid)
-          .update({'bioLinks': updatedLinks});
-      
-      await _loadBioLinks();
-      if (mounted) _showSnack('Link removed', isSuccess: true);
-    } catch (e) {
-      if (mounted) _showSnack('Failed to remove link', isSuccess: false);
-    }
-  }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // EXISTING DATA LOADING METHODS
-  // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _refreshCurrentTab() async {
     setState(() => _isTabLoading = true);
@@ -374,6 +255,47 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
     final snap = await FirebaseFirestore.instance
         .collection('users').doc(_targetUserId).collection('achievements').limit(10).get();
     if (mounted) setState(() => _achievements = snap.docs.map((d) => d.data()).toList());
+  }
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // STORY HIGHLIGHTS
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  Future<void> _loadStoryHighlights() async {
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_targetUserId)
+        .collection('story_highlights')
+        .orderBy('timestamp', descending: true)
+        .limit(10)
+        .get();
+    
+    if (mounted) {
+      setState(() {
+        _storyHighlights = snap.docs.map((d) {
+          final data = d.data();
+          data['id'] = d.id;
+          return data;
+        }).toList();
+      });
+    }
+  }
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // BIO LINKS
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  Future<void> _loadBioLinks() async {
+    final bioLinks = _userData?['bioLinks'] as List<dynamic>? ?? [];
+    if (mounted) {
+      setState(() {
+        _bioLinks = bioLinks.map((link) => {
+          'url': link['url'] ?? '',
+          'title': link['title'] ?? 'Link',
+          'icon': link['icon'] ?? '🔗',
+        }).toList();
+      });
+    }
   }
   
   Future<void> _loadPinnedVideos() async {
@@ -684,7 +606,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // AVATAR & COVER - SUPABASE
+  // AVATAR & COVER - SUPABASE (FIXED PATHS)
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _updateAvatar() async {
@@ -706,6 +628,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
+      // 🔥 FIXED: Removed 'users/' folder
       final String filePath = '$_currentUid/avatar.jpg';
       
       await _supabase.storage
@@ -761,7 +684,8 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      final String filePath = 'users/$_currentUid/cover.jpg';
+      // 🔥 FIXED: Removed 'users/' folder
+      final String filePath = '$_currentUid/cover.jpg';
       
       await _supabase.storage
           .from('images')
@@ -1138,7 +1062,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // SOCIAL LINKS - FIXED
+  // SOCIAL LINKS
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _openSocialLink(String url) async {
@@ -1179,7 +1103,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // MAIN BUILD - UPDATED with Highlights & Bio Links
+  // MAIN BUILD
   // ─────────────────────────────────────────────────────────────────────────
   
   @override
@@ -1300,7 +1224,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                         const SizedBox(height: 12),
                         if (_userData?['bio'] != null && _userData!['bio'].toString().isNotEmpty) Text(_userData!['bio'], style: const TextStyle(color: NGColors.textSecondary, fontSize: 13, height: 1.4)),
                         
-                        // NEW: Story Highlights
+                        // Story Highlights
                         if (_storyHighlights.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           SizedBox(
@@ -1313,12 +1237,8 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                                 final highlight = _storyHighlights[idx];
                                 return GestureDetector(
                                   onTap: () {
-                                    // Show story highlight
-                                    // You can navigate to a story viewer
+                                    // Navigate to story viewer
                                   },
-                                  onLongPress: _isCurrentUser ? () {
-                                    _removeStoryHighlight(highlight['id'] ?? '');
-                                  } : null,
                                   child: Column(
                                     children: [
                                       CircleAvatar(
@@ -1350,7 +1270,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                           const SizedBox(height: 8),
                         ],
                         
-                        // NEW: Bio Links
+                        // Bio Links
                         if (_bioLinks.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Wrap(
@@ -1485,7 +1405,17 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
           if (_isUploadingContent) _buildUploadOverlay(),
         ],
       ),
-      floatingActionButton: _isCurrentUser ? FloatingActionButton(backgroundColor: _accentColor, child: const Icon(Icons.add, color: NGColors.textPrimary, size: 28), onPressed: _showUploadSheet) : null,
+      // 🔥 FIXED: Lifted the button above the nav bar
+      floatingActionButton: _isCurrentUser
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 80.0),
+              child: FloatingActionButton(
+                backgroundColor: _accentColor,
+                child: const Icon(Icons.add, color: NGColors.textPrimary, size: 28),
+                onPressed: _showUploadSheet,
+              ),
+            )
+          : null,
     );
   }
   
