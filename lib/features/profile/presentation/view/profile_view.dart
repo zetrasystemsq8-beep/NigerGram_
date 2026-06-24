@@ -1,3 +1,4 @@
+
 // lib/features/profile/presentation/view/profile_view.dart
 //
 // ╔══════════════════════════════════════════════════════════╗
@@ -100,7 +101,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   bool _hasMoreVideos = true;
   bool _isLoadingMore = false;
   
-  // 🔥 FIX 1: Remove force unwrap - NULL SAFE
+  // 🔥 FIX: Null-safe current user
   String get _targetUserId {
     final user = FirebaseAuth.instance.currentUser;
     return widget.userId ?? user?.uid ?? '';
@@ -172,14 +173,12 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // DATA LOADING - FIXED
+  // DATA LOADING
   // ─────────────────────────────────────────────────────────────────────────
   
-  // 🔥 FIX 2: Guard against empty userId
   Future<void> _loadAll() async {
     if (!mounted) return;
     
-    // Guard: if no user is signed in or target userId is empty
     if (_targetUserId.isEmpty || _currentUid.isEmpty) {
       setState(() {
         _hasError = true;
@@ -193,7 +192,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
     try {
       await _loadUserData();
       
-      // 🔥 FIX 4: Throw error if user data is null
       if (_userData == null) {
         throw Exception("User not found");
       }
@@ -231,14 +229,12 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
     }
   }
   
-  // 🔥 FIX 3: Fixed tab refresh with overflow guard
   Future<void> _refreshCurrentTab() async {
     setState(() => _isTabLoading = true);
     try {
       final currentIndex = _tabController.index;
       final maxTabs = _isCurrentUser ? 6 : 5;
       
-      // Guard against index overflow
       if (currentIndex >= maxTabs) {
         setState(() => _isTabLoading = false);
         return;
@@ -273,7 +269,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
           }
           break;
         case 5:
-          // 🔥 FIX 3: Only run for current user, otherwise return
           if (_isCurrentUser) {
             await _loadLikedVideos();
           } else {
@@ -562,50 +557,118 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // VIDEO UPLOAD
+  // VIDEO UPLOAD - FIXED (20MB limit, clean filename)
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _pickAndUploadVideo(bool makePrivate) async {
     if (_currentUid.isEmpty) return;
     HapticFeedback.heavyImpact();
-    final XFile? videoFile = await _picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(minutes: 3));
+    
+    final XFile? videoFile = await _picker.pickVideo(
+      source: ImageSource.gallery, 
+      maxDuration: const Duration(minutes: 3),
+    );
     if (videoFile == null) return;
+    
     final File file = File(videoFile.path);
     final int fileSize = await file.length();
-    const int maxSizeBytes = 100 * 1024 * 1024;
+    
+    const int maxSizeBytes = 20 * 1024 * 1024; // 20MB
     if (fileSize > maxSizeBytes) {
-      if (mounted) _showSnack('Video too large (${(fileSize / (1024 * 1024)).toStringAsFixed(1)}MB). Max 100MB.', isSuccess: false);
+      if (mounted) _showSnack('Video too large (${(fileSize / (1024 * 1024)).toStringAsFixed(1)}MB). Max 20MB.', isSuccess: false);
       return;
     }
-    setState(() { _isUploadingContent = true; _uploadProgress = 0.05; _uploadLabel = 'Preparing upload...'; });
+    
+    setState(() { 
+      _isUploadingContent = true; 
+      _uploadProgress = 0.05; 
+      _uploadLabel = 'Preparing upload...'; 
+    });
+    
     try {
       final String videoId = FirebaseFirestore.instance.collection('videos').doc().id;
-      final String storagePath = 'videos/$_currentUid/$videoId.mp4';
-      setState(() { _uploadLabel = 'Uploading to Supabase...'; _uploadProgress = 0.1; });
-      await _supabase.storage.from('videos').uploadBinary(
-        storagePath, await file.readAsBytes(),
-        fileOptions: const FileOptions(contentType: 'video/mp4', upsert: false),
-      );
-      setState(() { _uploadProgress = 0.85; _uploadLabel = 'Generating CDN URL...'; });
-      final String videoUrl = _supabase.storage.from('videos').getPublicUrl(storagePath);
-      setState(() { _uploadProgress = 0.92; _uploadLabel = 'Saving to database...'; });
-      await FirebaseFirestore.instance.collection('videos').doc(videoId).set({
-        'videoId': videoId, 'userId': _currentUid, 'videoUrl': videoUrl,
-        'thumbnailUrl': '', 'isPrivate': makePrivate, 'isPinned': false,
-        'allowDuet': _allowDuet, 'allowStitch': _allowStitch, 'allowDownload': _allowDownload,
-        'likeCount': 0, 'commentCount': 0, 'shareCount': 0, 'viewCount': 0,
-        'fileSizeBytes': fileSize, 'timestamp': FieldValue.serverTimestamp(),
+      final String cleanVideoId = videoId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+      final String storagePath = 'videos/${_currentUid}_${cleanVideoId}_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      
+      setState(() { 
+        _uploadLabel = 'Uploading to Supabase...'; 
+        _uploadProgress = 0.1; 
       });
-      await FirebaseFirestore.instance.collection('users').doc(_currentUid).update({'videoCount': FieldValue.increment(1)});
-      setState(() { _uploadProgress = 1.0; _uploadLabel = 'Upload complete!'; });
+      
+      final bytes = await file.readAsBytes();
+      
+      await _supabase.storage.from('videos').uploadBinary(
+        storagePath, 
+        bytes,
+        fileOptions: const FileOptions(
+          contentType: 'video/mp4', 
+          upsert: false,
+        ),
+      );
+      
+      setState(() { 
+        _uploadProgress = 0.85; 
+        _uploadLabel = 'Generating CDN URL...'; 
+      });
+      
+      final String videoUrl = _supabase.storage.from('videos').getPublicUrl(storagePath);
+      
+      setState(() { 
+        _uploadProgress = 0.92; 
+        _uploadLabel = 'Saving to database...'; 
+      });
+      
+      await FirebaseFirestore.instance.collection('videos').doc(videoId).set({
+        'videoId': videoId, 
+        'userId': _currentUid, 
+        'videoUrl': videoUrl,
+        'thumbnailUrl': '', 
+        'isPrivate': makePrivate, 
+        'isPinned': false,
+        'allowDuet': _allowDuet, 
+        'allowStitch': _allowStitch, 
+        'allowDownload': _allowDownload,
+        'likeCount': 0, 
+        'commentCount': 0, 
+        'shareCount': 0, 
+        'viewCount': 0,
+        'fileSizeBytes': fileSize, 
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      
+      await FirebaseFirestore.instance.collection('users').doc(_currentUid).update({
+        'videoCount': FieldValue.increment(1)
+      });
+      
+      setState(() { 
+        _uploadProgress = 1.0; 
+        _uploadLabel = 'Upload complete!'; 
+      });
+      
       await Future.delayed(const Duration(milliseconds: 400));
       await _loadAll();
-      if (mounted) _showSnack(makePrivate ? 'Saved to private vault!' : 'Published to your profile!', isSuccess: true);
+      
+      if (mounted) {
+        _showSnack(
+          makePrivate ? 'Saved to private vault!' : 'Published to your profile!', 
+          isSuccess: true
+        );
+      }
     } catch (e) {
       debugPrint('Upload error: $e');
-      if (mounted) _showSnack('Upload failed', isSuccess: false);
+      if (mounted) {
+        String errorMsg = 'Upload failed. Please try again.';
+        if (e.toString().contains('Connection reset')) {
+          errorMsg = 'Connection lost. Please check your internet and try again.';
+        }
+        _showSnack(errorMsg, isSuccess: false);
+      }
     } finally {
-      if (mounted) setState(() { _isUploadingContent = false; _uploadProgress = 0.0; _uploadLabel = ''; });
+      if (mounted) setState(() { 
+        _isUploadingContent = false; 
+        _uploadProgress = 0.0; 
+        _uploadLabel = ''; 
+      });
     }
   }
   
@@ -648,7 +711,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // AVATAR & COVER
+  // AVATAR & COVER - FIXED (No folders, just filenames)
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _updateAvatar() async {
@@ -670,7 +733,8 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      final String filePath = '$_currentUid/avatar.jpg';
+      // 🔥 FIX: No folders, just filename
+      final String filePath = 'avatar_$_currentUid.jpg';
       
       await _supabase.storage
           .from('images')
@@ -725,7 +789,8 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      final String filePath = '$_currentUid/cover.jpg';
+      // 🔥 FIX: No folders, just filename
+      final String filePath = 'cover_$_currentUid.jpg';
       
       await _supabase.storage
           .from('images')
