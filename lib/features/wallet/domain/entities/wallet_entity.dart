@@ -1,46 +1,36 @@
+// lib/features/wallet/domain/entities/wallet_entity.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class WalletEntity {
-  final String uid;
+  final String userId;
   final double balance;
-  final double totalEarned;
-  final String? bankAccountNumber;
-  final String? bankName;
-  final String? bankAccountName;
-  final Timestamp? updatedAt;
+  final String currency;
+  final DateTime? updatedAt;
 
   WalletEntity({
-    required this.uid,
+    required this.userId,
     required this.balance,
-    required this.totalEarned,
-    this.bankAccountNumber,
-    this.bankName,
-    this.bankAccountName,
+    required this.currency,
     this.updatedAt,
   });
 
-  factory WalletEntity.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+  factory WalletEntity.fromMap(Map<String, dynamic> map) {
     return WalletEntity(
-      uid: data['uid'] as String? ?? doc.id,
-      balance: (data['balance'] as num?)?.toDouble() ?? 0.0,
-      totalEarned: (data['totalEarned'] as num?)?.toDouble() ?? 0.0,
-      bankAccountNumber: data['bankAccountNumber'] as String?,
-      bankName: data['bankName'] as String?,
-      bankAccountName: data['bankAccountName'] as String?,
-      updatedAt: data['updatedAt'] as Timestamp?,
+      userId: map['userId'] ?? '',
+      balance: (map['balance'] ?? 0.0).toDouble(),
+      currency: map['currency'] ?? 'NGN',
+      updatedAt: map['updatedAt'] != null
+          ? (map['updatedAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'uid': uid,
+      'userId': userId,
       'balance': balance,
-      'totalEarned': totalEarned,
-      'bankAccountNumber': bankAccountNumber,
-      'bankName': bankName,
-      'bankAccountName': bankAccountName,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'currency': currency,
+      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
     };
   }
 }
