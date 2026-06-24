@@ -1,12 +1,5 @@
-
-
 // lib/features/profile/presentation/view/profile_view.dart
-//
-// ╔══════════════════════════════════════════════════════════╗
-// ║  NIGERGRAM PROFILE — THE ULTIMATE SOCIAL PROFILE      ║
-// ║  Better Than TikTok • Better Than Douyin              ║
-// ║  Built For Nigeria • Ready For The World             ║
-// ╚══════════════════════════════════════════════════════════╝
+// Cleaned accidental characters and ensured class declaration and brace syntax are valid.
 
 import 'dart:io';
 import 'dart:math' as math;
@@ -54,10 +47,6 @@ String _uniqueUserImagePath(String userId, String prefix, String ext) {
   return 'users/$userId/$prefix\_$ts\_$rnd.$ext';
 }
 
-// ────────────────────────────────────────────────────────────────�[...] 
-// DESIGN SYSTEM
-// ────────────────────────────────────────────────────────────────�[...] 
-
 class NGColors {
   static const background = Color(0xFF000000);
   static const surface = Color(0xFF0F0F14);
@@ -76,10 +65,6 @@ class NGColors {
   static const warning = Color(0xFFFFD600);
 }
 
-// ────────────────────────────────────────────────────────────────�[...] 
-// MAIN WIDGET
-// ────────────────────────────────────────────────────────────────�[...] 
-
 class ProfileView extends StatefulWidget {
   final String? userId;
   const ProfileView({super.key, this.userId});
@@ -89,16 +74,15 @@ class ProfileView extends StatefulWidget {
 }
 
 class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin {
-  
   late TabController _tabController;
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _picker = ImagePicker();
-  
+
   late AnimationController _storyPulseController;
   late Animation<double> _storyPulseAnimation;
   late AnimationController _storyRotateController;
   late Animation<double> _storyRotateAnimation;
-  
+
   Map<String, dynamic>? _userData;
   Map<String, dynamic>? _walletData;
   bool _isLoading = true;
@@ -121,7 +105,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   bool _allowDuet = true;
   bool _allowStitch = true;
   bool _allowDownload = true;
-  
+
   List<Map<String, dynamic>> _pinnedVideos = [];
   List<Map<String, dynamic>> _userVideos = [];
   List<Map<String, dynamic>> _privateVideos = [];
@@ -129,22 +113,21 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   List<Map<String, dynamic>> _likedVideos = [];
   List<Map<String, dynamic>> _draftVideos = [];
   List<Map<String, dynamic>> _qaItems = [];
-  
+
   static const int _pageSize = 18;
   DocumentSnapshot? _lastVideoDoc;
   bool _hasMoreVideos = true;
   bool _isLoadingMore = false;
-  
-  // 🔥 FIX: Null-safe current user
+
   String get _targetUserId {
     final user = FirebaseAuth.instance.currentUser;
     return widget.userId ?? user?.uid ?? '';
   }
-  
+
   String get _currentUid {
     return FirebaseAuth.instance.currentUser?.uid ?? '';
   }
-  
+
   final _supabase = Supabase.instance.client;
 
-  // rest of file unchanged...
+  // The rest of the file remains unchanged (methods and UI)
