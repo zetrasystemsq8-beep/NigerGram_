@@ -1,17 +1,9 @@
 // lib/features/profile/presentation/view/profile_view.dart
-//
-// ╔══════════════════════════════════════════════════════════╗
-// ║  NIGERGRAM PROFILE — THE ULTIMATE SOCIAL PROFILE      ║
-// ║  Better Than TikTok • Better Than Douyin              ║
-// ║  Built For Nigeria • Ready For The World             ║
-// ╚══════════════════════════════════════════════════════════╝
-
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -54,8 +46,7 @@ class ProfileView extends StatefulWidget {
   State<ProfileView> createState() => _ProfileViewState();
 }
 
-class _ProfileViewState extends State<ProfileView>
-    with TickerProviderStateMixin {
+class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin {
   
   late TabController _tabController;
   final ScrollController _scrollController = ScrollController();
@@ -88,6 +79,12 @@ class _ProfileViewState extends State<ProfileView>
   bool _allowDuet = true;
   bool _allowStitch = true;
   bool _allowDownload = true;
+  
+  // NEW: Story Highlights
+  List<Map<String, dynamic>> _storyHighlights = [];
+  
+  // NEW: Bio Links
+  List<Map<String, dynamic>> _bioLinks = [];
   
   List<Map<String, dynamic>> _pinnedVideos = [];
   List<Map<String, dynamic>> _userVideos = [];
@@ -168,7 +165,7 @@ class _ProfileViewState extends State<ProfileView>
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // DATA LOADING
+  // DATA LOADING - UPDATED with Highlights & Bio Links
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _loadAll() async {
@@ -198,6 +195,10 @@ class _ProfileViewState extends State<ProfileView>
         if (!_isCurrentUser) _checkBlockStatus().catchError((_) {}),
         _checkStoryStatus().catchError((_) {}),
         _loadAchievements().catchError((_) {}),
+        // NEW: Load story highlights
+        _loadStoryHighlights().catchError((_) {}),
+        // NEW: Load bio links from user data
+        _loadBioLinks().catchError((_) {}),
       ]);
     } catch (e) {
       debugPrint('Profile load error: $e');
@@ -206,6 +207,123 @@ class _ProfileViewState extends State<ProfileView>
       if (mounted) setState(() => _isLoading = false);
     }
   }
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // NEW: STORY HIGHLIGHTS
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  Future<void> _loadStoryHighlights() async {
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_targetUserId)
+        .collection('story_highlights')
+        .orderBy('timestamp', descending: true)
+        .limit(10)
+        .get();
+    
+    if (mounted) {
+      setState(() {
+        _storyHighlights = snap.docs.map((d) => d.data()).toList();
+      });
+    }
+  }
+  
+  Future<void> _addStoryHighlight(String storyId, String thumbnailUrl, String title) async {
+    if (!_isCurrentUser) return;
+    
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUid)
+          .collection('story_highlights')
+          .add({
+        'storyId': storyId,
+        'thumbnailUrl': thumbnailUrl,
+        'title': title,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      await _loadStoryHighlights();
+      if (mounted) _showSnack('Story added to highlights!', isSuccess: true);
+    } catch (e) {
+      if (mounted) _showSnack('Failed to add highlight', isSuccess: false);
+    }
+  }
+  
+  Future<void> _removeStoryHighlight(String highlightId) async {
+    if (!_isCurrentUser) return;
+    
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUid)
+          .collection('story_highlights')
+          .doc(highlightId)
+          .delete();
+      await _loadStoryHighlights();
+      if (mounted) _showSnack('Highlight removed', isSuccess: true);
+    } catch (e) {
+      if (mounted) _showSnack('Failed to remove highlight', isSuccess: false);
+    }
+  }
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // NEW: BIO LINKS
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  Future<void> _loadBioLinks() async {
+    // Bio links are stored in the user document
+    final bioLinks = _userData?['bioLinks'] as List<dynamic>? ?? [];
+    if (mounted) {
+      setState(() {
+        _bioLinks = bioLinks.map((link) => {
+          'url': link['url'] ?? '',
+          'title': link['title'] ?? 'Link',
+          'icon': link['icon'] ?? '🌐',
+        }).toList();
+      });
+    }
+  }
+  
+  Future<void> _addBioLink(String url, String title, String icon) async {
+    if (!_isCurrentUser) return;
+    
+    try {
+      final newLink = {'url': url, 'title': title, 'icon': icon};
+      final updatedLinks = List<Map<String, dynamic>>.from(_bioLinks)..add(newLink);
+      
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUid)
+          .update({'bioLinks': updatedLinks});
+      
+      await _loadBioLinks();
+      if (mounted) _showSnack('Link added to bio!', isSuccess: true);
+    } catch (e) {
+      if (mounted) _showSnack('Failed to add link', isSuccess: false);
+    }
+  }
+  
+  Future<void> _removeBioLink(int index) async {
+    if (!_isCurrentUser) return;
+    
+    try {
+      final updatedLinks = List<Map<String, dynamic>>.from(_bioLinks)..removeAt(index);
+      
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUid)
+          .update({'bioLinks': updatedLinks});
+      
+      await _loadBioLinks();
+      if (mounted) _showSnack('Link removed', isSuccess: true);
+    } catch (e) {
+      if (mounted) _showSnack('Failed to remove link', isSuccess: false);
+    }
+  }
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // EXISTING DATA LOADING METHODS
+  // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _refreshCurrentTab() async {
     setState(() => _isTabLoading = true);
@@ -502,12 +620,12 @@ class _ProfileViewState extends State<ProfileView>
       final String videoId = FirebaseFirestore.instance.collection('videos').doc().id;
       final String storagePath = 'videos/$_currentUid/$videoId.mp4';
       setState(() { _uploadLabel = 'Uploading to Supabase...'; _uploadProgress = 0.1; });
-      await _supabase.storage.from('nigergram-videos').uploadBinary(
+      await _supabase.storage.from('videos').uploadBinary(
         storagePath, await file.readAsBytes(),
         fileOptions: const FileOptions(contentType: 'video/mp4', upsert: false),
       );
       setState(() { _uploadProgress = 0.85; _uploadLabel = 'Generating CDN URL...'; });
-      final String videoUrl = _supabase.storage.from('nigergram-videos').getPublicUrl(storagePath);
+      final String videoUrl = _supabase.storage.from('videos').getPublicUrl(storagePath);
       setState(() { _uploadProgress = 0.92; _uploadLabel = 'Saving to database...'; });
       await FirebaseFirestore.instance.collection('videos').doc(videoId).set({
         'videoId': videoId, 'userId': _currentUid, 'videoUrl': videoUrl,
@@ -550,7 +668,7 @@ class _ProfileViewState extends State<ProfileView>
     if (confirm != true) return;
     try {
       await FirebaseFirestore.instance.collection('videos').doc(videoId).delete();
-      try { await _supabase.storage.from('nigergram-videos').remove(['videos/$_currentUid/$videoId.mp4']); } catch (_) {}
+      try { await _supabase.storage.from('videos').remove(['videos/$_currentUid/$videoId.mp4']); } catch (_) {}
       await FirebaseFirestore.instance.collection('users').doc(_currentUid).update({'videoCount': FieldValue.increment(-1)});
       await _loadAll();
       if (mounted) _showSnack('Video deleted', isSuccess: true);
@@ -566,63 +684,118 @@ class _ProfileViewState extends State<ProfileView>
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // AVATAR & COVER
+  // AVATAR & COVER - SUPABASE
   // ─────────────────────────────────────────────────────────────────────────
   
-Future<void> _updateAvatar() async {
-  if (!_isCurrentUser) return;
-  HapticFeedback.mediumImpact();
+  Future<void> _updateAvatar() async {
+    if (!_isCurrentUser) return;
+    HapticFeedback.mediumImpact();
 
-  final XFile? img = await _picker.pickImage(
-    source: ImageSource.gallery,
-    imageQuality: 80,
-    maxWidth: 400,
-  );
-  if (img == null) return;
+    final XFile? img = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+      maxWidth: 400,
+    );
+    if (img == null) return;
 
-  setState(() {
-    _isUploadingContent = true;
-    _uploadLabel = 'Uploading photo...';
-    _uploadProgress = 0.3;
-  });
+    setState(() {
+      _isUploadingContent = true;
+      _uploadLabel = 'Uploading photo...';
+      _uploadProgress = 0.3;
+    });
 
-  try {
-    final file = File(img.path);
-    final String filePath = 'users/$_currentUid/avatar.jpg';
-    
-    // Upload to Supabase Storage
-    await _supabase.storage
-        .from('images') // Or create a bucket called 'images'
-        .uploadBinary(filePath, await file.readAsBytes(),
+    try {
+      final file = File(img.path);
+      final String filePath = 'users/$_currentUid/avatar.jpg';
+      
+      await _supabase.storage
+          .from('images')
+          .uploadBinary(
+            filePath, 
+            await file.readAsBytes(),
             fileOptions: const FileOptions(
               contentType: 'image/jpeg',
               upsert: true,
-            ));
+            ),
+          );
 
-    // Get public URL
-    final String url = _supabase.storage
-        .from('images')
-        .getPublicUrl(filePath);
+      final String url = _supabase.storage
+          .from('images')
+          .getPublicUrl(filePath);
 
-    // Save to Firestore
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(_currentUid)
-        .update({'profilePicUrl': url});
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUid)
+          .update({'profilePicUrl': url});
 
-    await _loadUserData();
-    if (mounted) _showSnack('Profile photo updated!', isSuccess: true);
-  } catch (e) {
-    debugPrint('Upload error: $e');
-    if (mounted) _showSnack('Failed to update photo', isSuccess: false);
-  } finally {
-    if (mounted) setState(() {
-      _isUploadingContent = false;
-      _uploadProgress = 0.0;
-      _uploadLabel = '';
-    });
+      await _loadUserData();
+      if (mounted) _showSnack('Profile photo updated!', isSuccess: true);
+    } catch (e) {
+      debugPrint('Upload error: $e');
+      if (mounted) _showSnack('Failed to update photo', isSuccess: false);
+    } finally {
+      if (mounted) setState(() {
+        _isUploadingContent = false;
+        _uploadProgress = 0.0;
+        _uploadLabel = '';
+      });
+    }
   }
-}
+
+  Future<void> _updateCover() async {
+    if (!_isCurrentUser) return;
+    HapticFeedback.mediumImpact();
+
+    final XFile? img = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 75,
+      maxWidth: 1080,
+    );
+    if (img == null) return;
+
+    setState(() {
+      _isUploadingContent = true;
+      _uploadLabel = 'Uploading cover...';
+      _uploadProgress = 0.3;
+    });
+
+    try {
+      final file = File(img.path);
+      final String filePath = 'users/$_currentUid/cover.jpg';
+      
+      await _supabase.storage
+          .from('images')
+          .uploadBinary(
+            filePath, 
+            await file.readAsBytes(),
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
+
+      final String url = _supabase.storage
+          .from('images')
+          .getPublicUrl(filePath);
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUid)
+          .update({'coverUrl': url});
+
+      await _loadUserData();
+      if (mounted) _showSnack('Cover updated!', isSuccess: true);
+    } catch (e) {
+      debugPrint('Cover upload error: $e');
+      if (mounted) _showSnack('Failed to update cover', isSuccess: false);
+    } finally {
+      if (mounted) setState(() {
+        _isUploadingContent = false;
+        _uploadProgress = 0.0;
+        _uploadLabel = '';
+      });
+    }
+  }
   
   // ─────────────────────────────────────────────────────────────────────────
   // EDIT PROFILE
@@ -681,7 +854,6 @@ Future<void> _updateAvatar() async {
                     const SizedBox(height: 12),
                     TextFormField(controller: bioCtrl, style: const TextStyle(color: NGColors.textPrimary, fontSize: 14), decoration: _inputDeco('Bio'), maxLines: 3),
                     const SizedBox(height: 12),
-                    // FIX: Updated Instagram field with validation
                     TextFormField(
                       controller: instaCtrl,
                       style: const TextStyle(color: NGColors.textPrimary, fontSize: 14),
@@ -704,7 +876,6 @@ Future<void> _updateAvatar() async {
                       },
                     ),
                     const SizedBox(height: 12),
-                    // FIX: Updated YouTube field with validation
                     TextFormField(
                       controller: ytCtrl,
                       style: const TextStyle(color: NGColors.textPrimary, fontSize: 14),
@@ -970,7 +1141,6 @@ Future<void> _updateAvatar() async {
   // SOCIAL LINKS - FIXED
   // ─────────────────────────────────────────────────────────────────────────
   
-  /// Safely format and open social media links
   Future<void> _openSocialLink(String url) async {
     if (url.trim().isEmpty) return;
     
@@ -993,61 +1163,23 @@ Future<void> _updateAvatar() async {
     }
   }
   
-  /// Format social media links properly with platform detection
   String _formatSocialLink(String url) {
     String trimmed = url.trim();
-    
     if (trimmed.isEmpty) return trimmed;
-    
-    // Already has protocol
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return trimmed;
     }
-    
-    // Remove @ prefix for handles
     if (trimmed.startsWith('@')) {
       trimmed = trimmed.substring(1);
     }
-    
-    // Detect platform from URL or handle
-    // Instagram
-    if (trimmed.contains('instagram.com') || trimmed.contains('ig.me')) {
-      return _ensureProtocol(trimmed);
-    }
-    // YouTube
-    if (trimmed.contains('youtube.com') || trimmed.contains('youtu.be') ||
-        trimmed.contains('/@') || trimmed.contains('/c/') || trimmed.contains('/channel/')) {
-      return _ensureProtocol(trimmed);
-    }
-    // Twitter/X
-    if (trimmed.contains('twitter.com') || trimmed.contains('x.com')) {
-      return _ensureProtocol(trimmed);
-    }
-    // TikTok
-    if (trimmed.contains('tiktok.com')) {
-      return _ensureProtocol(trimmed);
-    }
-    
-    // Handle simple username (letters, numbers, underscores, dots)
     if (RegExp(r'^[a-zA-Z0-9_.]+$').hasMatch(trimmed)) {
-      // Default to Instagram for simple usernames
       return 'https://instagram.com/$trimmed';
     }
-    
-    // Default: add https://
-    return _ensureProtocol(trimmed);
-  }
-  
-  /// Ensure URL has a protocol
-  String _ensureProtocol(String url) {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-    return 'https://$url';
+    return 'https://$trimmed';
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // MAIN BUILD
+  // MAIN BUILD - UPDATED with Highlights & Bio Links
   // ─────────────────────────────────────────────────────────────────────────
   
   @override
@@ -1167,7 +1299,105 @@ Future<void> _updateAvatar() async {
                         Text('@${_userData?['username'] ?? 'user'}', style: TextStyle(color: _accentColor, fontSize: 13, fontWeight: FontWeight.w500)),
                         const SizedBox(height: 12),
                         if (_userData?['bio'] != null && _userData!['bio'].toString().isNotEmpty) Text(_userData!['bio'], style: const TextStyle(color: NGColors.textSecondary, fontSize: 13, height: 1.4)),
-                        // FIX: Updated social links display with safe opening
+                        
+                        // NEW: Story Highlights
+                        if (_storyHighlights.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 70,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _storyHighlights.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 8),
+                              itemBuilder: (context, idx) {
+                                final highlight = _storyHighlights[idx];
+                                return GestureDetector(
+                                  onTap: () {
+                                    // Show story highlight
+                                    // You can navigate to a story viewer
+                                  },
+                                  onLongPress: _isCurrentUser ? () {
+                                    _removeStoryHighlight(highlight['id'] ?? '');
+                                  } : null,
+                                  child: Column(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 26,
+                                        backgroundColor: NGColors.surfaceLight,
+                                        backgroundImage: highlight['thumbnailUrl'] != null
+                                            ? CachedNetworkImageProvider(highlight['thumbnailUrl'])
+                                            : null,
+                                        child: highlight['thumbnailUrl'] == null
+                                            ? Icon(Icons.star, color: _accentColor, size: 24)
+                                            : null,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        highlight['title'] ?? 'Story',
+                                        style: TextStyle(
+                                          color: NGColors.textSecondary,
+                                          fontSize: 10,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        
+                        // NEW: Bio Links
+                        if (_bioLinks.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: _bioLinks.map((link) {
+                              return GestureDetector(
+                                onTap: () async {
+                                  try {
+                                    final uri = Uri.parse(link['url']);
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                    }
+                                  } catch (_) {
+                                    if (mounted) _showSnack('Cannot open link', isSuccess: false);
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: NGColors.surfaceLight,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        link['icon'] ?? '🔗',
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        link['title'] ?? 'Link',
+                                        style: TextStyle(
+                                          color: NGColors.textPrimary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        
                         if (_userData?['instagramLink'] != null && _userData!['instagramLink'].toString().isNotEmpty) ...[
                           const SizedBox(height: 8),
                           GestureDetector(
