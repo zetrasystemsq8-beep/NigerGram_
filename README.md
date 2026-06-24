@@ -29,6 +29,8 @@ supabase/migrations/              # Supabase SQL migrations (policies for storag
 android/, ios/                    # Platform-specific projects
 pubspec.yaml                      # Dart/Flutter dependencies
 README.md                         # (this file)
+CONTRIBUTING.md                   # Contribution guidelines
+CODE_OF_CONDUCT.md                # Community conduct
 LICENSE                           # Project license
 ```
 
@@ -116,12 +118,20 @@ Common CI checklist:
 - Add any secrets (google-services.json) to Actions via repository secrets if required by your workflow.
 - Ensure Supabase migrations/policies were applied if tests rely on them.
 
+## Screenshots
+
+Add screenshots to `assets/screenshots/` and reference them here. Example markdown to add after you upload images:
+
+```markdown
+![Home feed](assets/screenshots/home_feed.png)
+![Profile view](assets/screenshots/profile_view.png)
+```
+
+Note: Do not commit large binary files to the main repo if you prefer to store them in a release or external CDN.
+
 ## Contributing
 
-Contributions welcome. Please:
-- Fork the repository
-- Create a feature branch
-- Open a PR with a clear description and testing steps
+See CONTRIBUTING.md for contribution guidelines.
 
 ## Contact / Creator
 
