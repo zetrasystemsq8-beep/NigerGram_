@@ -1,21 +1,28 @@
-import 'package:equatable/equatable.dart';
-import 'package:nigergram/features/wallet/domain/entities/transaction_entity.dart';
+// lib/features/wallet/presentation/bloc/wallet_state.dart
 import 'package:nigergram/features/wallet/domain/entities/wallet_entity.dart';
+import 'package:nigergram/features/wallet/domain/entities/transaction_entity.dart';
 
-class WalletState extends Equatable {
+class WalletState {
   final WalletEntity? wallet;
   final List<WalletTransactionEntity> transactions;
   final bool isLoading;
   final String error;
 
-  const WalletState({
+  WalletState({
     this.wallet,
     this.transactions = const [],
     this.isLoading = false,
     this.error = '',
   });
 
-  factory WalletState.initial() => const WalletState();
+  factory WalletState.initial() {
+    return WalletState(
+      wallet: null,
+      transactions: const [],
+      isLoading: false,
+      error: '',
+    );
+  }
 
   WalletState copyWith({
     WalletEntity? wallet,
@@ -30,7 +37,4 @@ class WalletState extends Equatable {
       error: error ?? this.error,
     );
   }
-
-  @override
-  List<Object?> get props => [wallet, transactions, isLoading, error];
 }
