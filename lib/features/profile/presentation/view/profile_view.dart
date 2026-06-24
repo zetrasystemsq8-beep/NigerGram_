@@ -569,45 +569,60 @@ class _ProfileViewState extends State<ProfileView>
   // AVATAR & COVER
   // ─────────────────────────────────────────────────────────────────────────
   
-  Future<void> _updateAvatar() async {
-    if (!_isCurrentUser) return;
-    HapticFeedback.mediumImpact();
-    final XFile? img = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 400);
-    if (img == null) return;
-    setState(() { _isUploadingContent = true; _uploadLabel = 'Updating photo...'; _uploadProgress = 0.3; });
-    try {
-      final ref = FirebaseStorage.instance.ref('users/$_currentUid/avatar.jpg');
-      await ref.putFile(File(img.path), SettableMetadata(contentType: 'image/jpeg'));
-      final url = await ref.getDownloadURL();
-      await FirebaseFirestore.instance.collection('users').doc(_currentUid).update({'profilePicUrl': url});
-      await _loadUserData();
-      if (mounted) _showSnack('Profile photo updated!', isSuccess: true);
-    } catch (e) {
-      if (mounted) _showSnack('Failed to update photo', isSuccess: false);
-    } finally {
-      if (mounted) setState(() { _isUploadingContent = false; _uploadProgress = 0.0; _uploadLabel = ''; });
-    }
+Future<void> _updateAvatar() async {
+  if (!_isCurrentUser) return;
+  HapticFeedback.mediumImpact();
+
+  final XFile? img = await _picker.pickImage(
+    source: ImageSource.gallery,
+    imageQuality: 80,
+    maxWidth: 400,
+  );
+  if (img == null) return;
+
+  setState(() {
+    _isUploadingContent = true;
+    _uploadLabel = 'Uploading photo...';
+    _uploadProgress = 0.3;
+  });
+
+  try {
+    final file = File(img.path);
+    final String filePath = 'users/$_currentUid/avatar.jpg';
+    
+    // Upload to Supabase Storage
+    await _supabase.storage
+        .from('images') // Or create a bucket called 'images'
+        .uploadBinary(filePath, await file.readAsBytes(),
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ));
+
+    // Get public URL
+    final String url = _supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+    // Save to Firestore
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_currentUid)
+        .update({'profilePicUrl': url});
+
+    await _loadUserData();
+    if (mounted) _showSnack('Profile photo updated!', isSuccess: true);
+  } catch (e) {
+    debugPrint('Upload error: $e');
+    if (mounted) _showSnack('Failed to update photo', isSuccess: false);
+  } finally {
+    if (mounted) setState(() {
+      _isUploadingContent = false;
+      _uploadProgress = 0.0;
+      _uploadLabel = '';
+    });
   }
-  
-  Future<void> _updateCover() async {
-    if (!_isCurrentUser) return;
-    HapticFeedback.mediumImpact();
-    final XFile? img = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75, maxWidth: 1080);
-    if (img == null) return;
-    setState(() { _isUploadingContent = true; _uploadLabel = 'Updating cover...'; _uploadProgress = 0.3; });
-    try {
-      final ref = FirebaseStorage.instance.ref('users/$_currentUid/cover.jpg');
-      await ref.putFile(File(img.path), SettableMetadata(contentType: 'image/jpeg'));
-      final url = await ref.getDownloadURL();
-      await FirebaseFirestore.instance.collection('users').doc(_currentUid).update({'coverUrl': url});
-      await _loadUserData();
-      if (mounted) _showSnack('Cover updated!', isSuccess: true);
-    } catch (e) {
-      if (mounted) _showSnack('Failed to update cover', isSuccess: false);
-    } finally {
-      if (mounted) setState(() { _isUploadingContent = false; _uploadProgress = 0.0; _uploadLabel = ''; });
-    }
-  }
+}
   
   // ─────────────────────────────────────────────────────────────────────────
   // EDIT PROFILE
