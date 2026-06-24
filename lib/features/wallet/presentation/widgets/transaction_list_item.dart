@@ -1,26 +1,42 @@
-import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:nigergram/features/wallet/domain/entities/transaction_entity.dart';
+// lib/features/wallet/domain/entities/transaction_entity.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class TransactionListItem extends StatelessWidget {
-  final WalletTransactionEntity transaction;
+class WalletTransactionEntity {
+  final String id;
+  final String type; // 'credit' or 'debit'
+  final double amount;
+  final String? description;
+  final String? status; // 'success', 'pending', 'failed'
+  final Timestamp? timestamp;
 
-  const TransactionListItem({required this.transaction, super.key});
+  WalletTransactionEntity({
+    required this.id,
+    required this.type,
+    required this.amount,
+    this.description,
+    this.status,
+    this.timestamp,
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    final amountText = '₦${transaction.amount.toStringAsFixed(0)}';
-    final date = transaction.timestamp;
-    final dateText = date != null ? DateFormat.yMMMd().add_jm().format(date.toDate()) : '';
-    return ListTile(
-      leading: CircleAvatar(
-        child: Icon(
-          transaction.type == 'tip' ? Icons.card_giftcard : transaction.type == 'fund' ? Icons.account_balance_wallet : Icons.swap_horiz,
-        ),
-      ),
-      title: Text(transaction.type.toUpperCase()),
-      subtitle: Text('${transaction.toUsername ?? ''} • $dateText'),
-      trailing: Text(amountText, style: const TextStyle(fontWeight: FontWeight.bold)),
+  factory WalletTransactionEntity.fromMap(Map<String, dynamic> map, String id) {
+    return WalletTransactionEntity(
+      id: id,
+      type: map['type'] ?? '',
+      amount: (map['amount'] ?? 0.0).toDouble(),
+      description: map['description'],
+      status: map['status'],
+      timestamp: map['timestamp'] as Timestamp?,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'type': type,
+      'amount': amount,
+      'description': description,
+      'status': status,
+      'timestamp': timestamp,
+    };
   }
 }
