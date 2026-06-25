@@ -1,296 +1,316 @@
-// lib/features/gist_hub/presentation/view/gist_create_post.dart
-import 'dart:io';
+// lib/features/gist_hub/presentation/widgets/gist_post_card.dart
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:nigergram/core/design_system/colors.dart';
-import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
+import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 
-class GistCreatePost extends StatefulWidget {
-  const GistCreatePost({super.key});
+class GistPostCard extends StatefulWidget {
+  final GistPostEntity post;
+  final GistService service;
+
+  const GistPostCard({
+    super.key,
+    required this.post,
+    required this.service,
+  });
 
   @override
-  State<GistCreatePost> createState() => _GistCreatePostState();
+  State<GistPostCard> createState() => _GistPostCardState();
 }
 
-class _GistCreatePostState extends State<GistCreatePost> {
-  final TextEditingController _contentController = TextEditingController();
-  final GistService _service = GistService();
-  
-  String _postType = 'text'; // 'text', 'image', 'poll'
-  File? _imageFile;
-  final List<TextEditingController> _pollControllers = [
-    TextEditingController(),
-    TextEditingController(),
-  ];
-  bool _isAnonymous = false;
+class _GistPostCardState extends State<GistPostCard> {
+  late GistPostEntity _post;
   bool _isLoading = false;
-  final ImagePicker _picker = ImagePicker();
 
-  Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-    if (image != null) {
-      setState(() {
-        _imageFile = File(image.path);
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    _post = widget.post;
   }
 
-  Future<void> _submitPost() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login first')),
-      );
-      return;
-    }
+  void _addReaction(String emoji) {
+    setState(() {
+      _post.reactions[emoji] = (_post.reactions[emoji] ?? 0) + 1;
+    });
+    widget.service.addReaction(
+      postId: _post.id,
+      emoji: emoji,
+    ).catchError((e) {
+      setState(() {
+        _post.reactions[emoji] = (_post.reactions[emoji] ?? 0) - 1;
+      });
+    });
+  }
 
-    if (_contentController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please write something')),
-      );
-      return;
-    }
+  void _sharePost() {
+    final shareText = '${_post.content}\n\nView on NigerGram: https://nigergram.app/gist/${_post.id}';
+    Share.share(shareText, subject: 'Check this Gist');
+  }
 
-    setState(() => _isLoading = true);
-
-    try {
-      String? imageUrl;
-      if (_imageFile != null) {
-        // TODO: Upload to Supabase Storage
-        // For now, we'll skip image upload
-        imageUrl = null;
-      }
-
-      String? pollOption1 = _pollControllers[0].text.trim();
-      String? pollOption2 = _pollControllers[1].text.trim();
-      
-      final post = GistPostEntity(
-        id: '',
-        userId: user.uid,
-        displayName: user.displayName ?? 'User',
-        username: user.email?.split('@').first ?? 'user',
-        profilePic: '',
-        type: _postType,
-        content: _contentController.text.trim(),
-        imageUrl: imageUrl,
-        pollOptions: _postType == 'poll' ? [pollOption1, pollOption2] : [],
-        pollVotes: {},
-        reactions: {},
-        commentCount: 0,
-        createdAt: FieldValue.serverTimestamp() as Timestamp?,
-        isAnonymous: _isAnonymous,
-      );
-
-      await _service.createPost(post);
-      
-      if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gist posted! 🎉')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to post: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+  String _formatDate(Timestamp? timestamp) {
+    if (timestamp == null) return 'Just now';
+    final date = timestamp.toDate();
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: NGColors.background,
-      appBar: AppBar(
-        backgroundColor: NGColors.surface,
-        title: const Text(
-          'Drop Gist',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _submitPost,
-            child: Text(
-              _isLoading ? 'Posting...' : 'Post',
-              style: TextStyle(
-                color: _isLoading ? Colors.grey : NGColors.accent,
-                fontWeight: FontWeight.bold,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: NGColors.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // User Info
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: NGColors.surfaceLight,
+                backgroundImage: _post.isAnonymous || _post.profilePic.isEmpty
+                    ? null
+                    : CachedNetworkImageProvider(_post.profilePic),
+                child: _post.isAnonymous || _post.profilePic.isEmpty
+                    ? const Icon(Icons.person, color: NGColors.textMuted, size: 20)
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _post.isAnonymous ? 'Anonymous' : _post.displayName,
+                    style: const TextStyle(
+                      color: NGColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    _post.isAnonymous ? 'Anonymous' : '@${_post.username}',
+                    style: TextStyle(
+                      color: NGColors.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                _formatDate(_post.createdAt),
+                style: TextStyle(
+                  color: NGColors.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Content
+          Text(
+            _post.content,
+            style: const TextStyle(
+              color: NGColors.textPrimary,
+              fontSize: 15,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Image
+          if (_post.imageUrl != null && _post.imageUrl!.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: CachedNetworkImage(
+                imageUrl: _post.imageUrl!,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: 200,
+                placeholder: (context, url) => Container(
+                  color: NGColors.surfaceLight,
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: NGColors.accent,
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: NGColors.surfaceLight,
+                  child: const Icon(Icons.error, color: NGColors.textMuted),
+                ),
               ),
             ),
+          const SizedBox(height: 12),
+
+          // Poll
+          if (_post.type == 'poll' && _post.pollOptions.isNotEmpty)
+            _buildPoll(),
+          const SizedBox(height: 12),
+
+          // Reactions
+          Row(
+            children: [
+              _buildReactionButton('😂'),
+              const SizedBox(width: 4),
+              _buildReactionButton('😱'),
+              const SizedBox(width: 4),
+              _buildReactionButton('👀'),
+              const SizedBox(width: 4),
+              _buildReactionButton('🥴'),
+              const SizedBox(width: 4),
+              _buildReactionButton('🇳🇬'),
+              const Spacer(),
+              // Comment Count
+              Row(
+                children: [
+                  const Icon(
+                    Icons.chat_bubble_outline,
+                    color: NGColors.textMuted,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${_post.commentCount}',
+                    style: TextStyle(
+                      color: NGColors.textMuted,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              // Share Button
+              GestureDetector(
+                onTap: _sharePost,
+                child: const Icon(
+                  Icons.share_outlined,
+                  color: NGColors.textMuted,
+                  size: 18,
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  Widget _buildReactionButton(String emoji) {
+    final count = _post.reactions[emoji] ?? 0;
+    return GestureDetector(
+      onTap: () => _addReaction(emoji),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: NGColors.surfaceLight,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
           children: [
-            // Post Type Selection
-            Row(
-              children: [
-                _buildTypeButton('Text', 'text'),
-                const SizedBox(width: 8),
-                _buildTypeButton('Image', 'image'),
-                const SizedBox(width: 8),
-                _buildTypeButton('Poll', 'poll'),
-              ],
+            Text(
+              emoji,
+              style: const TextStyle(fontSize: 14),
             ),
-            const SizedBox(height: 16),
-
-            // Content Input
-            TextField(
-              controller: _contentController,
-              maxLines: 5,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'What\'s the gist?',
-                hintStyle: TextStyle(color: NGColors.textMuted),
-                filled: true,
-                fillColor: NGColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Image Picker
-            if (_postType == 'image') ...[
-              if (_imageFile != null)
-                Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    image: DecorationImage(
-                      image: FileImage(_imageFile!),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => setState(() => _imageFile = null),
-                    ),
-                  ),
-                )
-              else
-                GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    height: 150,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: NGColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: NGColors.divider),
-                    ),
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_photo_alternate, color: NGColors.textMuted),
-                        SizedBox(height: 8),
-                        Text(
-                          'Tap to add image',
-                          style: TextStyle(color: NGColors.textMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-
-            // Poll Options
-            if (_postType == 'poll') ...[
-              const SizedBox(height: 16),
-              TextField(
-                controller: _pollControllers[0],
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Option 1',
-                  hintStyle: TextStyle(color: NGColors.textMuted),
-                  filled: true,
-                  fillColor: NGColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _pollControllers[1],
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Option 2',
-                  hintStyle: TextStyle(color: NGColors.textMuted),
-                  filled: true,
-                  fillColor: NGColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
+            if (count > 0) ...[
+              const SizedBox(width: 4),
+              Text(
+                count.toString(),
+                style: TextStyle(
+                  color: NGColors.textSecondary,
+                  fontSize: 12,
                 ),
               ),
             ],
-
-            const SizedBox(height: 16),
-
-            // Anonymous Toggle
-            Row(
-              children: [
-                Switch(
-                  value: _isAnonymous,
-                  onChanged: (val) => setState(() => _isAnonymous = val),
-                  activeColor: NGColors.accent,
-                ),
-                Text(
-                  'Post anonymously',
-                  style: TextStyle(
-                    color: _isAnonymous ? NGColors.accent : NGColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTypeButton(String label, String type) {
-    final isSelected = _postType == type;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _postType = type),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? NGColors.accent : NGColors.surface,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : NGColors.textMuted,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+  Widget _buildPoll() {
+    final totalVotes = _post.pollVotes.values.fold(0, (sum, val) => sum + val);
+    return Column(
+      children: [
+        ..._post.pollOptions.asMap().entries.map((entry) {
+          final index = entry.key;
+          final option = entry.value;
+          final votes = _post.pollVotes[index.toString()] ?? 0;
+          final percentage = totalVotes > 0 ? (votes / totalVotes * 100) : 0;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: GestureDetector(
+              onTap: () {
+                if (_post.pollVotes.keys.contains(index.toString())) return;
+                widget.service.castVote(
+                  postId: _post.id,
+                  choiceIndex: index,
+                ).then((_) {
+                  setState(() {
+                    _post.pollVotes[index.toString()] = votes + 1;
+                  });
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: NGColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        option,
+                        style: TextStyle(
+                          color: NGColors.textPrimary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 40,
+                      child: Text(
+                        '${percentage.toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          color: NGColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+          );
+        }).toList(),
+        Text(
+          '${totalVotes} votes',
+          style: TextStyle(
+            color: NGColors.textMuted,
+            fontSize: 11,
           ),
         ),
-      ),
+      ],
     );
   }
 }
