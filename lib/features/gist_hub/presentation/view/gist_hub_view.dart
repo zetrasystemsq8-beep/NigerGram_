@@ -65,10 +65,11 @@ class _GistHubViewState extends State<GistHubView> {
           return Center(child: Text('No posts', style: TextStyle(color: NGColors.textSecondary)));
         }
 
-        final posts = rawList.map((m) {
+        // Ensure we produce a typed list of GistPostEntity
+        final List<GistPostEntity> posts = rawList.map<GistPostEntity>((m) {
           if (m is GistPostEntity) return m;
-          final id = (m['id'] ?? '') as String;
-          return GistPostEntity.fromJson(m as Map<String, dynamic>, id);
+          final id = (m['id'] ?? '')?.toString() ?? '';
+          return GistPostEntity.fromJson(Map<String, dynamic>.from(m as Map), id);
         }).toList();
 
         return RefreshIndicator(
@@ -77,7 +78,7 @@ class _GistHubViewState extends State<GistHubView> {
             padding: const EdgeInsets.only(top: 8, bottom: 80),
             itemCount: posts.length,
             itemBuilder: (context, index) {
-              final p = posts[index];
+              final GistPostEntity p = posts[index];
               return GistPostCard(post: p, service: _service);
             },
           ),
