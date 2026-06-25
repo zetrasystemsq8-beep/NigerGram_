@@ -729,7 +729,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // AVATAR & COVER - CORRECTED WITH 'images' BUCKET
+  // AVATAR & COVER - WITH CACHE-BUSTING TIMESTAMP
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _updateAvatar() async {
@@ -758,7 +758,9 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      final String fileName = 'avatar_${_currentUid.substring(0, 8)}.jpg';
+      // 🔥 FIX: Add timestamp to bust cache
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String fileName = 'avatar_${_currentUid.substring(0, 8)}_$timestamp.jpg';
       
       print('📤 Uploading avatar: $fileName');
       print('📁 File size: ${await file.length()} bytes');
@@ -766,7 +768,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       
       final bytes = await file.readAsBytes();
       
-      // 🔥 CORRECT: Use 'images' bucket
       await _supabase.storage
           .from('images')
           .uploadBinary(
@@ -780,7 +781,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
       print('✅ Avatar upload successful');
 
-      // 🔥 CORRECT: Use 'images' bucket
       final String url = _supabase.storage
           .from('images')
           .getPublicUrl(fileName);
@@ -835,7 +835,9 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      final String fileName = 'cover_${_currentUid.substring(0, 8)}.jpg';
+      // 🔥 FIX: Add timestamp to bust cache
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String fileName = 'cover_${_currentUid.substring(0, 8)}_$timestamp.jpg';
       
       print('📤 Uploading cover: $fileName');
       print('📁 File size: ${await file.length()} bytes');
@@ -843,7 +845,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       
       final bytes = await file.readAsBytes();
       
-      // 🔥 CORRECT: Use 'images' bucket
       await _supabase.storage
           .from('images')
           .uploadBinary(
@@ -857,7 +858,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
       print('✅ Cover upload successful');
 
-      // 🔥 CORRECT: Use 'images' bucket
       final String url = _supabase.storage
           .from('images')
           .getPublicUrl(fileName);
