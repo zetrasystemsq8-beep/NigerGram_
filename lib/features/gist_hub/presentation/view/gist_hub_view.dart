@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_post_card.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
 import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 
 class GistHubView extends StatefulWidget {
@@ -12,74 +15,164 @@ class GistHubView extends StatefulWidget {
   State<GistHubView> createState() => _GistHubViewState();
 }
 
-class _GistHubViewState extends State<GistHubView> {
+class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final GistService _service = GistService();
 
   @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        backgroundColor: NGColors.background,
-        appBar: AppBar(
-          backgroundColor: NGColors.surface,
-          elevation: 0,
-          title: const Text('Gist Hub'),
-          bottom: TabBar(
-            indicatorColor: NGColors.accent,
-            tabs: const [
-              Tab(text: 'Trending'),
-              Tab(text: 'Latest'),
-              Tab(text: 'Polls'),
-            ],
+    return Scaffold(
+      backgroundColor: NGColors.background,
+      appBar: AppBar(
+        backgroundColor: NGColors.surface,
+        elevation: 0,
+        title: const Text(
+          'Gist Hub',
+          style: TextStyle(
+            color: NGColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
         ),
-        body: TabBarView(
-          children: [
-            _buildFeed('Trending'),
-            _buildFeed('Latest'),
-            _buildFeed('Polls'),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: NGColors.accent,
+          labelColor: NGColors.textPrimary,
+          unselectedLabelColor: NGColors.textMuted,
+          tabs: const [
+            Tab(text: 'Trending'),
+            Tab(text: 'Latest'),
+            Tab(text: 'Polls'),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
-          backgroundColor: NGColors.accent,
-          child: const Icon(Icons.create),
-          onPressed: () => GoRouter.of(context).push('/gist-hub/create'),
-        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildFeed('trending'),
+          _buildFeed('latest'),
+          _buildFeed('polls'),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: NGColors.accent,
+        child: const Icon(Icons.create, color: Colors.white),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const GistCreatePost()),
+          ).then((_) => setState(() {}));
+        },
       ),
     );
   }
 
   Widget _buildFeed(String filter) {
-    return StreamBuilder<List<Map<String, dynamic>>>(
+    return StreamBuilder<List<GistPostEntity>>(
       stream: _service.getGistFeedStream(filter: filter),
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return Center(child: Text('Failed to load feed', style: TextStyle(color: NGColors.textSecondary)));
-        }
-        if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final rawList = snap.data!;
-        if (rawList.isEmpty) {
-          return Center(child: Text('No posts', style: TextStyle(color: NGColors.textSecondary)));
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: NGColors.textMuted,
+                  size: 48,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Failed to load feed',
+                  style: TextStyle(
+                    color: NGColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => setState(() {}),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: NGColors.accent,
+                  ),
+                  child: const Text(
+                    'Retry',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
-        // Ensure we produce a typed list of GistPostEntity
-        final List<GistPostEntity> posts = rawList.map<GistPostEntity>((m) {
-          if (m is GistPostEntity) return m;
-          final id = (m['id'] ?? '')?.toString() ?? '';
-          return GistPostEntity.fromJson(Map<String, dynamic>.from(m as Map), id);
-        }).toList();
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(
+              color: NGColors.accent,
+            ),
+          );
+        }
+
+        final posts = snapshot.data!;
+
+        if (posts.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.chat_bubble_outline,
+                  color: NGColors.textMuted,
+                  size: 48,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No gist yet',
+                  style: TextStyle(
+                    color: NGColors.textSecondary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Be the first to drop gist!',
+                  style: TextStyle(
+                    color: NGColors.textMuted,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
 
         return RefreshIndicator(
-          onRefresh: () async => Future.value(),
+          color: NGColors.accent,
+          onRefresh: () async {
+            setState(() {});
+          },
           child: ListView.builder(
             padding: const EdgeInsets.only(top: 8, bottom: 80),
             itemCount: posts.length,
             itemBuilder: (context, index) {
-              final GistPostEntity p = posts[index];
-              return GistPostCard(post: p, service: _service);
+              final post = posts[index];
+              return GistPostCard(
+                post: post,
+                service: _service,
+              );
             },
           ),
         );
