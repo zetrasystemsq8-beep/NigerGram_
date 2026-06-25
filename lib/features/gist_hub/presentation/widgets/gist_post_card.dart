@@ -1,10 +1,8 @@
-import 'package:nigergram/core/design_system/colors.dart';
-// lib/features/gist_hub/presentation/widgets/gist_post_card.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:nigergram/core/design_system/colors.dart';
+import 'package:nigergram/core/design_system/colors.dart'; // 👈 IMPORT ADDED
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 
@@ -24,7 +22,6 @@ class GistPostCard extends StatefulWidget {
 
 class _GistPostCardState extends State<GistPostCard> {
   late GistPostEntity _post;
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -106,7 +103,7 @@ class _GistPostCardState extends State<GistPostCard> {
                     ),
                   ),
                   Text(
-                    _post.isAnonymous ? 'Anonymous' : '@${_post.username}',
+                    _post.isAnonymous ? '' : '@${_post.username}',
                     style: TextStyle(
                       color: NGColors.textMuted,
                       fontSize: 12,
@@ -162,8 +159,8 @@ class _GistPostCardState extends State<GistPostCard> {
             ),
           const SizedBox(height: 12),
 
-          // Poll
-          if (_post.type == 'poll' && _post.pollOptions.isNotEmpty)
+          // Poll - FIXED null safety
+          if (_post.type == 'poll' && (_post.pollOptions?.isNotEmpty ?? false))
             _buildPoll(),
           const SizedBox(height: 12),
 
@@ -248,10 +245,14 @@ class _GistPostCardState extends State<GistPostCard> {
   }
 
   Widget _buildPoll() {
+    final pollOptions = _post.pollOptions ?? [];
     final totalVotes = _post.pollVotes.values.fold(0, (sum, val) => sum + val);
+    
+    if (pollOptions.isEmpty) return const SizedBox.shrink();
+    
     return Column(
       children: [
-        ..._post.pollOptions.asMap().entries.map((entry) {
+        ...pollOptions.asMap().entries.map((entry) {
           final index = entry.key;
           final option = entry.value;
           final votes = _post.pollVotes[index.toString()] ?? 0;
