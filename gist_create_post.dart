@@ -1,9 +1,8 @@
-// lib/features/gist_hub/presentation/view/gist_create_post.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:nigergram/core/design_system/colors.dart';
+import 'package:nigergram/core/design_system/colors.dart'; // 👈 ADD THIS
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 
 class GistCreatePost extends StatefulWidget {
