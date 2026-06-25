@@ -100,7 +100,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   bool _hasMoreVideos = true;
   bool _isLoadingMore = false;
   
-  // 🔥 FIX: Null-safe current user
+  // Null-safe current user
   String get _targetUserId {
     final user = FirebaseAuth.instance.currentUser;
     return widget.userId ?? user?.uid ?? '';
@@ -221,7 +221,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
         _loadAchievements().catchError((_) {}),
       ]);
     } catch (e) {
-      debugPrint('Profile load error: $e');
+      print('❌ Profile load error: $e');
       if (mounted) setState(() => _hasError = true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -333,12 +333,32 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   
   Future<void> _loadPublicVideos() async {
     if (_targetUserId.isEmpty) return;
-    final snap = await FirebaseFirestore.instance
-        .collection('videos').where('userId', isEqualTo: _targetUserId)
-        .where('isPrivate', isEqualTo: false).orderBy('timestamp', descending: true).limit(_pageSize).get();
-    _lastVideoDoc = snap.docs.isNotEmpty ? snap.docs.last : null;
-    _hasMoreVideos = snap.docs.length == _pageSize;
-    if (mounted) setState(() => _userVideos = snap.docs.map((d) => d.data()).toList());
+    
+    print('📹 Loading public videos for userId: $_targetUserId');
+    
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('videos')
+          .where('userId', isEqualTo: _targetUserId)
+          .where('isPrivate', isEqualTo: false)
+          .orderBy('timestamp', descending: true)
+          .limit(_pageSize)
+          .get();
+      
+      print('📹 Found ${snap.docs.length} public videos');
+      
+      _lastVideoDoc = snap.docs.isNotEmpty ? snap.docs.last : null;
+      _hasMoreVideos = snap.docs.length == _pageSize;
+      
+      if (mounted) {
+        setState(() {
+          _userVideos = snap.docs.map((d) => d.data()).toList();
+        });
+        print('📹 _userVideos length: ${_userVideos.length}');
+      }
+    } catch (e) {
+      print('❌ Error loading public videos: $e');
+    }
   }
   
   Future<void> _loadMorePublicVideos() async {
@@ -478,7 +498,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       await _loadUserData();
       if (mounted) setState(() => _isFollowing = !_isFollowing);
     } catch (e) {
-      debugPrint('Follow error: $e');
+      print('Follow error: $e');
     } finally {
       if (mounted) setState(() => _isFollowLoading = false);
     }
@@ -513,7 +533,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       }
       if (mounted) setState(() => _isBlocked = !_isBlocked);
     } catch (e) {
-      debugPrint('Block error: $e');
+      print('Block error: $e');
     }
   }
   
@@ -556,7 +576,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // VIDEO UPLOAD - FIXED (20MB limit, clean filename)
+  // VIDEO UPLOAD
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _pickAndUploadVideo(bool makePrivate) async {
@@ -654,7 +674,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
         );
       }
     } catch (e) {
-      debugPrint('Upload error: $e');
+      print('❌ Upload error: $e');
       if (mounted) {
         String errorMsg = 'Upload failed. Please try again.';
         if (e.toString().contains('Connection reset')) {
@@ -710,11 +730,15 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // AVATAR & COVER - FIXED (No folders, just filenames)
+  // AVATAR & COVER - WITH DEBUG LOGGING
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _updateAvatar() async {
-    if (!_isCurrentUser || _currentUid.isEmpty) return;
+    if (!_isCurrentUser || _currentUid.isEmpty) {
+      print('❌ _updateAvatar: User not authenticated');
+      return;
+    }
+    
     HapticFeedback.mediumImpact();
 
     final XFile? img = await _picker.pickImage(
@@ -722,7 +746,10 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       imageQuality: 80,
       maxWidth: 400,
     );
-    if (img == null) return;
+    if (img == null) {
+      print('ℹ️ _updateAvatar: No image selected');
+      return;
+    }
 
     setState(() {
       _isUploadingContent = true;
@@ -732,34 +759,44 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      // 🔥 FIX: No folders, just filename
-      final String filePath = 'avatar_$_currentUid.jpg';
+      final String fileName = 'avatar_$_currentUid.jpg';
+      
+      print('📤 Uploading avatar: $fileName');
+      print('📁 File size: ${await file.length()} bytes');
+      print('🔑 Supabase session: ${_supabase.auth.currentSession != null}');
       
       await _supabase.storage
           .from('images')
-          .uploadBinary(
-            filePath, 
-            await file.readAsBytes(),
+          .upload(
+            fileName,
+            file,
             fileOptions: const FileOptions(
               contentType: 'image/jpeg',
               upsert: true,
             ),
           );
 
+      print('✅ Avatar upload successful');
+
       final String url = _supabase.storage
           .from('images')
-          .getPublicUrl(filePath);
+          .getPublicUrl(fileName);
+
+      print('✅ Public URL: $url');
 
       await FirebaseFirestore.instance
           .collection('users')
           .doc(_currentUid)
           .update({'profilePicUrl': url});
 
+      print('✅ Firestore updated');
+
       await _loadUserData();
       if (mounted) _showSnack('Profile photo updated!', isSuccess: true);
-    } catch (e) {
-      debugPrint('Upload error: $e');
-      if (mounted) _showSnack('Failed to update photo', isSuccess: false);
+    } catch (e, stackTrace) {
+      print('❌❌❌ AVATAR ERROR: $e');
+      print('❌❌❌ STACK TRACE: $stackTrace');
+      if (mounted) _showSnack('Failed to update photo: $e', isSuccess: false);
     } finally {
       if (mounted) setState(() {
         _isUploadingContent = false;
@@ -770,7 +807,11 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
 
   Future<void> _updateCover() async {
-    if (!_isCurrentUser || _currentUid.isEmpty) return;
+    if (!_isCurrentUser || _currentUid.isEmpty) {
+      print('❌ _updateCover: User not authenticated');
+      return;
+    }
+    
     HapticFeedback.mediumImpact();
 
     final XFile? img = await _picker.pickImage(
@@ -778,7 +819,10 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       imageQuality: 75,
       maxWidth: 1080,
     );
-    if (img == null) return;
+    if (img == null) {
+      print('ℹ️ _updateCover: No image selected');
+      return;
+    }
 
     setState(() {
       _isUploadingContent = true;
@@ -788,34 +832,44 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      // 🔥 FIX: No folders, just filename
-      final String filePath = 'cover_$_currentUid.jpg';
+      final String fileName = 'cover_$_currentUid.jpg';
+      
+      print('📤 Uploading cover: $fileName');
+      print('📁 File size: ${await file.length()} bytes');
+      print('🔑 Supabase session: ${_supabase.auth.currentSession != null}');
       
       await _supabase.storage
           .from('images')
-          .uploadBinary(
-            filePath, 
-            await file.readAsBytes(),
+          .upload(
+            fileName,
+            file,
             fileOptions: const FileOptions(
               contentType: 'image/jpeg',
               upsert: true,
             ),
           );
 
+      print('✅ Cover upload successful');
+
       final String url = _supabase.storage
           .from('images')
-          .getPublicUrl(filePath);
+          .getPublicUrl(fileName);
+
+      print('✅ Public URL: $url');
 
       await FirebaseFirestore.instance
           .collection('users')
           .doc(_currentUid)
           .update({'coverUrl': url});
 
+      print('✅ Firestore cover updated');
+
       await _loadUserData();
       if (mounted) _showSnack('Cover updated!', isSuccess: true);
-    } catch (e) {
-      debugPrint('Cover upload error: $e');
-      if (mounted) _showSnack('Failed to update cover', isSuccess: false);
+    } catch (e, stackTrace) {
+      print('❌❌❌ COVER ERROR: $e');
+      print('❌❌❌ STACK TRACE: $stackTrace');
+      if (mounted) _showSnack('Failed to update cover: $e', isSuccess: false);
     } finally {
       if (mounted) setState(() {
         _isUploadingContent = false;
@@ -1185,7 +1239,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
         }
       }
     } catch (e) {
-      debugPrint('Error opening social link: $e');
+      print('Error opening social link: $e');
       if (mounted) {
         _showSnack('Invalid link format', isSuccess: false);
       }
