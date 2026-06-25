@@ -729,7 +729,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // AVATAR & COVER - WITH DEBUG LOGGING
+  // AVATAR & COVER - FIXED WITH uploadBinary
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _updateAvatar() async {
@@ -758,17 +758,19 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      final String fileName = 'avatar_$_currentUid.jpg';
+      final String fileName = 'avatar_${_currentUid.substring(0, 8)}.jpg';
       
       print('📤 Uploading avatar: $fileName');
       print('📁 File size: ${await file.length()} bytes');
       print('🔑 Supabase session: ${_supabase.auth.currentSession != null}');
       
+      final bytes = await file.readAsBytes();
+      
       await _supabase.storage
           .from('images')
-          .upload(
+          .uploadBinary(
             fileName,
-            file,
+            bytes,
             fileOptions: const FileOptions(
               contentType: 'image/jpeg',
               upsert: true,
@@ -795,7 +797,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
     } catch (e, stackTrace) {
       print('❌❌❌ AVATAR ERROR: $e');
       print('❌❌❌ STACK TRACE: $stackTrace');
-      if (mounted) _showSnack('Failed to update photo: $e', isSuccess: false);
+      if (mounted) _showSnack('Failed: $e', isSuccess: false);
     } finally {
       if (mounted) setState(() {
         _isUploadingContent = false;
@@ -831,17 +833,19 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
     try {
       final file = File(img.path);
-      final String fileName = 'cover_$_currentUid.jpg';
+      final String fileName = 'cover_${_currentUid.substring(0, 8)}.jpg';
       
       print('📤 Uploading cover: $fileName');
       print('📁 File size: ${await file.length()} bytes');
       print('🔑 Supabase session: ${_supabase.auth.currentSession != null}');
       
+      final bytes = await file.readAsBytes();
+      
       await _supabase.storage
           .from('images')
-          .upload(
+          .uploadBinary(
             fileName,
-            file,
+            bytes,
             fileOptions: const FileOptions(
               contentType: 'image/jpeg',
               upsert: true,
@@ -868,7 +872,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
     } catch (e, stackTrace) {
       print('❌❌❌ COVER ERROR: $e');
       print('❌❌❌ STACK TRACE: $stackTrace');
-      if (mounted) _showSnack('Failed to update cover: $e', isSuccess: false);
+      if (mounted) _showSnack('Failed: $e', isSuccess: false);
     } finally {
       if (mounted) setState(() {
         _isUploadingContent = false;
@@ -1261,7 +1265,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // MAIN BUILD - FIXED (SliverOverlapAbsorber REMOVED)
+  // MAIN BUILD
   // ─────────────────────────────────────────────────────────────────────────
   
   @override
@@ -1438,7 +1442,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                       ]),
                     ),
                   ),
-                  // 🔥 FIXED: SliverOverlapAbsorber REMOVED - replaced with SliverPersistentHeader only
+                  // 🔥 FIXED: SliverOverlapAbsorber REMOVED
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: _SliverTabBarDelegate(
@@ -1501,7 +1505,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       ])))]));
     }
     return RefreshIndicator(color: _accentColor, onRefresh: _refreshCurrentTab, child: CustomScrollView(key: PageStorageKey(tabName), slivers: [
-      // 🔥 FIXED: SliverOverlapAbsorber removed here too
       SliverGrid(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 9 / 14, crossAxisSpacing: 1, mainAxisSpacing: 1),
         delegate: SliverChildBuilderDelegate((context, idx) {
