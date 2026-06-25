@@ -16,7 +16,7 @@ class _GistCreatePostState extends State<GistCreatePost> {
   final TextEditingController _contentController = TextEditingController();
   final GistService _service = GistService();
   
-  String _postType = 'text';
+  String _postType = 'text'; // text, image, poll
   File? _imageFile;
   final List<TextEditingController> _pollControllers = [
     TextEditingController(),
@@ -129,6 +129,7 @@ class _GistCreatePostState extends State<GistCreatePost> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Post Type Buttons
             Row(
               children: [
                 _buildTypeButton('Text', 'text'),
@@ -139,6 +140,8 @@ class _GistCreatePostState extends State<GistCreatePost> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // Content Input
             TextField(
               controller: _contentController,
               maxLines: 5,
@@ -155,6 +158,8 @@ class _GistCreatePostState extends State<GistCreatePost> {
               ),
             ),
             const SizedBox(height: 16),
+
+            // Image Picker
             if (_postType == 'image') ...[
               if (_imageFile != null)
                 Container(
@@ -200,6 +205,8 @@ class _GistCreatePostState extends State<GistCreatePost> {
                   ),
                 ),
             ],
+
+            // Poll Options
             if (_postType == 'poll') ...[
               const SizedBox(height: 16),
               TextField(
@@ -232,7 +239,10 @@ class _GistCreatePostState extends State<GistCreatePost> {
                 ),
               ),
             ],
+
             const SizedBox(height: 16),
+
+            // Anonymous Toggle
             Row(
               children: [
                 Switch(
