@@ -1,3 +1,4 @@
+import 'package:nigergram/core/design_system/colors.dart';
 // lib/features/gist_hub/presentation/widgets/gist_post_card.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
