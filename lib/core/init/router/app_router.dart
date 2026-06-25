@@ -13,6 +13,8 @@ import 'package:nigergram/features/wallet/presentation/view/wallet_home_view.dar
 import 'package:nigergram/features/wallet/presentation/view/fund_wallet_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/creator_earnings_view.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
 // TODO: Ensure this import points to your actual VideoDetailView location
 // import 'package:nigergram/features/video_feed/presentation/view/video_detail_view.dart';
 import 'package:go_router/go_router.dart';
@@ -57,6 +59,17 @@ class AppRouter {
         path: RouterEnum.profileView.routeName,
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const ProfileView()),
+      ),
+      // Gist Hub routes
+      GoRoute(
+        path: '/gist-hub',
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const GistHubView()),
+      ),
+      GoRoute(
+        path: '/gist-hub/create',
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const GistCreatePost()),
       ),
       // Institutional Grade Route for Video Detail
       // This handles the navigation from ProfileView without crashing
