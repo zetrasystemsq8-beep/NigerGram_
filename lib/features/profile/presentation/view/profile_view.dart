@@ -729,7 +729,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // AVATAR & COVER - FIXED WITH uploadBinary
+  // AVATAR & COVER - CORRECTED WITH 'images' BUCKET
   // ─────────────────────────────────────────────────────────────────────────
   
   Future<void> _updateAvatar() async {
@@ -766,6 +766,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       
       final bytes = await file.readAsBytes();
       
+      // 🔥 CORRECT: Use 'images' bucket
       await _supabase.storage
           .from('images')
           .uploadBinary(
@@ -779,6 +780,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
       print('✅ Avatar upload successful');
 
+      // 🔥 CORRECT: Use 'images' bucket
       final String url = _supabase.storage
           .from('images')
           .getPublicUrl(fileName);
@@ -841,6 +843,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       
       final bytes = await file.readAsBytes();
       
+      // 🔥 CORRECT: Use 'images' bucket
       await _supabase.storage
           .from('images')
           .uploadBinary(
@@ -854,6 +857,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
 
       print('✅ Cover upload successful');
 
+      // 🔥 CORRECT: Use 'images' bucket
       final String url = _supabase.storage
           .from('images')
           .getPublicUrl(fileName);
@@ -1442,7 +1446,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                       ]),
                     ),
                   ),
-                  // 🔥 FIXED: SliverOverlapAbsorber REMOVED
+                  // SliverOverlapAbsorber REMOVED
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: _SliverTabBarDelegate(
