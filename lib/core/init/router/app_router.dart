@@ -14,9 +14,6 @@ import 'package:nigergram/features/wallet/presentation/view/fund_wallet_view.dar
 import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/creator_earnings_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
-import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
-// TODO: Ensure this import points to your actual VideoDetailView location
-// import 'package:nigergram/features/video_feed/presentation/view/video_detail_view.dart';
 import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -60,35 +57,41 @@ class AppRouter {
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const ProfileView()),
       ),
-      // Gist Hub routes
       GoRoute(
         path: '/gist-hub',
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const GistHubView()),
       ),
-      GoRoute(
-        path: '/gist-hub/create',
-        pageBuilder: (context, state) =>
-            customPageBuilderWidget(context, state, const GistCreatePost()),
-      ),
-      // Institutional Grade Route for Video Detail
-      // This handles the navigation from ProfileView without crashing
+      // TODO: Uncomment when gist_create_post.dart is created
+      // GoRoute(
+      //   path: '/gist-hub/create',
+      //   pageBuilder: (context, state) =>
+      //       customPageBuilderWidget(context, state, const GistCreatePost()),
+      // ),
       GoRoute(
         path: '/video-detail/:videoId',
         pageBuilder: (context, state) {
           final videoId = state.pathParameters['videoId']!;
-          // Return your VideoDetailView here once the UI file is ready
           return customPageBuilderWidget(
             context,
             state,
             Scaffold(
-              appBar: AppBar(title: const Text('Video Detail')),
-              body: Center(child: Text('Loading video: $videoId')),
+              backgroundColor: Colors.black,
+              appBar: AppBar(
+                backgroundColor: Colors.black,
+                iconTheme: const IconThemeData(color: Colors.white),
+                title: const Text('Video', style: TextStyle(color: Colors.white)),
+              ),
+              body: Center(
+                child: Text(
+                  'Loading video: $videoId',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
             ),
           );
         },
       ),
-      // Discover route for tag-filtered feed
       GoRoute(
         path: '/discover',
         pageBuilder: (context, state) {
@@ -100,7 +103,6 @@ class AppRouter {
           );
         },
       ),
-      // Wallet routes
       GoRoute(
         path: '/wallet',
         pageBuilder: (context, state) =>
