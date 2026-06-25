@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_post_card.dart';
-import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
 import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 
