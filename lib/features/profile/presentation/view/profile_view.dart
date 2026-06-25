@@ -100,7 +100,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   bool _hasMoreVideos = true;
   bool _isLoadingMore = false;
   
-  // Null-safe current user
   String get _targetUserId {
     final user = FirebaseAuth.instance.currentUser;
     return widget.userId ?? user?.uid ?? '';
@@ -1262,7 +1261,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // MAIN BUILD
+  // MAIN BUILD - FIXED (SliverOverlapAbsorber REMOVED)
   // ─────────────────────────────────────────────────────────────────────────
   
   @override
@@ -1439,6 +1438,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                       ]),
                     ),
                   ),
+                  // 🔥 FIXED: SliverOverlapAbsorber REMOVED - replaced with SliverPersistentHeader only
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: _SliverTabBarDelegate(
@@ -1501,7 +1501,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       ])))]));
     }
     return RefreshIndicator(color: _accentColor, onRefresh: _refreshCurrentTab, child: CustomScrollView(key: PageStorageKey(tabName), slivers: [
-      SliverOverlapInjector(handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context)),
+      // 🔥 FIXED: SliverOverlapAbsorber removed here too
       SliverGrid(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 9 / 14, crossAxisSpacing: 1, mainAxisSpacing: 1),
         delegate: SliverChildBuilderDelegate((context, idx) {
