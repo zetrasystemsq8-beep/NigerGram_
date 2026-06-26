@@ -14,10 +14,8 @@ class InboxView extends StatefulWidget {
 
 class _InboxViewState extends State<InboxView> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  
   static const int _pageSize = 30;
 
   String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -105,7 +103,6 @@ class _InboxViewState extends State<InboxView> {
       final profilePic = userDoc.data()?['profilePicUrl'] ?? '';
       
       final chatId = _getChatId(_currentUserId, otherUserId);
-      
       final chatDoc = await _firestore.collection('chats').doc(chatId).get();
 
       if (chatDoc.exists) {
@@ -476,7 +473,7 @@ class _InboxViewState extends State<InboxView> {
                                       ],
                                     ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
                           );
@@ -545,13 +542,16 @@ class _InboxViewState extends State<InboxView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const _NewChatSheet(
-        onUserSelected: _startNewChat,
+      builder: (context) => _NewChatSheet(
+        onUserSelected: (userId) => _startNewChat(userId),
       ),
     );
   }
 }
 
+// ============================================================
+// _NewChatSheet - Dedicated widget with proper disposal
+// ============================================================
 class _NewChatSheet extends StatefulWidget {
   final void Function(String userId) onUserSelected;
 
