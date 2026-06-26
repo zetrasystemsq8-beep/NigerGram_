@@ -48,7 +48,7 @@ class _GistCommentSheetState extends State<GistCommentSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('💬 Comment added!'),
-            backgroundColor: NGColors.success,
+            backgroundColor: Colors.green, // 🔥 FIXED
           ),
         );
       }
