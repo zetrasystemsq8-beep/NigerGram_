@@ -23,8 +23,17 @@ class NGColors {
   static const Color textMuted = Colors.grey;
 
   // Brand / Accent
-  static const Color accent = Colors.blue;
+  static const Color accent = Color(0xFFFF0050); // NigerGram Red/Pink
+  static const Color accentGold = Color(0xFFFFD700); // 👈 ADD THIS
+  static const Color accentBlue = Color(0xFF0088FF);
+  static const Color accentPurple = Color(0xFF8B00FF);
+  static const Color accentGreen = Color(0xFF00C853);
 
   // Borders / Dividers
   static const Color divider = Color(0xFF3A3A3A);
+  
+  // Status
+  static const Color success = Color(0xFF00C853); // 👈 ADD THIS
+  static const Color error = Color(0xFFFF1744); // 👈 ADD THIS
+  static const Color warning = Color(0xFFFFD600); // 👈 ADD THIS
 }
