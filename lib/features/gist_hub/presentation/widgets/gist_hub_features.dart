@@ -1,5 +1,5 @@
 // lib/features/gist_hub/presentation/widgets/gist_hub_features.dart
-// 🔥 FINAL PRODUCTION-READY VERSION - RACE CONDITION FIXED
+// 🔥 ALL 6 FEATURES IN ONE FILE - FIXED
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -12,27 +12,8 @@ import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dar
 // HELPER: Add reaction with atomic totalReactions update
 // ============================================================
 class ReactionHelper {
-  static Future<bool> hasUserReacted({
-    required String postId,
-    required String userId,
-    required String emoji,
-  }) async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('gist_posts')
-          .doc(postId)
-          .collection('reactions')
-          .doc(userId)
-          .get();
-      return doc.exists && doc.data()?[emoji] == true;
-    } catch (_) {
-      return false;
-    }
-  }
-
   static Future<void> addReaction({
     required String postId,
-    required String userId,
     required String emoji,
   }) async {
     final postRef = FirebaseFirestore.instance.collection('gist_posts').doc(postId);
@@ -44,14 +25,6 @@ class ReactionHelper {
         
         final data = snapshot.data() as Map<String, dynamic>;
         final reactions = Map<String, int>.from(data['reactions'] ?? {});
-        
-        final userReactionRef = postRef.collection('reactions').doc(userId);
-        final userReactionDoc = await transaction.get(userReactionRef);
-        
-        if (userReactionDoc.exists && userReactionDoc.data()?[emoji] == true) {
-          return;
-        }
-        
         final current = reactions[emoji] ?? 0;
         reactions[emoji] = current + 1;
         
@@ -64,11 +37,6 @@ class ReactionHelper {
           'reactions': reactions,
           'totalReactions': total,
         });
-        
-        transaction.set(userReactionRef, {
-          emoji: true,
-          'timestamp': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
       });
     } catch (e) {
       debugPrint('❌ Failed to add reaction: $e');
@@ -117,7 +85,7 @@ class DeleteGistFeature {
         
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('🗑️ Gist and all related data deleted'), backgroundColor: Colors.green),
+            const SnackBar(content: Text('🗑️ Gist deleted'), backgroundColor: Colors.green),
           );
           onDeleted();
         }
@@ -258,7 +226,7 @@ class ReportPostFeature {
         });
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Report submitted. We\'ll review it.'), backgroundColor: Colors.green),
+            const SnackBar(content: Text('✅ Report submitted'), backgroundColor: Colors.green),
           );
         }
       } catch (e) {
@@ -450,7 +418,7 @@ class ReplyToCommentFeature {
 }
 
 // ============================================================
-// FEATURE 5: GIST OF THE DAY 🏆 (ATOMIC)
+// FEATURE 5: GIST OF THE DAY 🏆
 // ============================================================
 class GistOfTheDayFeature {
   static const String _lockDocPath = 'config/gistOfTheDayLock';
@@ -480,7 +448,6 @@ class GistOfTheDayFeature {
         }
       }
 
-      // Fetch candidate before transaction
       final candidateSnapshot = await FirebaseFirestore.instance
           .collection('gist_posts')
           .orderBy('totalReactions', descending: true)
@@ -491,7 +458,6 @@ class GistOfTheDayFeature {
       
       final doc = candidateSnapshot.docs.first;
 
-      // 🔥 FIX: ATOMIC - clear old flags AND set new flag in ONE transaction
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         final lockSnapshot = await transaction.get(lockRef);
         final lockData = lockSnapshot.data() ?? {};
@@ -501,7 +467,6 @@ class GistOfTheDayFeature {
           return;
         }
         
-        // 🔥 Clear ALL old Gist of the Day flags inside the transaction
         final oldWinners = await FirebaseFirestore.instance
             .collection('gist_posts')
             .where('isGistOfTheDay', isEqualTo: true)
@@ -513,13 +478,11 @@ class GistOfTheDayFeature {
           });
         }
         
-        // Set new lock
         transaction.set(lockRef, {
           'selectedPostId': doc.id,
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
         
-        // Mark new winner
         transaction.update(doc.reference, {
           'isGistOfTheDay': true,
         });
@@ -581,10 +544,57 @@ class GistOfTheDayFeature {
 }
 
 // ============================================================
-// FEATURE 6: LIVE ACTIVITY (COMPLETE)
+// FEATURE 6: LIVE ACTIVITY - FIXED
 // ============================================================
 class LiveActivityFeature {
   static Stream<int> getLivePostCount() {
     return Stream.periodic(const Duration(seconds: 5), (_) => DateTime.now())
         .asyncMap((now) async {
-          final oneMinuteAgo = now.subtract(const Duration(min
+          final oneMinuteAgo = now.subtract(const Duration(minutes: 1));
+          final snap = await FirebaseFirestore.instance
+              .collection('gist_posts')
+              .where('createdAt', isGreaterThan: oneMinuteAgo)
+              .count()
+              .get();
+          return snap.count;
+        });
+  }
+
+  static Widget buildLiveActivityCard(int count) {
+    if (count == 0) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: NGColors.accent.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: NGColors.accent.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '$count ${count == 1 ? 'person' : 'people'} just posted! 🔥',
+              style: TextStyle(
+                color: NGColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const Icon(Icons.whatshot, color: NGColors.accent, size: 20),
+        ],
+      ),
+    );
+  }
+}
