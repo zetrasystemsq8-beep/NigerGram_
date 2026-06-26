@@ -9,28 +9,21 @@ class GistService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
+  // 🔥 FIXED: Removed orderBy to avoid index errors
   Stream<List<Map<String, dynamic>>> getGistFeedStream({required String filter}) {
-    Query<Map<String, dynamic>> q = _firestore.collection('gist_posts');
-
-    if (filter == 'Latest') {
-      q = q.orderBy('createdAt', descending: true);
-    } else if (filter == 'Trending') {
-      q = q.orderBy('commentCount', descending: true);
-    } else if (filter == 'Polls') {
-      q = q.where('type', isEqualTo: 'poll').orderBy('createdAt', descending: true);
-    } else {
-      q = q.orderBy('createdAt', descending: true);
-    }
-
-    return q.snapshots().map((snap) {
-      return snap.docs.map((d) {
-        final data = d.data();
-        return {
-          'id': d.id,
-          ...data,
-        };
-      }).toList();
-    });
+    // Simple: just get all posts, no ordering
+    return _firestore
+        .collection('gist_posts')
+        .snapshots()
+        .map((snap) {
+          return snap.docs.map((d) {
+            final data = d.data();
+            return {
+              'id': d.id,
+              ...data,
+            };
+          }).toList();
+        });
   }
 
   Future<void> createPost({
@@ -184,6 +177,7 @@ class GistService {
         'profilePic': profilePic,
         'text': text,
         'createdAt': now,
+        'isAnonymous': false,
       });
 
       final postRef = _firestore.collection('gist_posts').doc(postId);
