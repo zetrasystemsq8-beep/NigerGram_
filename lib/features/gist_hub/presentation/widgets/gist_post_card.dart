@@ -160,7 +160,7 @@ class _GistPostCardState extends State<GistPostCard> {
             ),
           const SizedBox(height: 12),
 
-          // Poll
+          // 🔥 FIXED: Poll with clickable options
           if (_post.type == 'poll' && (_post.pollOptions?.isNotEmpty ?? false))
             _buildPoll(),
           const SizedBox(height: 12),
@@ -258,6 +258,7 @@ class _GistPostCardState extends State<GistPostCard> {
     );
   }
 
+  // 🔥 FIXED: Poll with clickable options and vote tracking
   Widget _buildPoll() {
     final pollOptions = _post.pollOptions ?? [];
     final totalVotes = _post.pollVotes.values.fold(0, (sum, val) => sum + val);
@@ -271,11 +272,26 @@ class _GistPostCardState extends State<GistPostCard> {
           final option = entry.value;
           final votes = _post.pollVotes[index.toString()] ?? 0;
           final percentage = totalVotes > 0 ? (votes / totalVotes * 100) : 0;
+          
+          // Check if user already voted for this option
+          final hasVoted = _post.pollVotes.containsKey(index.toString());
+          
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: GestureDetector(
               onTap: () {
-                if (_post.pollVotes.keys.contains(index.toString())) return;
+                // If already voted, don't allow voting again
+                if (hasVoted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('You already voted on this poll'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                  return;
+                }
+                
+                // Cast vote
                 widget.service.castVote(
                   postId: _post.id,
                   choiceIndex: index,
@@ -283,13 +299,27 @@ class _GistPostCardState extends State<GistPostCard> {
                   setState(() {
                     _post.pollVotes[index.toString()] = votes + 1;
                   });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Voted for: $option'),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }).catchError((e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to vote: $e'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
                 });
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: NGColors.surfaceLight,
+                  color: hasVoted ? NGColors.accent.withOpacity(0.2) : NGColors.surfaceLight,
                   borderRadius: BorderRadius.circular(8),
+                  border: hasVoted ? Border.all(color: NGColors.accent) : null,
                 ),
                 child: Row(
                   children: [
@@ -297,8 +327,9 @@ class _GistPostCardState extends State<GistPostCard> {
                       child: Text(
                         option,
                         style: TextStyle(
-                          color: NGColors.textPrimary,
+                          color: hasVoted ? NGColors.accent : NGColors.textPrimary,
                           fontSize: 13,
+                          fontWeight: hasVoted ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                     ),
@@ -308,8 +339,9 @@ class _GistPostCardState extends State<GistPostCard> {
                       child: Text(
                         '${percentage.toStringAsFixed(0)}%',
                         style: TextStyle(
-                          color: NGColors.textSecondary,
+                          color: hasVoted ? NGColors.accent : NGColors.textSecondary,
                           fontSize: 12,
+                          fontWeight: hasVoted ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
                     ),
