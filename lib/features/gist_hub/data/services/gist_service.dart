@@ -9,20 +9,28 @@ class GistService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  // Get feed stream - no ordering to avoid index errors
   Stream<List<Map<String, dynamic>>> getGistFeedStream({required String filter}) {
-    return _firestore
-        .collection('gist_posts')
-        .snapshots()
-        .map((snap) {
-          return snap.docs.map((d) {
-            final data = d.data();
-            return {
-              'id': d.id,
-              ...data,
-            };
-          }).toList();
-        });
+    Query<Map<String, dynamic>> query = _firestore.collection('gist_posts');
+
+    if (filter == 'trending') {
+      // Trending: by total reactions count
+      // Use the sum of all reaction emojis
+      query = query.orderBy('reactions.😂', descending: true);
+    } else if (filter == 'polls') {
+      query = query.where('type', isEqualTo: 'poll');
+    } else {
+      query = query.orderBy('createdAt', descending: true);
+    }
+
+    return query.limit(50).snapshots().map((snap) {
+      return snap.docs.map((d) {
+        final data = d.data();
+        return {
+          'id': d.id,
+          ...data,
+        };
+      }).toList();
+    });
   }
 
   Future<void> createPost({
@@ -55,12 +63,10 @@ class GistService {
         profilePic = '';
       }
 
-      // 🔥 FIX: Use Supabase for images
       String? imageUrl;
       if (imageFile != null) {
         try {
           final String filePath = 'gist_images/${DateTime.now().millisecondsSinceEpoch}_${imageFile.path.split('/').last}';
-          
           final bytes = await imageFile.readAsBytes();
           await _supabase.storage
               .from('images')
@@ -72,11 +78,9 @@ class GistService {
                   upsert: true,
                 ),
               );
-          
           imageUrl = _supabase.storage
               .from('images')
               .getPublicUrl(filePath);
-              
         } catch (e) {
           print('❌ Image upload error: $e');
           imageUrl = null;
@@ -141,16 +145,13 @@ class GistService {
   }) async {
     final postRef = _firestore.collection('gist_posts').doc(postId);
     try {
-      await _firestore.runTransaction((tx) async {
-        final snapshot = await tx.get(postRef);
-        if (!snapshot.exists) throw Exception('Post not found');
-        final data = snapshot.data() as Map<String, dynamic>;
-        final Map<String, dynamic> pollVotes = (data['pollVotes'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k.toString(), v ?? 0)) ?? {'0': 0, '1': 0};
-        final key = choiceIndex.toString();
-        final current = (pollVotes[key] is int) ? pollVotes[key] as int : int.tryParse(pollVotes[key]?.toString() ?? '0') ?? 0;
-        pollVotes[key] = current + 1;
-        tx.update(postRef, {'pollVotes': pollVotes});
-      });
+      final doc = await postRef.get();
+      if (!doc.exists) throw Exception('Post not found');
+      final data = doc.data() as Map<String, dynamic>;
+      final pollVotes = Map<String, int>.from(data['pollVotes'] ?? {'0': 0, '1': 0});
+      final key = choiceIndex.toString();
+      pollVotes[key] = (pollVotes[key] ?? 0) + 1;
+      await postRef.update({'pollVotes': pollVotes});
     } catch (e) {
       rethrow;
     }
