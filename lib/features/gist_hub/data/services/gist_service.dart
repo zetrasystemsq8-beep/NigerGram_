@@ -9,55 +9,30 @@ class GistService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  Stream<List<GistPostEntity>> getGistFeedStream({
-  required String filter,
-}) {
-  Query<Map<String, dynamic>> q =
-      _firestore.collection('gist_posts');
+  Stream<List<Map<String, dynamic>>> getGistFeedStream({required String filter}) {
+    Query<Map<String, dynamic>> q = _firestore.collection('gist_posts');
 
-  // Your GistHubView passes lowercase strings:
-  // "trending", "latest", "polls"
-  if (filter == 'latest') {
-    q = q.orderBy('createdAt', descending: true);
-  } else if (filter == 'trending') {
-    q = q.orderBy('commentCount', descending: true);
-  } else if (filter == 'polls') {
-    q = q
-        .where('type', isEqualTo: 'poll')
-        .orderBy('createdAt', descending: true);
-  } else {
-    q = q.orderBy('createdAt', descending: true);
+    if (filter == 'Latest') {
+      q = q.orderBy('createdAt', descending: true);
+    } else if (filter == 'Trending') {
+      q = q.orderBy('commentCount', descending: true);
+    } else if (filter == 'Polls') {
+      q = q.where('type', isEqualTo: 'poll').orderBy('createdAt', descending: true);
+    } else {
+      q = q.orderBy('createdAt', descending: true);
+    }
+
+    return q.snapshots().map((snap) {
+      return snap.docs.map((d) {
+        final data = d.data();
+        return {
+          'id': d.id,
+          ...data,
+        };
+      }).toList();
+    });
   }
 
-  return q.snapshots().map((snapshot) {
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-
-      return GistPostEntity(
-        id: doc.id,
-        userId: data['userId'] ?? '',
-        displayName: data['displayName'] ?? '',
-        username: data['username'] ?? '',
-        profilePic: data['profilePic'] ?? '',
-        type: data['type'] ?? 'text',
-        content: data['content'] ?? '',
-        imageUrl: data['imageUrl'],
-        pollOptions: (data['pollOptions'] as List?)
-            ?.map((e) => e.toString())
-            .toList(),
-        pollVotes: Map<String, int>.from(
-          data['pollVotes'] ?? {},
-        ),
-        reactions: Map<String, int>.from(
-          data['reactions'] ?? {},
-        ),
-        commentCount: data['commentCount'] ?? 0,
-        createdAt: data['createdAt'] as Timestamp?,
-        isAnonymous: data['isAnonymous'] ?? false,
-      );
-    }).toList();
-  });
-}
   Future<void> createPost({
     required String type,
     required String content,
