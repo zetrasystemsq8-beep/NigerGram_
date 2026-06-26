@@ -9,9 +9,8 @@ class GistService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // 🔥 FIXED: Removed orderBy to avoid index errors
+  // Get feed stream - no ordering to avoid index errors
   Stream<List<Map<String, dynamic>>> getGistFeedStream({required String filter}) {
-    // Simple: just get all posts, no ordering
     return _firestore
         .collection('gist_posts')
         .snapshots()
@@ -138,11 +137,11 @@ class GistService {
     }
   }
 
+  // 🔥 FIXED: Removed .orderBy() to avoid index error
   Stream<QuerySnapshot<Map<String, dynamic>>> getCommentsStream(String postId) {
     return _firestore
         .collection('gist_comments')
         .where('postId', isEqualTo: postId)
-        .orderBy('createdAt', descending: true)
         .snapshots();
   }
 
