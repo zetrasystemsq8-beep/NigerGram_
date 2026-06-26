@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:nigergram/core/design_system/colors.dart'; // 👈 IMPORT ADDED
+import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
+import 'package:nigergram/features/gist_hub/presentation/widgets/gist_comment_sheet.dart';
 
 class GistPostCard extends StatefulWidget {
   final GistPostEntity post;
@@ -159,12 +160,12 @@ class _GistPostCardState extends State<GistPostCard> {
             ),
           const SizedBox(height: 12),
 
-          // Poll - FIXED null safety
+          // Poll
           if (_post.type == 'poll' && (_post.pollOptions?.isNotEmpty ?? false))
             _buildPoll(),
           const SizedBox(height: 12),
 
-          // Reactions
+          // Reactions & Actions
           Row(
             children: [
               _buildReactionButton('😂'),
@@ -177,23 +178,36 @@ class _GistPostCardState extends State<GistPostCard> {
               const SizedBox(width: 4),
               _buildReactionButton('🇳🇬'),
               const Spacer(),
-              // Comment Count
-              Row(
-                children: [
-                  const Icon(
-                    Icons.chat_bubble_outline,
-                    color: NGColors.textMuted,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${_post.commentCount}',
-                    style: TextStyle(
-                      color: NGColors.textMuted,
-                      fontSize: 13,
+              // Comment Button - Opens comment sheet
+              GestureDetector(
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => GistCommentSheet(
+                      postId: _post.id,
+                      service: widget.service,
                     ),
-                  ),
-                ],
+                  );
+                },
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.chat_bubble_outline,
+                      color: NGColors.textMuted,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_post.commentCount}',
+                      style: TextStyle(
+                        color: NGColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(width: 16),
               // Share Button
