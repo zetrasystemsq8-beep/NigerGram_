@@ -178,7 +178,7 @@ class _GistPostCardState extends State<GistPostCard> {
               const SizedBox(width: 4),
               _buildReactionButton('🇳🇬'),
               const Spacer(),
-              // Comment Button - Opens comment sheet
+              // Comment Button - opens comment sheet
               GestureDetector(
                 onTap: () {
                   showModalBottomSheet(
