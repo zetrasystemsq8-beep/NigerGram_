@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_post_card.dart';
+import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
-import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 
 class GistHubView extends StatefulWidget {
   const GistHubView({super.key});
@@ -51,8 +50,8 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
           labelColor: NGColors.textPrimary,
           unselectedLabelColor: NGColors.textMuted,
           tabs: const [
-            Tab(text: 'Trending'),
             Tab(text: 'Latest'),
+            Tab(text: 'Trending'),
             Tab(text: 'Polls'),
           ],
         ),
@@ -60,9 +59,9 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildFeed('trending'),
-          _buildFeed('latest'),
-          _buildFeed('polls'),
+          _buildFeed('Latest'),
+          _buildFeed('Trending'),
+          _buildFeed('Polls'),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -79,7 +78,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
   }
 
   Widget _buildFeed(String filter) {
-    return StreamBuilder<List<GistPostEntity>>(
+    return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _service.getGistFeedStream(filter: filter),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -124,9 +123,9 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
           );
         }
 
-        final posts = snapshot.data!;
+        final rawData = snapshot.data!;
 
-        if (posts.isEmpty) {
+        if (rawData.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -157,6 +156,10 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
             ),
           );
         }
+
+        final posts = rawData.map((data) {
+          return GistPostEntity.fromMap(data, data['id'] ?? '');
+        }).toList();
 
         return RefreshIndicator(
           color: NGColors.accent,
