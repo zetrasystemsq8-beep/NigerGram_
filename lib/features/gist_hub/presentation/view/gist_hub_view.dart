@@ -16,11 +16,22 @@ class GistHubView extends StatefulWidget {
 class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final GistService _service = GistService();
+  int _totalGists = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadGistCount();
+  }
+
+  Future<void> _loadGistCount() async {
+    try {
+      final snap = await FirebaseFirestore.instance.collection('gist_posts').get();
+      setState(() {
+        _totalGists = snap.docs.length;
+      });
+    } catch (_) {}
   }
 
   @override
@@ -36,29 +47,75 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
       appBar: AppBar(
         backgroundColor: NGColors.surface,
         elevation: 0,
-        title: const Text(
-          '🇳🇬 Gist Hub',
-          style: TextStyle(
-            color: NGColors.textPrimary,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: NGColors.accent,
-          indicatorWeight: 3,
-          labelColor: NGColors.textPrimary,
-          unselectedLabelColor: NGColors.textMuted,
-          labelStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-          tabs: const [
-            Tab(text: '🔥 Trending'),
-            Tab(text: '📰 Latest'),
-            Tab(text: '📊 Polls'),
+        toolbarHeight: 70,
+        title: Row(
+          children: [
+            const Text(
+              '🇳🇬 Gist Hub',
+              style: TextStyle(
+                color: NGColors.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: NGColors.accent.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: NGColors.accent.withOpacity(0.2),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.chat_bubble_outline,
+                    color: NGColors.accent,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$_totalGists Gists',
+                    style: TextStyle(
+                      color: NGColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(50),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: NGColors.accent,
+              indicatorWeight: 3,
+              indicatorSize: TabBarIndicatorSize.tab,
+              labelColor: NGColors.textPrimary,
+              unselectedLabelColor: NGColors.textMuted,
+              labelStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+              tabs: const [
+                Tab(text: '🔥 Trending'),
+                Tab(text: '📰 Latest'),
+                Tab(text: '📊 Polls'),
+              ],
+            ),
+          ),
         ),
       ),
       body: TabBarView(
@@ -73,13 +130,16 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
         padding: const EdgeInsets.only(bottom: 100.0),
         child: FloatingActionButton(
           backgroundColor: NGColors.accent,
-          elevation: 0,
-          child: const Icon(Icons.create, color: Colors.white, size: 28),
+          elevation: 8,
+          child: const Icon(Icons.add, color: Colors.white, size: 30),
           onPressed: () {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const GistCreatePost()),
-            ).then((_) => setState(() {}));
+            ).then((_) {
+              _loadGistCount();
+              setState(() {});
+            });
           },
         ),
       ),
@@ -98,17 +158,26 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                 Icon(
                   Icons.error_outline,
                   color: NGColors.textMuted,
-                  size: 48,
+                  size: 56,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Failed to load feed',
+                  'Can\'t load feed right now',
                   style: TextStyle(
                     color: NGColors.textSecondary,
-                    fontSize: 14,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                Text(
+                  'Check your connection and try again',
+                  style: TextStyle(
+                    color: NGColors.textMuted,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () => setState(() {}),
                   style: ElevatedButton.styleFrom(
@@ -116,10 +185,14 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 14,
+                    ),
                   ),
                   child: const Text(
                     'Retry',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -154,23 +227,23 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                 const SizedBox(height: 16),
                 Text(
                   filter == 'trending'
-                      ? 'No trending gist yet'
+                      ? 'Nothing trending yet 🔥'
                       : filter == 'polls'
-                          ? 'No polls yet'
+                          ? 'No polls yet 📊'
                           : 'No gist yet',
                   style: TextStyle(
                     color: NGColors.textSecondary,
                     fontSize: 16,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   filter == 'trending'
-                      ? 'Be the first to start a trend! 🔥'
+                      ? 'Be the first to start a trend!'
                       : filter == 'polls'
-                          ? 'Create a poll and get opinions! 📊'
-                          : 'Be the first to drop gist! 🇳🇬',
+                          ? 'Create a poll and get opinions!'
+                          : 'Drop your first gist now 🇳🇬',
                   style: TextStyle(
                     color: NGColors.textMuted,
                     fontSize: 13,
@@ -182,14 +255,21 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const GistCreatePost()),
-                    ).then((_) => setState(() {}));
+                    ).then((_) {
+                      _loadGistCount();
+                      setState(() {});
+                    });
                   },
-                  icon: const Icon(Icons.add, color: Colors.white),
+                  icon: const Icon(Icons.add, color: Colors.white, size: 18),
                   label: const Text('Drop Gist'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: NGColors.accent,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
                     ),
                   ),
                 ),
@@ -204,17 +284,23 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
 
         return RefreshIndicator(
           color: NGColors.accent,
+          backgroundColor: NGColors.surface,
           onRefresh: () async {
+            _loadGistCount();
             setState(() {});
           },
           child: ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 80),
+            padding: const EdgeInsets.only(top: 8, bottom: 100),
             itemCount: posts.length,
             itemBuilder: (context, index) {
               final post = posts[index];
               return GistPostCard(
                 post: post,
                 service: _service,
+                onPostDeleted: () {
+                  _loadGistCount();
+                  setState(() {});
+                },
               );
             },
           ),
