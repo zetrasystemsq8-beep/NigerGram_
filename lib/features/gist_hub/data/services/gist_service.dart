@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 
 class GistService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final SupabaseClient _supabase = Supabase.instance.client;
 
   // Get feed stream - no ordering to avoid index errors
   Stream<List<Map<String, dynamic>>> getGistFeedStream({required String filter}) {
@@ -55,13 +55,32 @@ class GistService {
         profilePic = '';
       }
 
+      // 🔥 FIX: Use Supabase for images
       String? imageUrl;
       if (imageFile != null) {
-        final path = 'gist_images/${DateTime.now().millisecondsSinceEpoch}_${imageFile.path.split('/').last}';
-        final ref = _storage.ref().child(path);
-        final uploadTask = ref.putFile(imageFile);
-        final snapshot = await uploadTask;
-        imageUrl = await snapshot.ref.getDownloadURL();
+        try {
+          final String filePath = 'gist_images/${DateTime.now().millisecondsSinceEpoch}_${imageFile.path.split('/').last}';
+          
+          final bytes = await imageFile.readAsBytes();
+          await _supabase.storage
+              .from('images')
+              .uploadBinary(
+                filePath,
+                bytes,
+                fileOptions: const FileOptions(
+                  contentType: 'image/jpeg',
+                  upsert: true,
+                ),
+              );
+          
+          imageUrl = _supabase.storage
+              .from('images')
+              .getPublicUrl(filePath);
+              
+        } catch (e) {
+          print('❌ Image upload error: $e');
+          imageUrl = null;
+        }
       }
 
       final postRef = _firestore.collection('gist_posts').doc();
@@ -137,7 +156,6 @@ class GistService {
     }
   }
 
-  // 🔥 FIXED: Removed .orderBy() to avoid index error
   Stream<QuerySnapshot<Map<String, dynamic>>> getCommentsStream(String postId) {
     return _firestore
         .collection('gist_comments')
