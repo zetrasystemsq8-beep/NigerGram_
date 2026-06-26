@@ -545,18 +545,13 @@ class _InboxViewState extends State<InboxView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _NewChatSheet(
-        onUserSelected: (userId) {
-          _startNewChat(userId);
-        },
+      builder: (context) => const _NewChatSheet(
+        onUserSelected: _startNewChat,
       ),
     );
   }
 }
 
-// ============================================================
-// _NewChatSheet - Dedicated widget with proper disposal
-// ============================================================
 class _NewChatSheet extends StatefulWidget {
   final void Function(String userId) onUserSelected;
 
