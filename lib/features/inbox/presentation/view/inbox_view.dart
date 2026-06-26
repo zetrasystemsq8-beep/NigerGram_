@@ -182,7 +182,6 @@ class _InboxViewState extends State<InboxView> {
     return 'Now';
   }
 
-  // 🔥 Robust image widget with error handling
   Widget _buildProfileImage(String imageUrl, double radius) {
     if (imageUrl.isEmpty) {
       return CircleAvatar(
@@ -581,7 +580,6 @@ class _NewChatSheetState extends State<_NewChatSheet> {
     super.dispose();
   }
 
-  // 🔥 Robust image widget with error handling
   Widget _buildProfileImage(String imageUrl, double radius) {
     if (imageUrl.isEmpty) {
       return CircleAvatar(
@@ -670,7 +668,6 @@ class _NewChatSheetState extends State<_NewChatSheet> {
           const SizedBox(height: 16),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              // 🔥 Note: For large scale, replace with server-side search
               stream: _firestore
                   .collection('users')
                   .orderBy('displayName')
