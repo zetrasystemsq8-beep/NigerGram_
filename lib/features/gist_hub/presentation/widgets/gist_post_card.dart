@@ -10,11 +10,13 @@ import 'package:nigergram/features/gist_hub/presentation/widgets/gist_comment_sh
 class GistPostCard extends StatefulWidget {
   final GistPostEntity post;
   final GistService service;
+  final VoidCallback? onPostDeleted;
 
   const GistPostCard({
     super.key,
     required this.post,
     required this.service,
+    this.onPostDeleted,
   });
 
   @override
@@ -23,6 +25,7 @@ class GistPostCard extends StatefulWidget {
 
 class _GistPostCardState extends State<GistPostCard> {
   late GistPostEntity _post;
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -45,7 +48,7 @@ class _GistPostCardState extends State<GistPostCard> {
   }
 
   void _sharePost() {
-    final shareText = '${_post.content}\n\nView on NigerGram: https://nigergram.app/gist/${_post.id}';
+    final shareText = '${_post.content}\n\n🇳🇬 View on NigerGram: https://nigergram.app/gist/${_post.id}';
     Share.share(shareText, subject: 'Check this Gist');
   }
 
@@ -66,6 +69,91 @@ class _GistPostCardState extends State<GistPostCard> {
     }
   }
 
+  int get _totalReactions => _post.reactions.values.fold(0, (sum, val) => sum + val);
+
+  Widget _buildBadge() {
+    if (_totalReactions >= 20) {
+      return Container(
+        margin: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFFD700), Color(0xFFFF6B00)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.emoji_events, color: Colors.white, size: 12),
+            SizedBox(width: 4),
+            Text(
+              'HOT',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (_totalReactions >= 10) {
+      return Container(
+        margin: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: NGColors.accent.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: NGColors.accent.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.whatshot, color: NGColors.accent, size: 12),
+            SizedBox(width: 4),
+            Text(
+              'TRENDING',
+              style: TextStyle(
+                color: NGColors.accent,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (_totalReactions >= 5) {
+      return Container(
+        margin: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.green.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.auto_awesome, color: Colors.green, size: 10),
+            SizedBox(width: 4),
+            Text(
+              'POPULAR',
+              style: TextStyle(
+                color: Colors.green,
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -73,7 +161,13 @@ class _GistPostCardState extends State<GistPostCard> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: NGColors.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _totalReactions >= 20
+              ? const Color(0xFFFFD700).withOpacity(0.2)
+              : Colors.transparent,
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,27 +186,37 @@ class _GistPostCardState extends State<GistPostCard> {
                     : null,
               ),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _post.isAnonymous ? 'Anonymous' : _post.displayName,
-                    style: const TextStyle(
-                      color: NGColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _post.isAnonymous ? 'Anonymous' : _post.displayName,
+                        style: const TextStyle(
+                          color: NGColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  Text(
-                    _post.isAnonymous ? '' : '@${_post.username}',
-                    style: TextStyle(
-                      color: NGColors.textMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+                    if (!_post.isAnonymous) ...[
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          '@${_post.username}',
+                          style: TextStyle(
+                            color: NGColors.textMuted,
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                    _buildBadge(),
+                  ],
+                ),
               ),
-              const Spacer(),
               Text(
                 _formatDate(_post.createdAt),
                 style: TextStyle(
@@ -130,7 +234,7 @@ class _GistPostCardState extends State<GistPostCard> {
             style: const TextStyle(
               color: NGColors.textPrimary,
               fontSize: 15,
-              height: 1.5,
+              height: 1.6,
             ),
           ),
           const SizedBox(height: 12),
@@ -138,12 +242,12 @@ class _GistPostCardState extends State<GistPostCard> {
           // Image
           if (_post.imageUrl != null && _post.imageUrl!.isNotEmpty)
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
               child: CachedNetworkImage(
                 imageUrl: _post.imageUrl!,
                 fit: BoxFit.cover,
                 width: double.infinity,
-                height: 200,
+                height: 220,
                 placeholder: (context, url) => Container(
                   color: NGColors.surfaceLight,
                   child: const Center(
@@ -160,7 +264,7 @@ class _GistPostCardState extends State<GistPostCard> {
             ),
           const SizedBox(height: 12),
 
-          // 🔥 FIXED: Poll with clickable options
+          // Poll
           if (_post.type == 'poll' && (_post.pollOptions?.isNotEmpty ?? false))
             _buildPoll(),
           const SizedBox(height: 12),
@@ -178,7 +282,7 @@ class _GistPostCardState extends State<GistPostCard> {
               const SizedBox(width: 4),
               _buildReactionButton('🇳🇬'),
               const Spacer(),
-              // Comment Button - opens comment sheet
+              // Comment Button
               GestureDetector(
                 onTap: () {
                   showModalBottomSheet(
@@ -233,8 +337,11 @@ class _GistPostCardState extends State<GistPostCard> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: NGColors.surfaceLight,
+          color: count > 0 ? NGColors.accent.withOpacity(0.1) : NGColors.surfaceLight,
           borderRadius: BorderRadius.circular(16),
+          border: count > 0
+              ? Border.all(color: NGColors.accent.withOpacity(0.3))
+              : null,
         ),
         child: Row(
           children: [
@@ -245,10 +352,11 @@ class _GistPostCardState extends State<GistPostCard> {
             if (count > 0) ...[
               const SizedBox(width: 4),
               Text(
-                count.toString(),
+                count > 99 ? '99+' : count.toString(),
                 style: TextStyle(
-                  color: NGColors.textSecondary,
+                  color: count > 0 ? NGColors.accent : NGColors.textSecondary,
                   fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -258,7 +366,6 @@ class _GistPostCardState extends State<GistPostCard> {
     );
   }
 
-  // 🔥 FIXED: Poll with clickable options and vote tracking
   Widget _buildPoll() {
     final pollOptions = _post.pollOptions ?? [];
     final totalVotes = _post.pollVotes.values.fold(0, (sum, val) => sum + val);
@@ -272,26 +379,22 @@ class _GistPostCardState extends State<GistPostCard> {
           final option = entry.value;
           final votes = _post.pollVotes[index.toString()] ?? 0;
           final percentage = totalVotes > 0 ? (votes / totalVotes * 100) : 0;
-          
-          // Check if user already voted for this option
           final hasVoted = _post.pollVotes.containsKey(index.toString());
           
           return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 6),
             child: GestureDetector(
               onTap: () {
-                // If already voted, don't allow voting again
                 if (hasVoted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('You already voted on this poll'),
+                      content: Text('You already voted!'),
                       duration: Duration(seconds: 1),
                     ),
                   );
                   return;
                 }
                 
-                // Cast vote
                 widget.service.castVote(
                   postId: _post.id,
                   choiceIndex: index,
@@ -301,25 +404,27 @@ class _GistPostCardState extends State<GistPostCard> {
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Voted for: $option'),
+                      content: Text('✅ Voted: $option'),
                       duration: const Duration(seconds: 1),
                     ),
                   );
                 }).catchError((e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to vote: $e'),
-                      duration: const Duration(seconds: 2),
+                    const SnackBar(
+                      content: Text('Failed to vote, try again'),
+                      duration: Duration(seconds: 1),
                     ),
                   );
                 });
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: hasVoted ? NGColors.accent.withOpacity(0.2) : NGColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(8),
-                  border: hasVoted ? Border.all(color: NGColors.accent) : null,
+                  color: hasVoted ? NGColors.accent.withOpacity(0.15) : NGColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: hasVoted
+                      ? Border.all(color: NGColors.accent, width: 1.5)
+                      : null,
                 ),
                 child: Row(
                   children: [
@@ -328,20 +433,27 @@ class _GistPostCardState extends State<GistPostCard> {
                         option,
                         style: TextStyle(
                           color: hasVoted ? NGColors.accent : NGColors.textPrimary,
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: hasVoted ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    SizedBox(
-                      width: 40,
-                      child: Text(
-                        '${percentage.toStringAsFixed(0)}%',
-                        style: TextStyle(
-                          color: hasVoted ? NGColors.accent : NGColors.textSecondary,
-                          fontSize: 12,
-                          fontWeight: hasVoted ? FontWeight.bold : FontWeight.normal,
+                    Container(
+                      width: 50,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: hasVoted ? NGColors.accent : NGColors.surface,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${percentage.toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            color: hasVoted ? Colors.white : NGColors.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -351,8 +463,9 @@ class _GistPostCardState extends State<GistPostCard> {
             ),
           );
         }).toList(),
+        const SizedBox(height: 4),
         Text(
-          '${totalVotes} votes',
+          '${totalVotes > 0 ? totalVotes : 0} votes • ${totalVotes > 0 ? (totalVotes == 1 ? '1 person voted' : '$totalVotes people voted') : 'Be the first to vote'}',
           style: TextStyle(
             color: NGColors.textMuted,
             fontSize: 11,
