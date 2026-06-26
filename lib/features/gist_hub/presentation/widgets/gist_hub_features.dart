@@ -85,7 +85,7 @@ class DeleteGistFeature {
         
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('🗑️ Gist deleted'), backgroundColor: Colors.green),
+            const SnackBar(content: Text('🗑️ Gist deleted'), backgroundColor: NGColors.success),
           );
           onDeleted();
         }
@@ -210,7 +210,7 @@ class ReportPostFeature {
         if (existing.docs.isNotEmpty) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('You already reported this post'), backgroundColor: Colors.orange),
+              const SnackBar(content: Text('You already reported this post'), backgroundColor: NGColors.warning),
             );
           }
           return;
@@ -226,7 +226,7 @@ class ReportPostFeature {
         });
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Report submitted'), backgroundColor: Colors.green),
+            const SnackBar(content: Text('✅ Report submitted'), backgroundColor: NGColors.success),
           );
         }
       } catch (e) {
@@ -341,7 +341,7 @@ class ReplyToCommentFeature {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('💬 Reply added!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('💬 Reply added!'), backgroundColor: NGColors.success),
         );
       }
     } catch (e) {
@@ -500,7 +500,7 @@ class GistOfTheDayFeature {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFFD700), Color(0xFFFF6B00)],
+          colors: [NGColors.accentGold, Color(0xFFFF6B00)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -556,7 +556,7 @@ class LiveActivityFeature {
               .where('createdAt', isGreaterThan: oneMinuteAgo)
               .count()
               .get();
-          return snap.count;
+          return snap.count ?? 0; // 👈 FIX: Added ?? 0
         });
   }
 
