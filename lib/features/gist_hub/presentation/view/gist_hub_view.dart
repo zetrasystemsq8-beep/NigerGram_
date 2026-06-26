@@ -37,7 +37,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
         backgroundColor: NGColors.surface,
         elevation: 0,
         title: const Text(
-          'Gist Hub',
+          '🇳🇬 Gist Hub',
           style: TextStyle(
             color: NGColors.textPrimary,
             fontWeight: FontWeight.bold,
@@ -47,29 +47,34 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: NGColors.accent,
+          indicatorWeight: 3,
           labelColor: NGColors.textPrimary,
           unselectedLabelColor: NGColors.textMuted,
+          labelStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
           tabs: const [
-            Tab(text: 'Latest'),
-            Tab(text: 'Trending'),
-            Tab(text: 'Polls'),
+            Tab(text: '🔥 Trending'),
+            Tab(text: '📰 Latest'),
+            Tab(text: '📊 Polls'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildFeed('Latest'),
-          _buildFeed('Trending'),
-          _buildFeed('Polls'),
+          _buildFeed('trending'),
+          _buildFeed('latest'),
+          _buildFeed('polls'),
         ],
       ),
-      // 🔥 FIX: Increased bottom padding to 100.0
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 100.0),
         child: FloatingActionButton(
           backgroundColor: NGColors.accent,
-          child: const Icon(Icons.create, color: Colors.white),
+          elevation: 0,
+          child: const Icon(Icons.create, color: Colors.white, size: 28),
           onPressed: () {
             Navigator.push(
               context,
@@ -85,13 +90,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _service.getGistFeedStream(filter: filter),
       builder: (context, snapshot) {
-        // 🔥 FIX: Print error to console
         if (snapshot.hasError) {
-          print('❌ GIST FEED ERROR: ${snapshot.error}');
-        }
-
-        // 🔥 FIX: Only show error if there's no data
-        if (snapshot.hasError && !snapshot.hasData) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -114,6 +113,9 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                   onPressed: () => setState(() {}),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: NGColors.accent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: const Text(
                     'Retry',
@@ -141,13 +143,21 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.chat_bubble_outline,
+                  filter == 'trending'
+                      ? Icons.whatshot_outlined
+                      : filter == 'polls'
+                          ? Icons.poll_outlined
+                          : Icons.chat_bubble_outline,
                   color: NGColors.textMuted,
-                  size: 48,
+                  size: 56,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No gist yet',
+                  filter == 'trending'
+                      ? 'No trending gist yet'
+                      : filter == 'polls'
+                          ? 'No polls yet'
+                          : 'No gist yet',
                   style: TextStyle(
                     color: NGColors.textSecondary,
                     fontSize: 16,
@@ -156,10 +166,31 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Be the first to drop gist!',
+                  filter == 'trending'
+                      ? 'Be the first to start a trend! 🔥'
+                      : filter == 'polls'
+                          ? 'Create a poll and get opinions! 📊'
+                          : 'Be the first to drop gist! 🇳🇬',
                   style: TextStyle(
                     color: NGColors.textMuted,
                     fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const GistCreatePost()),
+                    ).then((_) => setState(() {}));
+                  },
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text('Drop Gist'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: NGColors.accent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ],
