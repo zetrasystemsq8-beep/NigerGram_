@@ -7,6 +7,7 @@ import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.dart';
 import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
+import 'package:nigergram/features/inbox/presentation/view/inbox_view.dart'; // ✅ ADD THIS
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -22,7 +23,7 @@ class _DashboardViewState extends State<DashboardView> {
     const VideoFeedView(),
     const GistHubView(),
     const SizedBox(),
-    const _InboxPlaceholder(),
+    const InboxView(), // ✅ CHANGED: Replaced _InboxPlaceholder
     const ProfileView(),
   ];
 
@@ -224,19 +225,4 @@ class _DashboardViewState extends State<DashboardView> {
   }
 }
 
-class _InboxPlaceholder extends StatelessWidget {
-  const _InboxPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Text(
-          'Inbox',
-          style: TextStyle(color: Colors.white, fontSize: 18),
-        ),
-      ),
-    );
-  }
-}
+// ✅ REMOVED _InboxPlaceholder - no longer needed
