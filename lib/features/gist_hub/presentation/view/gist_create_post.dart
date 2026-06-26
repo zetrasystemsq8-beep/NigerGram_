@@ -87,7 +87,7 @@ class _GistCreatePostState extends State<GistCreatePost> {
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gist posted! 🎉')),
+          const SnackBar(content: Text('🎉 Gist posted!')),
         );
       }
     } catch (e) {
@@ -108,7 +108,7 @@ class _GistCreatePostState extends State<GistCreatePost> {
       appBar: AppBar(
         backgroundColor: NGColors.surface,
         title: const Text(
-          'Drop Gist',
+          '🇳🇬 Drop Gist',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
@@ -119,6 +119,7 @@ class _GistCreatePostState extends State<GistCreatePost> {
               style: TextStyle(
                 color: _isLoading ? Colors.grey : NGColors.accent,
                 fontWeight: FontWeight.bold,
+                fontSize: 15,
               ),
             ),
           ),
@@ -131,18 +132,18 @@ class _GistCreatePostState extends State<GistCreatePost> {
           children: [
             Row(
               children: [
-                _buildTypeButton('Text', 'text'),
+                _buildTypeButton('📝 Text', 'text'),
                 const SizedBox(width: 8),
-                _buildTypeButton('Image', 'image'),
+                _buildTypeButton('🖼️ Image', 'image'),
                 const SizedBox(width: 8),
-                _buildTypeButton('Poll', 'poll'),
+                _buildTypeButton('📊 Poll', 'poll'),
               ],
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _contentController,
               maxLines: 5,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white, fontSize: 15),
               decoration: InputDecoration(
                 hintText: 'What\'s the gist?',
                 hintStyle: TextStyle(color: NGColors.textMuted),
@@ -152,6 +153,7 @@ class _GistCreatePostState extends State<GistCreatePost> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
+                contentPadding: const EdgeInsets.all(16),
               ),
             ),
             const SizedBox(height: 16),
@@ -189,7 +191,7 @@ class _GistCreatePostState extends State<GistCreatePost> {
                     child: const Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.add_photo_alternate, color: NGColors.textMuted),
+                        Icon(Icons.add_photo_alternate, color: NGColors.textMuted, size: 40),
                         SizedBox(height: 8),
                         Text(
                           'Tap to add image',
@@ -240,10 +242,12 @@ class _GistCreatePostState extends State<GistCreatePost> {
                   onChanged: (val) => setState(() => _isAnonymous = val),
                   activeColor: NGColors.accent,
                 ),
+                const SizedBox(width: 8),
                 Text(
-                  'Post anonymously',
+                  'Post anonymously 🕵️',
                   style: TextStyle(
                     color: _isAnonymous ? NGColors.accent : NGColors.textMuted,
+                    fontWeight: _isAnonymous ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
               ],
@@ -260,10 +264,10 @@ class _GistCreatePostState extends State<GistCreatePost> {
       child: GestureDetector(
         onTap: () => setState(() => _postType = type),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: isSelected ? NGColors.accent : NGColors.surface,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Center(
             child: Text(
@@ -271,6 +275,7 @@ class _GistCreatePostState extends State<GistCreatePost> {
               style: TextStyle(
                 color: isSelected ? Colors.white : NGColors.textMuted,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13,
               ),
             ),
           ),
