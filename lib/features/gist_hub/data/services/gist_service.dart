@@ -13,9 +13,7 @@ class GistService {
     Query<Map<String, dynamic>> query = _firestore.collection('gist_posts');
 
     if (filter == 'trending') {
-      // Trending: by total reactions count
-      // Use the sum of all reaction emojis
-      query = query.orderBy('reactions.😂', descending: true);
+      query = query.orderBy('totalReactions', descending: true);
     } else if (filter == 'polls') {
       query = query.where('type', isEqualTo: 'poll');
     } else {
@@ -89,6 +87,16 @@ class GistService {
 
       final postRef = _firestore.collection('gist_posts').doc();
       final now = FieldValue.serverTimestamp();
+      
+      // 🔥 FIX: Dynamic poll votes based on number of options
+      final expiryDate = DateTime.now().add(const Duration(days: 7));
+      final int optionCount = pollOptions?.length ?? 0;
+      final Map<String, int> initialPollVotes = {};
+      for (int i = 0; i < optionCount; i++) {
+        initialPollVotes[i.toString()] = 0;
+      }
+      final Map<String, int> initialPollVoters = {};
+      
       final initialReactions = {
         "😂": 0,
         "😱": 0,
@@ -96,8 +104,6 @@ class GistService {
         "🥴": 0,
         "🇳🇬": 0,
       };
-
-      final Map<String, int> initialPollVotes = {"0": 0, "1": 0};
 
       await postRef.set({
         'userId': userId,
@@ -109,10 +115,13 @@ class GistService {
         'imageUrl': imageUrl,
         'pollOptions': pollOptions,
         'pollVotes': initialPollVotes,
+        'pollVoters': initialPollVoters,
         'reactions': initialReactions,
         'commentCount': 0,
         'createdAt': now,
+        'expiresAt': type == 'poll' ? Timestamp.fromDate(expiryDate) : null,
         'isAnonymous': isAnonymous,
+        'totalReactions': 0,
       });
     } catch (e) {
       rethrow;
@@ -129,10 +138,18 @@ class GistService {
         final snapshot = await tx.get(postRef);
         if (!snapshot.exists) throw Exception('Post not found');
         final data = snapshot.data() as Map<String, dynamic>;
-        final Map<String, dynamic> reactions = (data['reactions'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k.toString(), v ?? 0)) ?? {};
-        final current = (reactions[emoji] is int) ? reactions[emoji] as int : int.tryParse(reactions[emoji]?.toString() ?? '0') ?? 0;
-        reactions[emoji] = current + 1;
-        tx.update(postRef, {'reactions': reactions});
+        final reactions = Map<String, int>.from(data['reactions'] ?? {});
+        reactions[emoji] = (reactions[emoji] ?? 0) + 1;
+        
+        int total = 0;
+        reactions.forEach((key, value) {
+          total += value;
+        });
+        
+        tx.update(postRef, {
+          'reactions': reactions,
+          'totalReactions': total,
+        });
       });
     } catch (e) {
       rethrow;
@@ -144,14 +161,32 @@ class GistService {
     required int choiceIndex,
   }) async {
     final postRef = _firestore.collection('gist_posts').doc(postId);
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not logged in');
+    
     try {
-      final doc = await postRef.get();
-      if (!doc.exists) throw Exception('Post not found');
-      final data = doc.data() as Map<String, dynamic>;
-      final pollVotes = Map<String, int>.from(data['pollVotes'] ?? {'0': 0, '1': 0});
-      final key = choiceIndex.toString();
-      pollVotes[key] = (pollVotes[key] ?? 0) + 1;
-      await postRef.update({'pollVotes': pollVotes});
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(postRef);
+        if (!snapshot.exists) throw Exception('Post not found');
+        
+        final data = snapshot.data() as Map<String, dynamic>;
+        
+        final voters = Map<String, int>.from(data['pollVoters'] ?? {});
+        if (voters.containsKey(user.uid)) {
+          throw Exception('You already voted');
+        }
+        
+        final pollVotes = Map<String, int>.from(data['pollVotes'] ?? {});
+        final key = choiceIndex.toString();
+        pollVotes[key] = (pollVotes[key] ?? 0) + 1;
+        
+        voters[user.uid] = choiceIndex;
+        
+        transaction.update(postRef, {
+          'pollVotes': pollVotes,
+          'pollVoters': voters,
+        });
+      });
     } catch (e) {
       rethrow;
     }
