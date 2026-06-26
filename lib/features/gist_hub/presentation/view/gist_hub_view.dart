@@ -64,15 +64,19 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
           _buildFeed('Polls'),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: NGColors.accent,
-        child: const Icon(Icons.create, color: Colors.white),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const GistCreatePost()),
-          ).then((_) => setState(() {}));
-        },
+      // 🔥 FIX: Increased bottom padding to 100.0
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 100.0),
+        child: FloatingActionButton(
+          backgroundColor: NGColors.accent,
+          child: const Icon(Icons.create, color: Colors.white),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const GistCreatePost()),
+            ).then((_) => setState(() {}));
+          },
+        ),
       ),
     );
   }
@@ -81,7 +85,13 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _service.getGistFeedStream(filter: filter),
       builder: (context, snapshot) {
+        // 🔥 FIX: Print error to console
         if (snapshot.hasError) {
+          print('❌ GIST FEED ERROR: ${snapshot.error}');
+        }
+
+        // 🔥 FIX: Only show error if there's no data
+        if (snapshot.hasError && !snapshot.hasData) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
