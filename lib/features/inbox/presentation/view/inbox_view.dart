@@ -545,8 +545,10 @@ class _InboxViewState extends State<InboxView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const _NewChatSheet(
-        onUserSelected: _startNewChat,
+      builder: (context) => _NewChatSheet(
+        onUserSelected: (userId) {
+          _startNewChat(userId);
+        },
       ),
     );
   }
