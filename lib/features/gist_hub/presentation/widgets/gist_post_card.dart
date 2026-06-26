@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_comment_sheet.dart';
+import 'package:nigergram/features/gist_hub/presentation/widgets/gist_hub_features.dart';
 
 class GistPostCard extends StatefulWidget {
   final GistPostEntity post;
@@ -25,12 +28,23 @@ class GistPostCard extends StatefulWidget {
 
 class _GistPostCardState extends State<GistPostCard> {
   late GistPostEntity _post;
-  bool _isDeleting = false;
+  bool _isSaved = false;
+  final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   void initState() {
     super.initState();
     _post = widget.post;
+    _checkIfSaved();
+  }
+
+  void _checkIfSaved() async {
+    if (_currentUserId.isNotEmpty) {
+      final saved = await SaveGistFeature.isPostSaved(_currentUserId, _post.id);
+      setState(() {
+        _isSaved = saved;
+      });
+    }
   }
 
   void _addReaction(String emoji) {
@@ -266,7 +280,7 @@ class _GistPostCardState extends State<GistPostCard> {
 
           // Poll
           if (_post.type == 'poll' && (_post.pollOptions?.isNotEmpty ?? false))
-            _buildPoll(),
+            _buildPremiumPoll(),
           const SizedBox(height: 12),
 
           // Reactions & Actions
@@ -366,112 +380,312 @@ class _GistPostCardState extends State<GistPostCard> {
     );
   }
 
-  Widget _buildPoll() {
+  Widget _buildPremiumPoll() {
     final pollOptions = _post.pollOptions ?? [];
     final totalVotes = _post.pollVotes.values.fold(0, (sum, val) => sum + val);
     
-    if (pollOptions.isEmpty) return const SizedBox.shrink();
+    // Check if CURRENT USER voted
+    final bool hasVoted = _post.pollVoters.containsKey(_currentUserId);
+    final int? votedIndex = hasVoted ? _post.pollVoters[_currentUserId] : null;
     
-    return Column(
-      children: [
-        ...pollOptions.asMap().entries.map((entry) {
-          final index = entry.key;
-          final option = entry.value;
-          final votes = _post.pollVotes[index.toString()] ?? 0;
-          final percentage = totalVotes > 0 ? (votes / totalVotes * 100) : 0;
-          final hasVoted = _post.pollVotes.containsKey(index.toString());
-          
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: GestureDetector(
-              onTap: () {
-                if (hasVoted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('You already voted!'),
-                      duration: Duration(seconds: 1),
+    String getTimeRemaining() {
+      if (_post.expiresAt == null) return '7 days left';
+      final expiry = _post.expiresAt!.toDate();
+      final now = DateTime.now();
+      final diff = expiry.difference(now);
+      if (diff.inDays > 0) return '${diff.inDays}d left';
+      if (diff.inHours > 0) return '${diff.inHours}h left';
+      if (diff.inMinutes > 0) return '${diff.inMinutes}m left';
+      return 'Expired';
+    }
+    
+    if (pollOptions.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: NGColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: NGColors.divider.withOpacity(0.3),
+        ),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Poll header
+          Row(
+            children: [
+              const Text(
+                '📊 Poll',
+                style: TextStyle(
+                  color: NGColors.accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (totalVotes > 10)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: NGColors.accentGold.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: NGColors.accentGold.withOpacity(0.3),
                     ),
-                  );
-                  return;
-                }
-                
-                widget.service.castVote(
-                  postId: _post.id,
-                  choiceIndex: index,
-                ).then((_) {
-                  setState(() {
-                    _post.pollVotes[index.toString()] = votes + 1;
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('✅ Voted: $option'),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
-                }).catchError((e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to vote, try again'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.whatshot, color: NGColors.accentGold, size: 10),
+                      SizedBox(width: 4),
+                      Text(
+                        'Hot',
+                        style: TextStyle(
+                          color: NGColors.accentGold,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: hasVoted ? NGColors.accent.withOpacity(0.15) : NGColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(10),
-                  border: hasVoted
-                      ? Border.all(color: NGColors.accent, width: 1.5)
-                      : null,
+                  color: NGColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: Text(
-                        option,
-                        style: TextStyle(
-                          color: hasVoted ? NGColors.accent : NGColors.textPrimary,
-                          fontSize: 14,
-                          fontWeight: hasVoted ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                      ),
+                    Icon(
+                      Icons.access_time,
+                      color: NGColors.textMuted,
+                      size: 10,
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      width: 50,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: hasVoted ? NGColors.accent : NGColors.surface,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${percentage.toStringAsFixed(0)}%',
-                          style: TextStyle(
-                            color: hasVoted ? Colors.white : NGColors.textSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                    const SizedBox(width: 4),
+                    Text(
+                      getTimeRemaining(),
+                      style: TextStyle(
+                        color: NGColors.textMuted,
+                        fontSize: 9,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          );
-        }).toList(),
-        const SizedBox(height: 4),
-        Text(
-          '${totalVotes > 0 ? totalVotes : 0} votes • ${totalVotes > 0 ? (totalVotes == 1 ? '1 person voted' : '$totalVotes people voted') : 'Be the first to vote'}',
-          style: TextStyle(
-            color: NGColors.textMuted,
-            fontSize: 11,
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          
+          // Poll options
+          ...pollOptions.asMap().entries.map((entry) {
+            final index = entry.key;
+            final option = entry.value;
+            final votes = _post.pollVotes[index.toString()] ?? 0;
+            final percentage = totalVotes > 0 ? (votes / totalVotes * 100) : 0;
+            final bool isSelected = hasVoted && votedIndex == index;
+            
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    if (hasVoted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('You already voted!'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                      return;
+                    }
+                    
+                    HapticFeedback.mediumImpact();
+                    
+                    widget.service.castVote(
+                      postId: _post.id,
+                      choiceIndex: index,
+                    ).then((_) {
+                      // Refresh from Firestore via parent
+                      setState(() {});
+                    }).catchError((e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to vote: ${e.toString()}'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOut,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? NGColors.accent.withOpacity(0.12)
+                          : NGColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? NGColors.accent
+                            : NGColors.divider.withOpacity(0.3),
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? NGColors.accent
+                                    : Colors.transparent,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? NGColors.accent
+                                      : NGColors.textMuted,
+                                  width: isSelected ? 0 : 2,
+                                ),
+                              ),
+                              child: isSelected
+                                  ? const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 14,
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(
+                                option,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? NGColors.accent
+                                      : NGColors.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${percentage.toStringAsFixed(0)}%',
+                              style: TextStyle(
+                                color: isSelected
+                                    ? NGColors.accent
+                                    : NGColors.textSecondary,
+                                fontSize: 16,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: totalVotes > 0 ? votes / totalVotes : 0,
+                            minHeight: 8,
+                            backgroundColor: NGColors.divider.withOpacity(0.2),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isSelected
+                                  ? NGColors.accent
+                                  : NGColors.accent.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Text(
+                              '$votes ${votes == 1 ? 'vote' : 'votes'}',
+                              style: TextStyle(
+                                color: NGColors.textMuted,
+                                fontSize: 11,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (isSelected)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: NGColors.accent.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: NGColors.accent,
+                                      size: 12,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Voted',
+                                      style: TextStyle(
+                                        color: NGColors.accent,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+          
+          const SizedBox(height: 12),
+          
+          // Poll footer
+          Row(
+            children: [
+              Icon(
+                Icons.people_outline,
+                color: NGColors.textMuted,
+                size: 14,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                totalVotes > 0
+                    ? '${totalVotes > 1000 ? '${(totalVotes / 1000).toStringAsFixed(1)}K' : totalVotes} ${totalVotes == 1 ? 'person voted' : 'people voted'}'
+                    : 'Be the first to vote',
+                style: TextStyle(
+                  color: NGColors.textMuted,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
