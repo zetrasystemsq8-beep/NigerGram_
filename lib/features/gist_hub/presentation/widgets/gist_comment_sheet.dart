@@ -28,7 +28,7 @@ class _GistCommentSheetState extends State<GistCommentSheet> {
     final user = _auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login to comment')),
+        const SnackBar(content: Text('Please login first')),
       );
       return;
     }
@@ -43,11 +43,13 @@ class _GistCommentSheetState extends State<GistCommentSheet> {
         postId: widget.postId,
         text: text,
       );
-      
       _commentController.clear();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Comment added!')),
+          const SnackBar(
+            content: Text('💬 Comment added!'),
+            backgroundColor: NGColors.success,
+          ),
         );
       }
     } catch (e) {
@@ -79,7 +81,7 @@ class _GistCommentSheetState extends State<GistCommentSheet> {
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
         color: NGColors.background,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
@@ -94,7 +96,7 @@ class _GistCommentSheetState extends State<GistCommentSheet> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Comments',
+            '💬 Comments',
             style: TextStyle(
               color: NGColors.textPrimary,
               fontSize: 18,
@@ -132,6 +134,11 @@ class _GistCommentSheetState extends State<GistCommentSheet> {
                         Text(
                           'No comments yet',
                           style: TextStyle(color: NGColors.textSecondary, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Be the first to comment!',
+                          style: TextStyle(color: NGColors.textMuted, fontSize: 12),
                         ),
                       ],
                     ),
