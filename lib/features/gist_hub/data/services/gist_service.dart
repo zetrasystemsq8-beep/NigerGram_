@@ -80,7 +80,7 @@ class GistService {
               .from('images')
               .getPublicUrl(filePath);
         } catch (e) {
-          debugPrint('❌ Image upload error: $e');
+          print('❌ Image upload error: $e');
           imageUrl = null;
         }
       }
