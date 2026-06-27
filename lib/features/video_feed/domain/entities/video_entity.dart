@@ -1,4 +1,6 @@
 // lib/features/video_feed/domain/entities/video_entity.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class VideoEntity {
   final String id;
   final String videoUrl;
