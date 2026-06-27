@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import 'video_feed_view_optimized_video_player.dart';
 import 'video_feed_view_interaction_buttons.dart';
 import 'comments_viewer_bottom_sheet.dart';
+import 'video_share_bottom_sheet.dart'; // ✅ NEW IMPORT
 
 class VideoFeedViewItem extends StatefulWidget {
   final VideoEntity videoItem;
@@ -92,7 +93,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     );
   }
 
-  /// 🔗 SHARE ACTION
+  /// 🔗 OLD SHARE ACTION (keep if needed)
   void _executePlatformShareAction(BuildContext context) {
     HapticFeedback.lightImpact();
     final String shareUrl = "https://nigergram.app/video/${widget.videoItem.id}";
@@ -111,6 +112,21 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     } catch (e) {
       debugPrint('Share error: $e');
     }
+  }
+
+  /// 🔗 NEW SHARE SHEET (Premium Upgrade)
+  void _showShareBottomSheet(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => VideoShareBottomSheet(
+        videoId: widget.videoItem.id,
+        username: widget.videoItem.username,
+        description: widget.videoItem.description,
+      ),
+    );
   }
 
   /// ❤️ HANDLE LIKE WITH ANIMATION
@@ -526,7 +542,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
               creatorId: widget.videoItem.creatorId,
               creatorUsername: widget.videoItem.username,
               onCommentTapped: () => _openCommentsModalSheet(context),
-              onShareTapped: () => _executePlatformShareAction(context),
+              onShareTapped: () => _showShareBottomSheet(context), // ✅ UPGRADED
               onBookmarkTapped: () => _handleBookmark(),
             ),
           ),
