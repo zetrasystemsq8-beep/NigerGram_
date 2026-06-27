@@ -55,7 +55,7 @@ class _InboxViewState extends State<InboxView> {
       final userDoc = await _firestore.collection('users').doc(otherUserId).get();
       final displayName = userDoc.data()?['displayName'] ?? 'User';
       final profilePic = userDoc.data()?['profilePicUrl'] ?? '';
-      
+
       try {
         await _firestore.collection('chats').doc(chatId).update({
           'participantData.${otherUserId}.displayName': displayName,
@@ -100,7 +100,7 @@ class _InboxViewState extends State<InboxView> {
       final userDoc = await _firestore.collection('users').doc(otherUserId).get();
       final displayName = userDoc.data()?['displayName'] ?? 'User';
       final profilePic = userDoc.data()?['profilePicUrl'] ?? '';
-      
+
       final chatId = _getChatId(_currentUserId, otherUserId);
       final chatDoc = await _firestore.collection('chats').doc(chatId).get();
 
@@ -110,9 +110,9 @@ class _InboxViewState extends State<InboxView> {
       }
 
       final currentUserData = await _firestore.collection('users').doc(_currentUserId).get();
-      final currentDisplayName = currentUserData.data()?['displayName'] ?? 
+      final currentDisplayName = currentUserData.data()?['displayName'] ??
           FirebaseAuth.instance.currentUser?.displayName ?? 'You';
-      final currentProfilePic = currentUserData.data()?['profilePicUrl'] ?? 
+      final currentProfilePic = currentUserData.data()?['profilePicUrl'] ??
           FirebaseAuth.instance.currentUser?.photoURL ?? '';
 
       await _firestore.collection('chats').doc(chatId).set({
@@ -161,9 +161,7 @@ class _InboxViewState extends State<InboxView> {
 
   int _getUnreadCount(Map<String, dynamic> chat) {
     final unread = chat['unreadCount']?[_currentUserId];
-    if (unread is num) {
-      return unread.toInt();
-    }
+    if (unread is num) return unread.toInt();
     return 0;
   }
 
@@ -186,7 +184,6 @@ class _InboxViewState extends State<InboxView> {
         child: Icon(Icons.person, color: NGColors.textMuted, size: radius * 1.2),
       );
     }
-
     return ClipOval(
       child: CachedNetworkImage(
         imageUrl: imageUrl,
@@ -199,10 +196,7 @@ class _InboxViewState extends State<InboxView> {
           child: const SizedBox(
             width: 20,
             height: 20,
-            child: CircularProgressIndicator(
-              color: NGColors.accent,
-              strokeWidth: 2,
-            ),
+            child: CircularProgressIndicator(color: NGColors.accent, strokeWidth: 2),
           ),
         ),
         errorWidget: (context, url, error) => CircleAvatar(
@@ -252,7 +246,7 @@ class _InboxViewState extends State<InboxView> {
                     style: const TextStyle(color: NGColors.textPrimary),
                     decoration: InputDecoration(
                       hintText: 'Search conversations...',
-                      hintStyle: TextStyle(color: NGColors.textMuted),
+                      hintStyle: const TextStyle(color: NGColors.textMuted),
                       prefixIcon: const Icon(Icons.search, color: NGColors.textMuted),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
@@ -274,18 +268,16 @@ class _InboxViewState extends State<InboxView> {
                 ),
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
-                    // 🔥 FIX: No .orderBy() - no index needed!
                     stream: _firestore
                         .collection('chats')
                         .where('participants', arrayContains: _currentUserId)
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
-                        final error = snapshot.error.toString();
                         return Center(
                           child: Text(
-                            'Error loading chats: $error',
-                            style: TextStyle(color: NGColors.textMuted),
+                            'Error loading chats: ${snapshot.error}',
+                            style: const TextStyle(color: NGColors.textMuted),
                           ),
                         );
                       }
@@ -297,24 +289,18 @@ class _InboxViewState extends State<InboxView> {
                       }
 
                       final docs = snapshot.data!.docs;
-                      if (docs.isEmpty) {
-                        return _buildEmptyState();
-                      }
+                      if (docs.isEmpty) return _buildEmptyState();
 
-                      // 🔥 FIX: Sort manually in memory (no index needed!)
                       final sortedDocs = List<QueryDocumentSnapshot>.from(docs);
                       sortedDocs.sort((a, b) {
                         final aData = a.data() as Map<String, dynamic>;
                         final bData = b.data() as Map<String, dynamic>;
                         final aTime = aData['lastMessageTime'] as Timestamp?;
                         final bTime = bData['lastMessageTime'] as Timestamp?;
-                        
-                        // Handle null timestamps - put them at the bottom
                         if (aTime == null && bTime == null) return 0;
                         if (aTime == null) return 1;
                         if (bTime == null) return -1;
-                        
-                        return bTime.compareTo(aTime); // Latest first
+                        return bTime.compareTo(aTime);
                       });
 
                       final chatList = sortedDocs.map((doc) {
@@ -342,11 +328,11 @@ class _InboxViewState extends State<InboxView> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.search_off, color: NGColors.textMuted, size: 48),
+                              const Icon(Icons.search_off, color: NGColors.textMuted, size: 48),
                               const SizedBox(height: 16),
                               Text(
                                 'No results for "$_searchQuery"',
-                                style: TextStyle(color: NGColors.textSecondary),
+                                style: const TextStyle(color: NGColors.textSecondary),
                               ),
                             ],
                           ),
@@ -373,7 +359,6 @@ class _InboxViewState extends State<InboxView> {
                           final profilePic = otherUserData['profilePic'] ?? '';
                           final lastMessage = chat['lastMessage'] ?? 'Start chatting...';
                           final lastMessageTime = chat['lastMessageTime'] as Timestamp?;
-                          
                           final unreadCount = _getUnreadCount(chat);
 
                           return GestureDetector(
@@ -381,9 +366,7 @@ class _InboxViewState extends State<InboxView> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               decoration: BoxDecoration(
-                                color: unreadCount > 0
-                                    ? NGColors.surface
-                                    : Colors.transparent,
+                                color: unreadCount > 0 ? NGColors.surface : Colors.transparent,
                                 border: Border(
                                   bottom: BorderSide(
                                     color: NGColors.divider.withOpacity(0.3),
@@ -415,7 +398,7 @@ class _InboxViewState extends State<InboxView> {
                                             ),
                                             Text(
                                               _formatTime(lastMessageTime),
-                                              style: TextStyle(
+                                              style: const TextStyle(
                                                 color: NGColors.textMuted,
                                                 fontSize: 11,
                                               ),
@@ -467,7 +450,7 @@ class _InboxViewState extends State<InboxView> {
                                       ],
                                     ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
                           );
@@ -494,13 +477,9 @@ class _InboxViewState extends State<InboxView> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.chat_bubble_outline,
-            color: NGColors.textMuted,
-            size: 64,
-          ),
+          const Icon(Icons.chat_bubble_outline, color: NGColors.textMuted, size: 64),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             'No messages yet',
             style: TextStyle(
               color: NGColors.textSecondary,
@@ -509,12 +488,9 @@ class _InboxViewState extends State<InboxView> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'Start a conversation with someone!',
-            style: TextStyle(
-              color: NGColors.textMuted,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: NGColors.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
@@ -523,9 +499,7 @@ class _InboxViewState extends State<InboxView> {
             label: const Text('Find People'),
             style: ElevatedButton.styleFrom(
               backgroundColor: NGColors.accent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ],
@@ -548,10 +522,7 @@ class _InboxViewState extends State<InboxView> {
 
 class _NewChatSheet extends StatefulWidget {
   final void Function(String userId) onUserSelected;
-
-  const _NewChatSheet({
-    required this.onUserSelected,
-  });
+  const _NewChatSheet({required this.onUserSelected});
 
   @override
   State<_NewChatSheet> createState() => _NewChatSheetState();
@@ -563,7 +534,6 @@ class _NewChatSheetState extends State<_NewChatSheet> {
   String _searchQuery = '';
 
   String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
-  bool get _isUserLoggedIn => _currentUserId.isNotEmpty;
 
   @override
   void dispose() {
@@ -579,7 +549,6 @@ class _NewChatSheetState extends State<_NewChatSheet> {
         child: Icon(Icons.person, color: NGColors.textMuted, size: radius * 1.2),
       );
     }
-
     return ClipOval(
       child: CachedNetworkImage(
         imageUrl: imageUrl,
@@ -592,10 +561,7 @@ class _NewChatSheetState extends State<_NewChatSheet> {
           child: const SizedBox(
             width: 20,
             height: 20,
-            child: CircularProgressIndicator(
-              color: NGColors.accent,
-              strokeWidth: 2,
-            ),
+            child: CircularProgressIndicator(color: NGColors.accent, strokeWidth: 2),
           ),
         ),
         errorWidget: (context, url, error) => CircleAvatar(
@@ -641,7 +607,7 @@ class _NewChatSheetState extends State<_NewChatSheet> {
             style: const TextStyle(color: NGColors.textPrimary),
             decoration: InputDecoration(
               hintText: 'Search by name or username...',
-              hintStyle: TextStyle(color: NGColors.textMuted),
+              hintStyle: const TextStyle(color: NGColors.textMuted),
               prefixIcon: const Icon(Icons.search, color: NGColors.textMuted),
               filled: true,
               fillColor: NGColors.surface,
@@ -650,11 +616,7 @@ class _NewChatSheetState extends State<_NewChatSheet> {
                 borderSide: BorderSide.none,
               ),
             ),
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value.toLowerCase();
-              });
-            },
+            onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -672,7 +634,6 @@ class _NewChatSheetState extends State<_NewChatSheet> {
                 }
 
                 final docs = snapshot.data!.docs;
-                
                 final filteredDocs = _searchQuery.isEmpty
                     ? docs
                     : docs.where((doc) {
@@ -687,13 +648,11 @@ class _NewChatSheetState extends State<_NewChatSheet> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.person_off, color: NGColors.textMuted, size: 48),
+                        const Icon(Icons.person_off, color: NGColors.textMuted, size: 48),
                         const SizedBox(height: 12),
                         Text(
-                          _searchQuery.isEmpty
-                              ? 'No users found'
-                              : 'No results for "$_searchQuery"',
-                          style: TextStyle(color: NGColors.textSecondary),
+                          _searchQuery.isEmpty ? 'No users found' : 'No results for "$_searchQuery"',
+                          style: const TextStyle(color: NGColors.textSecondary),
                         ),
                       ],
                     ),
@@ -706,23 +665,14 @@ class _NewChatSheetState extends State<_NewChatSheet> {
                     final doc = filteredDocs[index];
                     final data = doc.data() as Map<String, dynamic>;
                     final userId = doc.id;
-                    
                     if (userId == _currentUserId) return const SizedBox.shrink();
-
                     final displayName = data['displayName'] ?? 'User';
                     final username = data['username'] ?? 'user';
                     final profilePic = data['profilePicUrl'] ?? '';
-
                     return ListTile(
                       leading: _buildProfileImage(profilePic, 22),
-                      title: Text(
-                        displayName,
-                        style: const TextStyle(color: NGColors.textPrimary),
-                      ),
-                      subtitle: Text(
-                        '@$username',
-                        style: TextStyle(color: NGColors.textMuted, fontSize: 12),
-                      ),
+                      title: Text(displayName, style: const TextStyle(color: NGColors.textPrimary)),
+                      subtitle: Text('@$username', style: const TextStyle(color: NGColors.textMuted, fontSize: 12)),
                       onTap: () {
                         Navigator.pop(context);
                         widget.onUserSelected(userId);
