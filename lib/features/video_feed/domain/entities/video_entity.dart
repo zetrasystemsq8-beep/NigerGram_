@@ -42,7 +42,6 @@ class VideoEntity {
     required this.createdAt,
   });
 
-  // Factory method to create from Firestore
   factory VideoEntity.fromFirestore(
     DocumentSnapshot doc, {
     bool? isLiked,
