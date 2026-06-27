@@ -1,10 +1,11 @@
+// lib/features/upload/presentation/view/upload_view.dart
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/media/repository/media_repository.dart';
 
 class UploadPage extends StatefulWidget {
@@ -29,7 +30,7 @@ class _UploadPageState extends State<UploadPage> {
 
   final MediaRepository _mediaRepository = MediaRepository();
 
-  double _qualitySlider = 1.0; // 0=Low,1=Medium,2=High
+  double _qualitySlider = 1.0;
 
   @override
   void dispose() {
@@ -75,9 +76,9 @@ class _UploadPageState extends State<UploadPage> {
     if (_videoFile == null) return;
     if (_descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add a description'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('Please add a description'),
+          backgroundColor: NGColors.error,
         ),
       );
       return;
@@ -99,30 +100,27 @@ class _UploadPageState extends State<UploadPage> {
       final videoFileName = '${user.uid}_$timestamp.mp4';
       final supabase = Supabase.instance.client;
 
-      // Show an immediate snackbar so testers can see compression started
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Compression started — Media Engine ACTIVE'),
-        duration: Duration(seconds: 2),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Compression started — Media Engine ACTIVE'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: NGColors.accent,
+        ),
+      );
 
-      // Use MediaRepository to compress on-device, upload in a single-shot, and
-      // delete the original cached file after successful upload. Pass chosen quality.
       await _mediaRepository.compressUploadAndCleanup(
         _videoFile!,
         videoFileName,
         onCompressProgress: (p) {
-          // Map compress progress to 0.05 -> 0.35
           setState(() => _uploadProgress = 0.05 + (p * 0.3));
         },
         onUploadProgress: (p) {
-          // Map upload progress to 0.35 -> 1.0
           setState(() => _uploadProgress = 0.35 + (p * 0.65));
         },
         bucketName: 'videos',
         quality: _qualitySlider.toInt(),
       );
 
-      // After successful upload, get public URL and create Firestore doc
       setState(() => _uploadProgress = 0.95);
 
       final videoUrl = supabase.storage.from('videos').getPublicUrl(videoFileName);
@@ -139,7 +137,6 @@ class _UploadPageState extends State<UploadPage> {
           .where((t) => t.startsWith('#'))
           .toList();
 
-      // Firestore document matches the absolute clean model schema
       await FirebaseFirestore.instance.collection('videos').add({
         'videoUrl': videoUrl,
         'description': _descriptionController.text.trim(),
@@ -159,9 +156,9 @@ class _UploadPageState extends State<UploadPage> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Video posted to NigerGram!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('🎉 Video posted to NigerGram!'),
+            backgroundColor: NGColors.success,
           ),
         );
       }
@@ -171,7 +168,7 @@ class _UploadPageState extends State<UploadPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: NGColors.error,
           ),
         );
       }
@@ -181,12 +178,12 @@ class _UploadPageState extends State<UploadPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: NGColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: NGColors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: Icon(Icons.close, color: NGColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
@@ -194,17 +191,17 @@ class _UploadPageState extends State<UploadPage> {
           children: [
             Container(
               padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: Colors.red,
+              decoration: BoxDecoration(
+                color: NGColors.accent,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.blur_on_rounded, color: Colors.white, size: 14),
+              child: Icon(Icons.blur_on_rounded, color: NGColors.textPrimary, size: 14),
             ),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'ZETRA LAB ENGINE',
               style: TextStyle(
-                color: Colors.white,
+                color: NGColors.textPrimary,
                 fontWeight: FontWeight.w900,
                 fontSize: 14,
                 letterSpacing: 1.0,
@@ -222,31 +219,45 @@ class _UploadPageState extends State<UploadPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Small active banner so it's obvious this build contains the new media engine
+                  // Media Engine Banner
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade900,
+                      color: NGColors.accent.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: NGColors.accent.withOpacity(0.3),
+                      ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Media Engine: ACTIVE — Compression & fast upload enabled',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
+                      style: TextStyle(
+                        color: NGColors.textSecondary,
+                        fontSize: 12,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ),
                   _buildVideoSelector(),
                   const SizedBox(height: 12),
-                  // Compression quality slider (production UI)
-                  Text('Compression quality', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  // Compression quality slider
+                  Text(
+                    'Compression quality',
+                    style: TextStyle(
+                      color: NGColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
                   Slider(
                     value: _qualitySlider,
                     min: 0,
                     max: 2,
                     divisions: 2,
                     label: _qualityLabel(_qualitySlider.toInt()),
+                    activeColor: NGColors.accent,
+                    inactiveColor: NGColors.divider,
                     onChanged: (v) => setState(() => _qualitySlider = v),
                   ),
                   const SizedBox(height: 12),
@@ -262,7 +273,7 @@ class _UploadPageState extends State<UploadPage> {
                     child: Text(
                       "make from zetra lab",
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.25),
+                        color: NGColors.textMuted,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.8,
@@ -281,12 +292,16 @@ class _UploadPageState extends State<UploadPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.cloud_upload, color: Colors.red, size: 80),
+          Icon(
+            Icons.cloud_upload,
+            color: NGColors.accent,
+            size: 80,
+          ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Uploading your video...',
             style: TextStyle(
-              color: Colors.white,
+              color: NGColors.textPrimary,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -294,7 +309,10 @@ class _UploadPageState extends State<UploadPage> {
           const SizedBox(height: 8),
           Text(
             'Optimizing compression assets for Naija 🇳🇬',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            style: TextStyle(
+              color: NGColors.textSecondary,
+              fontSize: 14,
+            ),
           ),
           const SizedBox(height: 32),
           Padding(
@@ -305,15 +323,18 @@ class _UploadPageState extends State<UploadPage> {
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
                     value: _uploadProgress,
-                    backgroundColor: Colors.grey.shade800,
-                    color: Colors.red,
+                    backgroundColor: NGColors.surfaceLight,
+                    color: NGColors.accent,
                     minHeight: 6,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   '${(_uploadProgress * 100).toInt()}%',
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  style: TextStyle(
+                    color: NGColors.textPrimary,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
@@ -329,27 +350,37 @@ class _UploadPageState extends State<UploadPage> {
         width: double.infinity,
         height: 200,
         decoration: BoxDecoration(
-          color: Colors.grey.shade900,
+          color: NGColors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.red, width: 2),
+          border: Border.all(
+            color: NGColors.accent,
+            width: 2,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 50),
+            Icon(
+              Icons.check_circle,
+              color: NGColors.success,
+              size: 50,
+            ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Video ready to post',
               style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold),
+                color: NGColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => setState(() => _videoFile = null),
-              child: const Text('Change video',
-                  style: TextStyle(color: Colors.red)),
+              child: Text(
+                'Change video',
+                style: TextStyle(color: NGColors.accent),
+              ),
             ),
           ],
         ),
@@ -364,28 +395,36 @@ class _UploadPageState extends State<UploadPage> {
             width: double.infinity,
             height: 160,
             decoration: BoxDecoration(
-              color: Colors.grey.shade900,
+              color: NGColors.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade700),
+              border: Border.all(
+                color: NGColors.divider,
+              ),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.video_library,
-                    color: Colors.red.shade400, size: 50),
+                Icon(
+                  Icons.video_library,
+                  color: NGColors.accent,
+                  size: 50,
+                ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Pick from Gallery',
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600),
+                    color: NGColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'MP4, MOV up to 3 minutes',
                   style: TextStyle(
-                      color: Colors.grey.shade500, fontSize: 12),
+                    color: NGColors.textMuted,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -398,20 +437,25 @@ class _UploadPageState extends State<UploadPage> {
             width: double.infinity,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.red,
+              color: NGColors.accent,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.videocam, color: Colors.white, size: 28),
-                SizedBox(width: 12),
+                Icon(
+                  Icons.videocam,
+                  color: NGColors.textPrimary,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
                 Text(
                   'Record a Video',
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold),
+                    color: NGColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -425,30 +469,31 @@ class _UploadPageState extends State<UploadPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Description',
           style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w600),
+            color: NGColors.textSecondary,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey.shade900,
+            color: NGColors.surface,
             borderRadius: BorderRadius.circular(12),
           ),
           child: TextField(
             controller: _descriptionController,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: NGColors.textPrimary),
             maxLines: 3,
             maxLength: 150,
             decoration: InputDecoration(
               hintText: 'Tell Naija what this video is about...',
-              hintStyle: TextStyle(color: Colors.grey.shade600),
+              hintStyle: TextStyle(color: NGColors.textMuted),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(16),
-              counterStyle: TextStyle(color: Colors.grey.shade600),
+              counterStyle: TextStyle(color: NGColors.textMuted),
             ),
           ),
         ),
@@ -460,29 +505,33 @@ class _UploadPageState extends State<UploadPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Tags',
           style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w600),
+            color: NGColors.textSecondary,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey.shade900,
+            color: NGColors.surface,
             borderRadius: BorderRadius.circular(12),
           ),
           child: TextField(
             controller: _tagController,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: NGColors.textPrimary),
             decoration: InputDecoration(
               hintText: '#naija #comedy #viral',
-              hintStyle: TextStyle(color: Colors.grey.shade600),
+              hintStyle: TextStyle(color: NGColors.textMuted),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(16),
-              prefixIcon:
-                  Icon(Icons.tag, color: Colors.grey.shade600, size: 20),
+              prefixIcon: Icon(
+                Icons.tag,
+                color: NGColors.textMuted,
+                size: 20,
+              ),
             ),
           ),
         ),
@@ -494,12 +543,13 @@ class _UploadPageState extends State<UploadPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Category',
           style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w600),
+            color: NGColors.textSecondary,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 8),
         SizedBox(
@@ -514,27 +564,19 @@ class _UploadPageState extends State<UploadPage> {
                 onTap: () => setState(() => _selectedCategory = cat),
                 child: Container(
                   margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color:
-                        isSelected ? Colors.red : Colors.grey.shade900,
+                    color: isSelected ? NGColors.accent : NGColors.surface,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected
-                          ? Colors.red
-                          : Colors.grey.shade700,
+                      color: isSelected ? NGColors.accent : NGColors.divider,
                     ),
                   ),
                   child: Text(
                     cat,
                     style: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : Colors.grey.shade400,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      color: isSelected ? NGColors.textPrimary : NGColors.textMuted,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       fontSize: 13,
                     ),
                   ),
@@ -554,16 +596,16 @@ class _UploadPageState extends State<UploadPage> {
       child: ElevatedButton(
         onPressed: _videoFile == null ? null : _uploadVideo,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          disabledBackgroundColor: Colors.grey.shade800,
+          backgroundColor: NGColors.accent,
+          disabledBackgroundColor: NGColors.surfaceLight,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
         ),
-        child: const Text(
+        child: Text(
           'Post to NigerGram 🇳🇬',
           style: TextStyle(
-            color: Colors.white,
+            color: NGColors.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
