@@ -330,6 +330,7 @@ class _InboxViewState extends State<InboxView> {
                         return data;
                       }).toList();
 
+                      // 🔥 FIX: Search by BOTH displayName AND username
                       final filteredChats = _searchQuery.isEmpty
                           ? chatList
                           : chatList.where((chat) {
@@ -340,7 +341,8 @@ class _InboxViewState extends State<InboxView> {
                               );
                               final otherUserData = participants[otherUserId] as Map<String, dynamic>? ?? {};
                               final name = (otherUserData['displayName'] ?? '').toString().toLowerCase();
-                              return name.contains(_searchQuery);
+                              final username = (otherUserData['username'] ?? '').toString().toLowerCase();
+                              return name.contains(_searchQuery) || username.contains(_searchQuery);
                             }).toList();
 
                       if (filteredChats.isEmpty && _searchQuery.isNotEmpty) {
@@ -484,7 +486,6 @@ class _InboxViewState extends State<InboxView> {
                 ),
               ],
             ),
-      // 🔥 FIX: FAB Button with bottom padding
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 80.0),
         child: FloatingActionButton(
@@ -647,7 +648,7 @@ class _NewChatSheetState extends State<_NewChatSheet> {
             controller: _searchController,
             style: const TextStyle(color: NGColors.textPrimary),
             decoration: InputDecoration(
-              hintText: 'Search by name...',
+              hintText: 'Search by name or username...',
               hintStyle: TextStyle(color: NGColors.textMuted),
               prefixIcon: const Icon(Icons.search, color: NGColors.textMuted),
               filled: true,
@@ -680,6 +681,7 @@ class _NewChatSheetState extends State<_NewChatSheet> {
 
                 final docs = snapshot.data!.docs;
                 
+                // 🔥 FIX: Search by BOTH displayName AND username
                 final filteredDocs = _searchQuery.isEmpty
                     ? docs
                     : docs.where((doc) {
