@@ -1,3 +1,4 @@
+// lib/features/gist_hub/presentation/widgets/gist_post_card.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -48,9 +49,7 @@ class _GistPostCardState extends State<GistPostCard> {
     }
   }
 
-  // 🔥 FIX: Prevent multiple reactions
   void _addReaction(String emoji) {
-    // Check if user already reacted with this emoji
     if (_reactedEmojis.contains(emoji)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -312,7 +311,7 @@ class _GistPostCardState extends State<GistPostCard> {
               const SizedBox(width: 4),
               _buildReactionButton('🇳🇬'),
               const Spacer(),
-              // Comment Button
+              // Comment Button with proper count display
               GestureDetector(
                 onTap: () {
                   showModalBottomSheet(
@@ -334,7 +333,9 @@ class _GistPostCardState extends State<GistPostCard> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${_post.commentCount}',
+                      _post.commentCount == 0
+                          ? '0 Comments'
+                          : '${_post.commentCount} ${_post.commentCount == 1 ? 'Comment' : 'Comments'}',
                       style: TextStyle(
                         color: NGColors.textMuted,
                         fontSize: 13,
@@ -402,7 +403,7 @@ class _GistPostCardState extends State<GistPostCard> {
     );
   }
 
-  // 🔥 FIXED: Premium Poll with immediate UI update
+  // Premium Poll
   Widget _buildPremiumPoll() {
     final pollOptions = _post.pollOptions ?? [];
     final totalVotes = _post.pollVotes.values.fold(0, (sum, val) => sum + val);
@@ -535,7 +536,6 @@ class _GistPostCardState extends State<GistPostCard> {
                       postId: _post.id,
                       choiceIndex: index,
                     ).then((_) {
-                      // 🔥 FIX: Immediate UI update
                       setState(() {
                         _post.pollVotes[index.toString()] = (_post.pollVotes[index.toString()] ?? 0) + 1;
                         _post.pollVoters[_currentUserId] = index;
@@ -576,143 +576,71 @@ class _GistPostCardState extends State<GistPostCard> {
                               width: 22,
                               height: 22,
                               decoration: BoxDecoration(
-                                color: isSelected
-                                    ? NGColors.accent
-                                    : Colors.transparent,
                                 shape: BoxShape.circle,
+                                color: isSelected ? NGColors.accent : Colors.transparent,
                                 border: Border.all(
-                                  color: isSelected
-                                      ? NGColors.accent
-                                      : NGColors.textMuted,
-                                  width: isSelected ? 0 : 2,
+                                  color: isSelected ? NGColors.accent : NGColors.divider,
+                                  width: 2,
                                 ),
                               ),
                               child: isSelected
-                                  ? const Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 14,
-                                    )
+                                  ? const Icon(Icons.check, color: Colors.white, size: 14)
                                   : null,
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 option,
                                 style: TextStyle(
-                                  color: isSelected
-                                      ? NGColors.accent
-                                      : isUnselected
-                                          ? NGColors.textMuted
-                                          : NGColors.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
+                                  color: isSelected || isUnselected
+                                      ? NGColors.textPrimary
+                                      : NGColors.textSecondary,
+                                  fontSize: 14,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                                 ),
                               ),
                             ),
                             Text(
                               '${percentage.toStringAsFixed(0)}%',
                               style: TextStyle(
-                                color: isSelected
-                                    ? NGColors.accent
-                                    : NGColors.textSecondary,
-                                fontSize: 16,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.w500,
+                                color: isSelected ? NGColors.accent : NGColors.textMuted,
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: totalVotes > 0 ? votes / totalVotes : 0,
-                            minHeight: 8,
-                            backgroundColor: NGColors.divider.withOpacity(0.2),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              isSelected
-                                  ? NGColors.accent
-                                  : NGColors.accent.withOpacity(0.3),
+                        if (totalVotes > 0) ...[
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: percentage / 100,
+                              backgroundColor: NGColors.surfaceLight,
+                              color: isSelected ? NGColors.accent : Colors.grey.shade600,
+                              minHeight: 4,
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Text(
-                              '$votes ${votes == 1 ? 'vote' : 'votes'}',
-                              style: TextStyle(
-                                color: NGColors.textMuted,
-                                fontSize: 11,
-                              ),
-                            ),
-                            const Spacer(),
-                            if (isSelected)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: NGColors.accent.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: NGColors.accent,
-                                      size: 12,
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Voted',
-                                      style: TextStyle(
-                                        color: NGColors.accent,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
+                        ],
                       ],
                     ),
                   ),
                 ),
               ),
             );
-          }).toList(),
+          }),
           
-          const SizedBox(height: 12),
-          
-          // Poll footer
-          Row(
-            children: [
-              Icon(
-                Icons.people_outline,
-                color: NGColors.textMuted,
-                size: 14,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                totalVotes > 0
-                    ? '${totalVotes > 1000 ? '${(totalVotes / 1000).toStringAsFixed(1)}K' : totalVotes} ${totalVotes == 1 ? 'person voted' : 'people voted'}'
-                    : 'Be the first to vote',
+          if (totalVotes > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '$totalVotes vote${totalVotes > 1 ? 's' : ''}',
                 style: TextStyle(
                   color: NGColors.textMuted,
-                  fontSize: 12,
+                  fontSize: 11,
                 ),
               ),
-            ],
-          ),
+            ),
         ],
       ),
     );
