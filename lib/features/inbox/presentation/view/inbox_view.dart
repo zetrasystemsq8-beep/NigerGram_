@@ -473,7 +473,7 @@ class _InboxViewState extends State<InboxView> {
                                       ],
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           );
@@ -484,10 +484,14 @@ class _InboxViewState extends State<InboxView> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: NGColors.accent,
-        child: const Icon(Icons.chat, color: Colors.white),
-        onPressed: _isUserLoggedIn ? () => _showNewChatDialog() : null,
+      // 🔥 FIX: FAB Button with bottom padding
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80.0),
+        child: FloatingActionButton(
+          backgroundColor: NGColors.accent,
+          child: const Icon(Icons.chat, color: Colors.white),
+          onPressed: _isUserLoggedIn ? () => _showNewChatDialog() : null,
+        ),
       ),
     );
   }
@@ -549,9 +553,6 @@ class _InboxViewState extends State<InboxView> {
   }
 }
 
-// ============================================================
-// _NewChatSheet - Dedicated widget with proper disposal
-// ============================================================
 class _NewChatSheet extends StatefulWidget {
   final void Function(String userId) onUserSelected;
 
