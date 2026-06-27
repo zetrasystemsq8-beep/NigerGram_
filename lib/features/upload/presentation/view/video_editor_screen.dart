@@ -96,14 +96,15 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     setState(() {});
   }
 
-  // ✅ FIXED: uses saveTrimmedVideo with onSave callback (v4.0.2 API)
+  // ✅ FIXED for video_trimmer v5.0.0 - uses milliseconds not 0-1 values
   Future<void> _trimVideo() async {
     if (_controller == null) return;
     setState(() => _isTrimming = true);
     try {
+      final duration = _controller!.value.duration.inMilliseconds.toDouble();
       await _trimmer.saveTrimmedVideo(
-        startValue: _startValue,
-        endValue: _endValue,
+        startValue: _startValue * duration,
+        endValue: _endValue * duration,
         onSave: (outputPath) {
           if (outputPath != null && outputPath.isNotEmpty) {
             setState(() => _trimmedFile = File(outputPath));
@@ -242,7 +243,10 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
-                      child: Text(emojis[i], style: const TextStyle(fontSize: 28)),
+                      child: Text(
+                        emojis[i],
+                        style: const TextStyle(fontSize: 28),
+                      ),
                     ),
                   ),
                 ),
@@ -263,7 +267,9 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -373,7 +379,9 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
           color: color,
           shape: BoxShape.circle,
           border: Border.all(
-            color: _selectedTextColor == color ? NGColors.accent : NGColors.divider,
+            color: _selectedTextColor == color
+                ? NGColors.accent
+                : NGColors.divider,
             width: _selectedTextColor == color ? 3 : 1,
           ),
         ),
@@ -381,7 +389,12 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     );
   }
 
-  Widget _toolButton(IconData icon, String label, bool isSelected, VoidCallback onTap) {
+  Widget _toolButton(
+    IconData icon,
+    String label,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -390,7 +403,9 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isSelected ? NGColors.accent.withOpacity(0.15) : Colors.transparent,
+              color: isSelected
+                  ? NGColors.accent.withOpacity(0.15)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isSelected ? NGColors.accent : NGColors.divider,
@@ -453,7 +468,9 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
         ],
       ),
       body: _controller == null
-          ? const Center(child: CircularProgressIndicator(color: NGColors.accent))
+          ? const Center(
+              child: CircularProgressIndicator(color: NGColors.accent),
+            )
           : Column(
               children: [
                 Expanded(
@@ -472,14 +489,23 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                       ..._overlays.map((item) {
                         return Positioned(
                           left: item.x * MediaQuery.of(context).size.width - 50,
-                          top: item.y * (MediaQuery.of(context).size.height * 0.6) - 50,
+                          top: item.y *
+                                  (MediaQuery.of(context).size.height * 0.6) -
+                              50,
                           child: GestureDetector(
                             onTap: () => _removeOverlay(item.id),
                             onPanUpdate: (details) {
                               _updateOverlayPosition(
                                 item.id,
-                                (item.x + details.delta.dx / MediaQuery.of(context).size.width).clamp(0.0, 1.0),
-                                (item.y + details.delta.dy / (MediaQuery.of(context).size.height * 0.6)).clamp(0.0, 1.0),
+                                (item.x +
+                                        details.delta.dx /
+                                            MediaQuery.of(context).size.width)
+                                    .clamp(0.0, 1.0),
+                                (item.y +
+                                        details.delta.dy /
+                                            (MediaQuery.of(context).size.height *
+                                                0.6))
+                                    .clamp(0.0, 1.0),
                               );
                             },
                             onScaleUpdate: (details) {
@@ -503,12 +529,14 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                                 child: item.type == 'emoji'
                                     ? Text(
                                         item.content,
-                                        style: const TextStyle(fontSize: 40),
+                                        style:
+                                            const TextStyle(fontSize: 40),
                                       )
                                     : Text(
                                         item.content,
                                         style: TextStyle(
-                                          color: item.textColor ?? Colors.white,
+                                          color:
+                                              item.textColor ?? Colors.white,
                                           fontSize: item.fontSize ?? 24,
                                           fontWeight: FontWeight.bold,
                                           shadows: const [
@@ -572,7 +600,10 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: const BoxDecoration(
                     color: NGColors.surface,
                     border: Border(
@@ -713,14 +744,18 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                                   });
                                 },
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: NGColors.divider),
+                                  side: const BorderSide(
+                                    color: NGColors.divider,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                                 child: const Text(
                                   'Reset',
-                                  style: TextStyle(color: NGColors.textSecondary),
+                                  style: TextStyle(
+                                    color: NGColors.textSecondary,
+                                  ),
                                 ),
                               ),
                             ),
