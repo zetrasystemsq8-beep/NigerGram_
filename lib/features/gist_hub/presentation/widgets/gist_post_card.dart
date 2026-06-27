@@ -30,6 +30,7 @@ class _GistPostCardState extends State<GistPostCard> {
   late GistPostEntity _post;
   bool _isSaved = false;
   final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+  final Set<String> _reactedEmojis = {};
 
   @override
   void initState() {
@@ -47,16 +48,31 @@ class _GistPostCardState extends State<GistPostCard> {
     }
   }
 
+  // 🔥 FIX: Prevent multiple reactions
   void _addReaction(String emoji) {
+    // Check if user already reacted with this emoji
+    if (_reactedEmojis.contains(emoji)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You already reacted with this emoji!'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _post.reactions[emoji] = (_post.reactions[emoji] ?? 0) + 1;
+      _reactedEmojis.add(emoji);
     });
+    
     widget.service.addReaction(
       postId: _post.id,
       emoji: emoji,
     ).catchError((e) {
       setState(() {
         _post.reactions[emoji] = (_post.reactions[emoji] ?? 0) - 1;
+        _reactedEmojis.remove(emoji);
       });
     });
   }
@@ -346,14 +362,20 @@ class _GistPostCardState extends State<GistPostCard> {
 
   Widget _buildReactionButton(String emoji) {
     final count = _post.reactions[emoji] ?? 0;
+    final hasReacted = _reactedEmojis.contains(emoji);
+    
     return GestureDetector(
       onTap: () => _addReaction(emoji),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: count > 0 ? NGColors.accent.withOpacity(0.1) : NGColors.surfaceLight,
+          color: hasReacted 
+              ? NGColors.accent.withOpacity(0.2) 
+              : count > 0 
+                  ? NGColors.accent.withOpacity(0.1) 
+                  : NGColors.surfaceLight,
           borderRadius: BorderRadius.circular(16),
-          border: count > 0
+          border: hasReacted || count > 0
               ? Border.all(color: NGColors.accent.withOpacity(0.3))
               : null,
         ),
@@ -368,7 +390,7 @@ class _GistPostCardState extends State<GistPostCard> {
               Text(
                 count > 99 ? '99+' : count.toString(),
                 style: TextStyle(
-                  color: count > 0 ? NGColors.accent : NGColors.textSecondary,
+                  color: hasReacted ? NGColors.accent : NGColors.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -380,11 +402,11 @@ class _GistPostCardState extends State<GistPostCard> {
     );
   }
 
+  // 🔥 FIXED: Premium Poll with immediate UI update
   Widget _buildPremiumPoll() {
     final pollOptions = _post.pollOptions ?? [];
     final totalVotes = _post.pollVotes.values.fold(0, (sum, val) => sum + val);
     
-    // Check if CURRENT USER voted
     final bool hasVoted = _post.pollVoters.containsKey(_currentUserId);
     final int? votedIndex = hasVoted ? _post.pollVoters[_currentUserId] : null;
     
@@ -413,7 +435,6 @@ class _GistPostCardState extends State<GistPostCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Poll header
           Row(
             children: [
               const Text(
@@ -488,6 +509,7 @@ class _GistPostCardState extends State<GistPostCard> {
             final votes = _post.pollVotes[index.toString()] ?? 0;
             final percentage = totalVotes > 0 ? (votes / totalVotes * 100) : 0;
             final bool isSelected = hasVoted && votedIndex == index;
+            final bool isUnselected = hasVoted && votedIndex != index;
             
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -513,8 +535,11 @@ class _GistPostCardState extends State<GistPostCard> {
                       postId: _post.id,
                       choiceIndex: index,
                     ).then((_) {
-                      // Refresh from Firestore via parent
-                      setState(() {});
+                      // 🔥 FIX: Immediate UI update
+                      setState(() {
+                        _post.pollVotes[index.toString()] = (_post.pollVotes[index.toString()] ?? 0) + 1;
+                        _post.pollVoters[_currentUserId] = index;
+                      });
                     }).catchError((e) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -531,7 +556,9 @@ class _GistPostCardState extends State<GistPostCard> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? NGColors.accent.withOpacity(0.12)
-                          : NGColors.surfaceLight,
+                          : isUnselected
+                              ? NGColors.surfaceLight.withOpacity(0.5)
+                              : NGColors.surfaceLight,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isSelected
@@ -575,7 +602,9 @@ class _GistPostCardState extends State<GistPostCard> {
                                 style: TextStyle(
                                   color: isSelected
                                       ? NGColors.accent
-                                      : NGColors.textPrimary,
+                                      : isUnselected
+                                          ? NGColors.textMuted
+                                          : NGColors.textPrimary,
                                   fontSize: 15,
                                   fontWeight: isSelected
                                       ? FontWeight.w600
