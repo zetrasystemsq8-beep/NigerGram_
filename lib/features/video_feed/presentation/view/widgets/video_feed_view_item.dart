@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:video_player/video_player.dart';
@@ -32,9 +33,18 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   late AnimationController _heartExplosionController;
   final List<GlobalKey> _heartKeys = [];
 
+  // Local state for UI updates
+  bool _isLiked = false;
+  int _likeCount = 0;
+  bool _isFollowing = false;
+
   @override
   void initState() {
     super.initState();
+    _isLiked = widget.videoItem.isLiked ?? false;
+    _likeCount = widget.videoItem.likeCount;
+    _isFollowing = widget.videoItem.isFollowing ?? false;
+    
     _likeAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -50,6 +60,15 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     for (int i = 0; i < 12; i++) {
       _heartKeys.add(GlobalKey());
     }
+  }
+
+  @override
+  void didUpdateWidget(VideoFeedViewItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update local state when widget updates
+    _isLiked = widget.videoItem.isLiked ?? false;
+    _likeCount = widget.videoItem.likeCount;
+    _isFollowing = widget.videoItem.isFollowing ?? false;
   }
 
   @override
@@ -98,9 +117,32 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   void _handleLike() async {
     HapticFeedback.mediumImpact();
     
-    // Toggle like state
-    final bool newLikeState = !(widget.videoItem.isLiked ?? false);
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to like')),
+      );
+      return;
+    }
+
+    // Toggle like state locally
+    final bool newLikeState = !_isLiked;
     
+    // Update local state immediately for UI feedback
+    setState(() {
+      _isLiked = newLikeState;
+      _likeCount += newLikeState ? 1 : -1;
+      if (_likeCount < 0) _likeCount = 0;
+    });
+
+    // Trigger heart explosion on like
+    if (newLikeState) {
+      _heartExplosionController.forward(from: 0);
+    }
+    
+    // Animate the like button
+    _likeAnimationController.forward(from: 0);
+
     // Update Firebase
     try {
       final docRef = FirebaseFirestore.instance
@@ -110,30 +152,23 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
       if (newLikeState) {
         await docRef.update({
           'likeCount': FieldValue.increment(1),
-          'likedBy': FieldValue.arrayUnion([FirebaseAuth.instance.currentUser?.uid ?? '']),
+          'likedBy': FieldValue.arrayUnion([currentUser.uid]),
         });
       } else {
         await docRef.update({
           'likeCount': FieldValue.increment(-1),
-          'likedBy': FieldValue.arrayRemove([FirebaseAuth.instance.currentUser?.uid ?? '']),
+          'likedBy': FieldValue.arrayRemove([currentUser.uid]),
         });
       }
     } catch (e) {
       debugPrint('Like update error: $e');
+      // Revert on error
+      setState(() {
+        _isLiked = !newLikeState;
+        _likeCount += newLikeState ? -1 : 1;
+        if (_likeCount < 0) _likeCount = 0;
+      });
     }
-
-    // Trigger heart explosion on like
-    if (newLikeState) {
-      _heartExplosionController.forward(from: 0);
-    }
-    
-    // Animate the like button
-    _likeAnimationController.forward(from: 0);
-    
-    setState(() {
-      widget.videoItem.isLiked = newLikeState;
-      widget.videoItem.likeCount += newLikeState ? 1 : -1;
-    });
   }
 
   /// 🎬 TOGGLE PLAY/PAUSE
@@ -171,7 +206,17 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   void _handleFollow() async {
     HapticFeedback.lightImpact();
     final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to follow')),
+      );
+      return;
+    }
+
+    // Update local state immediately
+    setState(() {
+      _isFollowing = true;
+    });
 
     try {
       final docRef = FirebaseFirestore.instance
@@ -192,19 +237,35 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
         'following': FieldValue.increment(1),
         'followingList': FieldValue.arrayUnion([widget.videoItem.creatorId]),
       });
-      
-      setState(() {
-        widget.videoItem.isFollowing = true;
-      });
     } catch (e) {
       debugPrint('Follow error: $e');
+      // Revert on error
+      setState(() {
+        _isFollowing = false;
+      });
     }
+  }
+
+  /// 📌 HANDLE BOOKMARK
+  void _handleBookmark() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to save')),
+      );
+      return;
+    }
+
+    // Note: Bookmark state is handled by InteractionButtons widget
+    // This is just a pass-through
+    debugPrint('Bookmark toggled for: ${widget.videoItem.id}');
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isLiked = widget.videoItem.isLiked ?? false;
-    final bool isFollowing = widget.videoItem.isFollowing ?? false;
+    final bool isLiked = _isLiked;
+    final bool isFollowing = _isFollowing;
+    final bool isOwnVideo = widget.videoItem.creatorId == FirebaseAuth.instance.currentUser?.uid;
 
     return GestureDetector(
       onTap: _togglePlayPause,
@@ -359,7 +420,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
                 ),
 
                 // Follow Button (Emerald Green Accent)
-                if (!isFollowing && widget.videoItem.creatorId != FirebaseAuth.instance.currentUser?.uid)
+                if (!isFollowing && !isOwnVideo)
                   GestureDetector(
                     onTap: _handleFollow,
                     child: Container(
@@ -458,7 +519,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
             child: VideoFeedViewInteractionButtons(
               videoId: widget.videoItem.id,
               isLiked: isLiked,
-              likeCount: widget.videoItem.likeCount,
+              likeCount: _likeCount,
               commentCount: widget.videoItem.commentCount,
               shareCount: widget.videoItem.shareCount,
               isBookmarked: widget.videoItem.isBookmarked ?? false,
@@ -466,10 +527,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
               creatorUsername: widget.videoItem.username,
               onCommentTapped: () => _openCommentsModalSheet(context),
               onShareTapped: () => _executePlatformShareAction(context),
-              onBookmarkTapped: () {
-                HapticFeedback.selectionClick();
-                _handleBookmark();
-              },
+              onBookmarkTapped: () => _handleBookmark(),
             ),
           ),
 
@@ -495,37 +553,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
         ],
       ),
     );
-  }
-
-  /// 📌 HANDLE BOOKMARK
-  void _handleBookmark() async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return;
-
-    final bool newBookmarkState = !(widget.videoItem.isBookmarked ?? false);
-    
-    try {
-      final docRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .collection('bookmarks')
-          .doc(widget.videoItem.id);
-      
-      if (newBookmarkState) {
-        await docRef.set({
-          'videoId': widget.videoItem.id,
-          'savedAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        await docRef.delete();
-      }
-      
-      setState(() {
-        widget.videoItem.isBookmarked = newBookmarkState;
-      });
-    } catch (e) {
-      debugPrint('Bookmark error: $e');
-    }
   }
 }
 
