@@ -30,8 +30,8 @@ class AppWidget extends StatelessWidget {
         supportedLocales: AppLocalizations.supportedLocales,
         theme: ThemeData(
           brightness: Brightness.dark,
-          scaffoldBackgroundColor: black,
-          primaryColor: red,
+          scaffoldBackgroundColor: NGColors.background,
+          primaryColor: NGColors.accent,
         ),
       ),
     );
