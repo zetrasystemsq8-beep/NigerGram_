@@ -40,8 +40,8 @@ dependencies:
   cached_network_image: ^3.4.1
   share_plus: ^10.1.0
 
-  # ✅ FIXED: Video Trimming
-  video_trimmer: ^5.0.0  # ✅ Changed from ^3.1.0 to ^5.0.0
+  # Video Trimming - stable version
+  video_trimmer: ^4.0.0
 
 dev_dependencies:
   flutter_test:
