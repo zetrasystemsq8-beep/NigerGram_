@@ -1,12 +1,15 @@
 // lib/features/auth/presentation/view/login_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
 import 'package:nigergram/core/utils/error_handler.dart';
 import 'package:nigergram/features/auth/presentation/bloc/auth_cubit.dart';
+import 'package:nigergram/features/auth/presentation/view/terms_view.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,8 +26,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   bool _showSplash = true;
+  bool _termsAccepted = false;
   
-  // Tab controller for Login/Sign Up
   late TabController _tabController;
   int _currentTab = 0;
 
@@ -38,7 +41,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       });
     });
     
-    // 🔥 Show splash screen for 2 seconds
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         setState(() {
@@ -58,7 +60,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     super.dispose();
   }
 
-  // 🔥 Forgot Password Bottom Sheet
   void _showForgotPasswordSheet() {
     final TextEditingController emailController = TextEditingController();
     bool isLoading = false;
@@ -215,6 +216,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   }
 
   void _handleSignUp() async {
+    // 🔥 Check if terms are accepted
+    if (!_termsAccepted) {
+      NigerGramError.showSnackBar(context, 'Please agree to Terms & Conditions');
+      return;
+    }
+
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final username = _usernameController.text.trim();
@@ -238,7 +245,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         password: password,
       );
 
-      // Save user data to Firestore
       await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
         'displayName': username,
         'username': username,
@@ -268,7 +274,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 Splash Screen
     if (_showSplash) {
       return Scaffold(
         backgroundColor: NGColors.background,
@@ -276,7 +281,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 🔥 Elite Text Logo
               ShaderMask(
                 shaderCallback: (bounds) => const LinearGradient(
                   colors: [NGColors.accent, Colors.white, NGColors.accent],
@@ -343,7 +347,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       );
     }
 
-    // 🔥 Main Auth Screen
     return Scaffold(
       backgroundColor: NGColors.background,
       body: BlocListener<AuthCubit, AuthState>(
@@ -360,7 +363,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Column(
               children: [
-                // 🔥 Elite Logo Header
+                // Logo
                 ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
                     colors: [NGColors.accent, Colors.white, NGColors.accent],
@@ -389,7 +392,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
                 const SizedBox(height: 24),
 
-                // 🔥 Login / Sign Up Tabs
+                // Tabs
                 Container(
                   decoration: BoxDecoration(
                     color: NGColors.surface,
@@ -415,7 +418,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
                 const SizedBox(height: 20),
 
-                // 🔥 Form Fields
+                // Form
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
@@ -475,7 +478,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           ),
                         ),
 
-                        // 🔥 Sign Up only fields
+                        // Sign Up only fields
                         if (_currentTab == 1) ...[
                           const SizedBox(height: 12),
                           Container(
@@ -516,11 +519,82 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                               ),
                             ),
                           ),
+                          
+                          // 🔥 Terms Checkbox
+                          const SizedBox(height: 12),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: _termsAccepted,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _termsAccepted = value ?? false;
+                                    });
+                                  },
+                                  activeColor: NGColors.accent,
+                                  checkColor: Colors.white,
+                                  side: const BorderSide(color: NGColors.divider),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      color: NGColors.textSecondary,
+                                      fontSize: 13,
+                                      height: 1.4,
+                                    ),
+                                    children: [
+                                      const TextSpan(text: 'I agree to the '),
+                                      TextSpan(
+                                        text: 'Terms & Conditions',
+                                        style: const TextStyle(
+                                          color: NGColors.accent,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        recognizer: TapGestureRecognizer()
+                                          ..onTap = () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => const TermsView(type: 'terms'),
+                                              ),
+                                            );
+                                          },
+                                      ),
+                                      const TextSpan(text: ' and '),
+                                      TextSpan(
+                                        text: 'Privacy Policy',
+                                        style: const TextStyle(
+                                          color: NGColors.accent,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        recognizer: TapGestureRecognizer()
+                                          ..onTap = () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => const TermsView(type: 'privacy'),
+                                              ),
+                                            );
+                                          },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
 
                         const SizedBox(height: 20),
 
-                        // 🔥 Login / Sign Up Button
+                        // Login / Sign Up Button
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -562,7 +636,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
                         const SizedBox(height: 12),
 
-                        // 🔥 Forgot Password (only in Login tab)
+                        // Forgot Password (only in Login tab)
                         if (_currentTab == 0)
                           GestureDetector(
                             onTap: _showForgotPasswordSheet,
