@@ -330,7 +330,6 @@ class _InboxViewState extends State<InboxView> {
                         return data;
                       }).toList();
 
-                      // 🔥 FIX: Search by BOTH displayName AND username
                       final filteredChats = _searchQuery.isEmpty
                           ? chatList
                           : chatList.where((chat) {
@@ -681,7 +680,6 @@ class _NewChatSheetState extends State<_NewChatSheet> {
 
                 final docs = snapshot.data!.docs;
                 
-                // 🔥 FIX: Search by BOTH displayName AND username
                 final filteredDocs = _searchQuery.isEmpty
                     ? docs
                     : docs.where((doc) {
