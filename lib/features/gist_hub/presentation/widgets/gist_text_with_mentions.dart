@@ -47,7 +47,7 @@ class GistTextWithMentions extends StatelessWidget {
     final matches = mentionRegex.allMatches(text);
 
     for (final match in matches) {
-      // Add text before the mention
+      // Text before the mention
       if (match.start > lastMatchEnd) {
         spans.add(
           TextSpan(
@@ -56,7 +56,7 @@ class GistTextWithMentions extends StatelessWidget {
         );
       }
 
-      // Add the mention as a clickable span
+      // The mention itself
       final username = match.group(1)!;
       spans.add(
         TextSpan(
@@ -70,8 +70,8 @@ class GistTextWithMentions extends StatelessWidget {
               if (onMentionTap != null) {
                 onMentionTap!(username);
               } else {
-                // Default: navigate to profile
-                context.push('/profile/$username');
+                // ✅ FIXED: Use GoRouter
+                GoRouter.of(context).push('/profile/$username');
               }
             },
         ),
@@ -80,7 +80,7 @@ class GistTextWithMentions extends StatelessWidget {
       lastMatchEnd = match.end;
     }
 
-    // Add remaining text after the last mention
+    // Remaining text after the last mention
     if (lastMatchEnd < text.length) {
       spans.add(
         TextSpan(
