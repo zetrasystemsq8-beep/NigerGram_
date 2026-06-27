@@ -5,9 +5,8 @@ import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 
 class DiscoverFeedView extends StatefulWidget {
-  final String? tag; // ✅ ADD THIS
-
-  const DiscoverFeedView({super.key, this.tag}); // ✅ ADD THIS
+  final String? tag;
+  const DiscoverFeedView({super.key, this.tag});
 
   @override
   State<DiscoverFeedView> createState() => _DiscoverFeedViewState();
@@ -31,7 +30,6 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
           .orderBy('createdAt', descending: true)
           .limit(20);
 
-      // ✅ If tag is provided, filter by it
       if (widget.tag != null && widget.tag!.isNotEmpty) {
         query = query.where('tags', arrayContains: widget.tag);
       }
@@ -39,7 +37,8 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
       final snapshot = await query.get();
 
       final videos = snapshot.docs.map((doc) {
-        final data = doc.data();
+        // ✅ THE FIX: cast to Map<String, dynamic>
+        final data = doc.data() as Map<String, dynamic>;
         return VideoEntity(
           id: doc.id,
           videoUrl: data['videoUrl'] ?? '',
@@ -80,7 +79,7 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
         backgroundColor: NGColors.background,
         title: Text(
           widget.tag != null ? 'Discover #${widget.tag}' : 'Discover',
-          style: TextStyle(
+          style: const TextStyle(
             color: NGColors.textPrimary,
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -90,16 +89,14 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: NGColors.accent,
-              ),
+              child: CircularProgressIndicator(color: NGColors.accent),
             )
           : _videos.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.search_off_rounded,
                         color: NGColors.textMuted,
                         size: 64,
@@ -109,7 +106,7 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
                         widget.tag != null
                             ? 'No videos with #${widget.tag}'
                             : 'No videos found',
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: NGColors.textSecondary,
                           fontSize: 16,
                         ),
@@ -131,7 +128,7 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
                             ),
                       title: Text(
                         v.username,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: NGColors.textPrimary,
                           fontWeight: FontWeight.bold,
                         ),
@@ -140,19 +137,13 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
                         v.description,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: NGColors.textSecondary,
-                        ),
+                        style: const TextStyle(color: NGColors.textSecondary),
                       ),
                       trailing: Text(
                         '❤️ ${v.likeCount}',
-                        style: TextStyle(
-                          color: NGColors.textMuted,
-                        ),
+                        style: const TextStyle(color: NGColors.textMuted),
                       ),
-                      onTap: () {
-                        // Navigate to video detail
-                      },
+                      onTap: () {},
                     );
                   },
                 ),
