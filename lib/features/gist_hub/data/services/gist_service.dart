@@ -1,3 +1,4 @@
+// lib/features/gist_hub/data/services/gist_service.dart
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,6 +16,7 @@ class GistService {
     if (filter == 'trending') {
       query = query.orderBy('totalReactions', descending: true);
     } else if (filter == 'polls') {
+      // 🔥 FIX: Ensures only polls appear in Polls tab
       query = query.where('type', isEqualTo: 'poll');
     } else {
       query = query.orderBy('createdAt', descending: true);
@@ -104,12 +106,15 @@ class GistService {
         "🇳🇬": 0,
       };
 
+      // 🔥 FIX: Ensure poll posts are saved with type 'poll'
+      final actualType = (pollOptions != null && pollOptions.isNotEmpty) ? 'poll' : type;
+
       await postRef.set({
         'userId': userId,
         'displayName': displayName,
         'username': username,
         'profilePic': profilePic,
-        'type': type,
+        'type': actualType,  // ← FIXED: now 'poll' for polls
         'content': content,
         'imageUrl': imageUrl,
         'pollOptions': pollOptions,
@@ -155,7 +160,6 @@ class GistService {
     }
   }
 
-  // 🔥 FIXED: Correct vote logic with pollVoters
   Future<void> castVote({
     required String postId,
     required int choiceIndex,
@@ -171,18 +175,15 @@ class GistService {
         
         final data = snapshot.data() as Map<String, dynamic>;
         
-        // Check if user already voted
         final voters = Map<String, int>.from(data['pollVoters'] ?? {});
         if (voters.containsKey(user.uid)) {
           throw Exception('You already voted');
         }
         
-        // Update vote counts
         final pollVotes = Map<String, int>.from(data['pollVotes'] ?? {});
         final key = choiceIndex.toString();
         pollVotes[key] = (pollVotes[key] ?? 0) + 1;
         
-        // Store who voted
         voters[user.uid] = choiceIndex;
         
         transaction.update(postRef, {
