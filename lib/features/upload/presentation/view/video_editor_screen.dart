@@ -5,7 +5,6 @@ import 'package:video_trimmer/video_trimmer.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:video_player/video_player.dart';
 
-// ===================== OVERLAY ITEM MODEL =====================
 class OverlayItem {
   final String id;
   final String type; // 'emoji' or 'text'
@@ -57,10 +56,7 @@ class OverlayItem {
 class VideoEditorScreen extends StatefulWidget {
   final File videoFile;
 
-  const VideoEditorScreen({
-    super.key,
-    required this.videoFile,
-  });
+  const VideoEditorScreen({super.key, required this.videoFile});
 
   @override
   State<VideoEditorScreen> createState() => _VideoEditorScreenState();
@@ -75,9 +71,8 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
   VideoPlayerController? _controller;
   File? _trimmedFile;
 
-  // ===================== OVERLAY STATE =====================
   final List<OverlayItem> _overlays = [];
-  String _selectedTool = 'trim'; // 'trim', 'emoji', 'text'
+  String _selectedTool = 'trim';
   final TextEditingController _textController = TextEditingController();
   Color _selectedTextColor = Colors.white;
   double _selectedFontSize = 24;
@@ -94,29 +89,33 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     setState(() {});
   }
 
-  // ===================== FIXED TRIM METHOD =====================
+  // ===================== TRIMMING (UPDATED) =====================
   Future<void> _trimVideo() async {
     if (_controller == null) return;
     setState(() => _isTrimming = true);
     try {
       final totalDuration = _controller!.value.duration;
-      final start = Duration(milliseconds: (totalDuration.inMilliseconds * _startValue).toInt());
-      final end = Duration(milliseconds: (totalDuration.inMilliseconds * _endValue).toInt());
+      final start = Duration(
+          milliseconds: (totalDuration.inMilliseconds * _startValue).toInt());
+      final end = Duration(
+          milliseconds: (totalDuration.inMilliseconds * _endValue).toInt());
 
-      // ✅ CORRECT METHOD: trim(start:, end:)
-      final trimmed = await _trimmer.trim(
-        start: start,
-        end: end,
-      );
+      // Try using `.trim()` first (v4+)
+      File? trimmed;
+      try {
+        trimmed = await _trimmer.trim(start: start, end: end);
+      } catch (_) {
+        // Fallback to older `trimVideo` with doubles
+        trimmed = await _trimmer.trimVideo(
+            startValue: _startValue, endValue: _endValue);
+      }
+
       if (trimmed != null) {
-        setState(() => _trimmedFile = File(trimmed.path));
+        setState(() => _trimmedFile = trimmed);
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Trim failed: $e'),
-          backgroundColor: NGColors.error,
-        ),
+        SnackBar(content: Text('Trim failed: $e'), backgroundColor: NGColors.error),
       );
     } finally {
       setState(() => _isTrimming = false);
@@ -138,42 +137,36 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
 
   void _addEmoji(String emoji) {
     setState(() {
-      _overlays.add(
-        OverlayItem(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          type: 'emoji',
-          content: emoji,
-          x: 0.5,
-          y: 0.5,
-          scale: 1.0,
-        ),
-      );
+      _overlays.add(OverlayItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: 'emoji',
+        content: emoji,
+        x: 0.5,
+        y: 0.5,
+        scale: 1.0,
+      ));
     });
   }
 
   void _addTextOverlay() {
     if (_textController.text.trim().isEmpty) return;
     setState(() {
-      _overlays.add(
-        OverlayItem(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          type: 'text',
-          content: _textController.text.trim(),
-          x: 0.5,
-          y: 0.5,
-          scale: 1.0,
-          textColor: _selectedTextColor,
-          fontSize: _selectedFontSize,
-        ),
-      );
+      _overlays.add(OverlayItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: 'text',
+        content: _textController.text.trim(),
+        x: 0.5,
+        y: 0.5,
+        scale: 1.0,
+        textColor: _selectedTextColor,
+        fontSize: _selectedFontSize,
+      ));
     });
     _textController.clear();
   }
 
   void _removeOverlay(String id) {
-    setState(() {
-      _overlays.removeWhere((item) => item.id == id);
-    });
+    setState(() => _overlays.removeWhere((item) => item.id == id));
   }
 
   void _updateOverlayPosition(String id, double x, double y) {
@@ -201,7 +194,7 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
 
   // ===================== EMOJI PICKER =====================
   void _showEmojiPicker() {
-    final List<String> emojis = [
+    const emojis = [
       '😂', '😍', '🔥', '💯', '🥺', '😭', '❤️', '🙏',
       '🇳🇬', '🎉', '✨', '💪', '👀', '🤣', '😱', '🥰',
       '😎', '🤔', '💀', '👏', '🙌', '💖', '😘', '🥳',
@@ -212,52 +205,27 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: NGColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Container(
         height: 300,
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Add Emoji',
-              style: TextStyle(
-                color: NGColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('Add Emoji', style: TextStyle(color: NGColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Expanded(
               child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 8,
-                  childAspectRatio: 1,
-                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 8),
                 itemCount: emojis.length,
-                itemBuilder: (context, index) {
-                  return GestureDetector(
-                    onTap: () {
-                      _addEmoji(emojis[index]);
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: NGColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          emojis[index],
-                          style: const TextStyle(fontSize: 28),
-                        ),
-                      ),
-                    ),
-                  );
-                },
+                itemBuilder: (_, i) => GestureDetector(
+                  onTap: () { _addEmoji(emojis[i]); Navigator.pop(ctx); },
+                  child: Container(
+                    margin: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: NGColors.surface, borderRadius: BorderRadius.circular(12)),
+                    child: Center(child: Text(emojis[i], style: const TextStyle(fontSize: 28))),
+                  ),
+                ),
               ),
             ),
           ],
@@ -266,33 +234,22 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     );
   }
 
-  // ===================== TEXT OVERLAY SHEET =====================
+  // ===================== TEXT OVERLAY =====================
   void _showTextOverlaySheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: NGColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Container(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Add Text Overlay',
-                style: TextStyle(
-                  color: NGColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              Text('Add Text Overlay', style: TextStyle(color: NGColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               TextField(
                 controller: _textController,
@@ -302,72 +259,41 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                   hintStyle: TextStyle(color: NGColors.textMuted),
                   filled: true,
                   fillColor: NGColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
                 autofocus: true,
               ),
               const SizedBox(height: 16),
-              Text(
-                'Color',
-                style: TextStyle(color: NGColors.textSecondary, fontSize: 14),
-              ),
+              Text('Color', style: TextStyle(color: NGColors.textSecondary, fontSize: 14)),
               const SizedBox(height: 8),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildColorChip(Colors.white),
-                    _buildColorChip(Colors.black),
-                    _buildColorChip(Colors.red),
-                    _buildColorChip(Colors.green),
-                    _buildColorChip(Colors.blue),
-                    _buildColorChip(Colors.yellow),
-                    _buildColorChip(Colors.purple),
-                    _buildColorChip(Colors.orange),
-                    _buildColorChip(Colors.pink),
-                    _buildColorChip(NGColors.accent),
-                  ],
-                ),
+                child: Row(children: [
+                  _colorChip(Colors.white), _colorChip(Colors.black), _colorChip(Colors.red),
+                  _colorChip(Colors.green), _colorChip(Colors.blue), _colorChip(Colors.yellow),
+                  _colorChip(Colors.purple), _colorChip(Colors.orange), _colorChip(Colors.pink),
+                  _colorChip(NGColors.accent),
+                ]),
               ),
               const SizedBox(height: 12),
-              Text(
-                'Size: ${_selectedFontSize.toInt()}',
-                style: TextStyle(color: NGColors.textSecondary, fontSize: 14),
-              ),
+              Text('Size: ${_selectedFontSize.toInt()}', style: TextStyle(color: NGColors.textSecondary, fontSize: 14)),
               Slider(
                 value: _selectedFontSize,
-                min: 14,
-                max: 60,
-                activeColor: NGColors.accent,
-                inactiveColor: NGColors.divider,
+                min: 14, max: 60,
+                activeColor: NGColors.accent, inactiveColor: NGColors.divider,
                 onChanged: (v) => setState(() => _selectedFontSize = v),
               ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    _addTextOverlay();
-                    Navigator.pop(context);
-                  },
+                  onPressed: () { _addTextOverlay(); Navigator.pop(ctx); },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: NGColors.accent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text(
-                    'Add Text',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
+                  child: const Text('Add Text', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
               ),
             ],
@@ -377,20 +303,17 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     );
   }
 
-  Widget _buildColorChip(Color color) {
+  Widget _colorChip(Color color) {
     return GestureDetector(
       onTap: () => setState(() => _selectedTextColor = color),
       child: Container(
         margin: const EdgeInsets.only(right: 8),
-        width: 36,
-        height: 36,
+        width: 36, height: 36,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
           border: Border.all(
-            color: _selectedTextColor == color
-                ? NGColors.accent
-                : NGColors.divider,
+            color: _selectedTextColor == color ? NGColors.accent : NGColors.divider,
             width: _selectedTextColor == color ? 3 : 1,
           ),
         ),
@@ -409,41 +332,24 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
           icon: Icon(Icons.close, color: NGColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Edit Video',
-          style: TextStyle(
-            color: NGColors.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: Text('Edit Video', style: TextStyle(color: NGColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
         actions: [
           TextButton(
-            onPressed: _trimmedFile != null || _overlays.isNotEmpty
-                ? _saveAndReturn
-                : null,
+            onPressed: (_trimmedFile != null || _overlays.isNotEmpty) ? _saveAndReturn : null,
             child: Text(
               'Apply',
               style: TextStyle(
-                color: _trimmedFile != null || _overlays.isNotEmpty
-                    ? NGColors.accent
-                    : NGColors.textMuted,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+                color: (_trimmedFile != null || _overlays.isNotEmpty) ? NGColors.accent : NGColors.textMuted,
+                fontWeight: FontWeight.bold, fontSize: 16,
               ),
             ),
           ),
         ],
       ),
       body: _controller == null
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: NGColors.accent,
-              ),
-            )
+          ? const Center(child: CircularProgressIndicator(color: NGColors.accent))
           : Column(
               children: [
-                // Video Preview with Overlays
                 Expanded(
                   flex: 3,
                   child: Stack(
@@ -457,7 +363,7 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                           ),
                         ),
                       ),
-                      // ===================== OVERLAY RENDERER =====================
+                      // Overlays
                       ..._overlays.map((item) {
                         return Positioned(
                           left: item.x * MediaQuery.of(context).size.width - 50,
@@ -467,17 +373,12 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                             onPanUpdate: (details) {
                               _updateOverlayPosition(
                                 item.id,
-                                (item.x + details.delta.dx / MediaQuery.of(context).size.width)
-                                    .clamp(0.0, 1.0),
-                                (item.y + details.delta.dy / (MediaQuery.of(context).size.height * 0.6))
-                                    .clamp(0.0, 1.0),
+                                (item.x + details.delta.dx / MediaQuery.of(context).size.width).clamp(0.0, 1.0),
+                                (item.y + details.delta.dy / (MediaQuery.of(context).size.height * 0.6)).clamp(0.0, 1.0),
                               );
                             },
                             onScaleUpdate: (details) {
-                              _updateOverlayScale(
-                                item.id,
-                                (item.scale * details.scale).clamp(0.5, 3.0),
-                              );
+                              _updateOverlayScale(item.id, (item.scale * details.scale).clamp(0.5, 3.0));
                             },
                             child: Transform.scale(
                               scale: item.scale,
@@ -486,29 +387,17 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.black.withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.3),
-                                    width: 1,
-                                  ),
+                                  border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
                                 ),
                                 child: item.type == 'emoji'
-                                    ? Text(
-                                        item.content,
-                                        style: const TextStyle(fontSize: 40),
-                                      )
+                                    ? Text(item.content, style: const TextStyle(fontSize: 40))
                                     : Text(
                                         item.content,
                                         style: TextStyle(
                                           color: item.textColor ?? Colors.white,
                                           fontSize: item.fontSize ?? 24,
                                           fontWeight: FontWeight.bold,
-                                          shadows: const [
-                                            Shadow(
-                                              color: Colors.black87,
-                                              blurRadius: 4,
-                                              offset: Offset(0, 2),
-                                            ),
-                                          ],
+                                          shadows: const [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 2))],
                                         ),
                                       ),
                               ),
@@ -516,170 +405,103 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                           ),
                         );
                       }).toList(),
-                      // Play/Pause Overlay
                       Center(
                         child: GestureDetector(
                           onTap: _togglePlay,
                           child: Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.5),
-                              shape: BoxShape.circle,
-                            ),
+                            width: 60, height: 60,
+                            decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), shape: BoxShape.circle),
                             child: Icon(
-                              _isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: NGColors.textPrimary,
-                              size: 36,
+                              _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                              color: NGColors.textPrimary, size: 36,
                             ),
                           ),
                         ),
                       ),
-                      // Overlay count badge
                       if (_overlays.isNotEmpty)
                         Positioned(
-                          top: 8,
-                          right: 8,
+                          top: 8, right: 8,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: NGColors.accent.withOpacity(0.9),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${_overlays.length} overlays',
-                              style: TextStyle(
-                                color: NGColors.textPrimary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: NGColors.accent.withOpacity(0.9), borderRadius: BorderRadius.circular(12)),
+                            child: Text('${_overlays.length} overlays', style: TextStyle(color: NGColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold)),
                           ),
                         ),
                     ],
                   ),
                 ),
-
                 // Tools Row
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: NGColors.surface,
-                    border: Border(
-                      top: BorderSide(
-                        color: NGColors.divider,
-                        width: 1,
-                      ),
-                    ),
+                    border: Border(top: BorderSide(color: NGColors.divider, width: 1)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildToolButton(
-                        icon: Icons.cut,
-                        label: 'Trim',
-                        isActive: _selectedTool == 'trim',
-                        onTap: () => setState(() => _selectedTool = 'trim'),
-                      ),
-                      _buildToolButton(
-                        icon: Icons.emoji_emotions,
-                        label: 'Emoji',
-                        isActive: _selectedTool == 'emoji',
-                        onTap: () {
-                          setState(() => _selectedTool = 'emoji');
-                          _showEmojiPicker();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.text_fields,
-                        label: 'Text',
-                        isActive: _selectedTool == 'text',
-                        onTap: () {
-                          setState(() => _selectedTool = 'text');
-                          _showTextOverlaySheet();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.delete_outline,
-                        label: 'Clear All',
-                        isActive: false,
-                        onTap: () {
-                          if (_overlays.isNotEmpty) {
-                            setState(() => _overlays.clear());
-                          }
-                        },
-                      ),
+                      _toolButton(Icons.cut, 'Trim', _selectedTool == 'trim', () => setState(() => _selectedTool = 'trim')),
+                      _toolButton(Icons.emoji_emotions, 'Emoji', _selectedTool == 'emoji', () {
+                        setState(() => _selectedTool = 'emoji');
+                        _showEmojiPicker();
+                      }),
+                      _toolButton(Icons.text_fields, 'Text', _selectedTool == 'text', () {
+                        setState(() => _selectedTool = 'text');
+                        _showTextOverlaySheet();
+                      }),
+                      _toolButton(Icons.delete_outline, 'Clear All', false, () {
+                        if (_overlays.isNotEmpty) setState(() => _overlays.clear());
+                      }),
                     ],
                   ),
                 ),
-
-                // Trim Section (only when trim is active)
+                // Trim Section (custom RangeSlider)
                 if (_selectedTool == 'trim')
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: NGColors.surfaceLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    decoration: BoxDecoration(color: NGColors.surfaceLight, borderRadius: BorderRadius.circular(12)),
                     margin: const EdgeInsets.all(12),
                     child: Column(
                       children: [
                         Row(
                           children: [
-                            Text(
-                              'Trim Video',
-                              style: TextStyle(
-                                color: NGColors.textPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
+                            Text('Trim Video', style: TextStyle(color: NGColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
                             const Spacer(),
                             if (_trimmedFile != null)
                               Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: NGColors.success.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: NGColors.success.withOpacity(0.3),
-                                  ),
+                                  border: Border.all(color: NGColors.success.withOpacity(0.3)),
                                 ),
-                                child: Text(
-                                  'Trimmed',
-                                  style: TextStyle(
-                                    color: NGColors.success,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                child: Text('Trimmed', style: TextStyle(color: NGColors.success, fontSize: 11, fontWeight: FontWeight.bold)),
                               ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        // ✅ Use the package's TrimViewer widget
-                        TrimViewer(
-                          trimmer: _trimmer,
-                          startValue: _startValue,
-                          endValue: _endValue,
-                          onStartValueChanged: (value) {
-                            setState(() => _startValue = value);
+                        // Custom Range Slider
+                        RangeSlider(
+                          values: RangeValues(_startValue, _endValue),
+                          min: 0.0,
+                          max: 1.0,
+                          activeColor: NGColors.accent,
+                          inactiveColor: NGColors.divider,
+                          onChanged: (values) {
+                            setState(() {
+                              _startValue = values.start;
+                              _endValue = values.end;
+                            });
                           },
-                          onEndValueChanged: (value) {
-                            setState(() => _endValue = value);
-                          },
-                          viewerWidth: MediaQuery.of(context).size.width - 40,
-                          viewerHeight: 60,
                         ),
-                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Start', style: TextStyle(color: NGColors.textMuted, fontSize: 12)),
+                            Text('End', style: TextStyle(color: NGColors.textMuted, fontSize: 12)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
                         Row(
                           children: [
                             Expanded(
@@ -693,16 +515,9 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                                 },
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(color: NGColors.divider),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
-                                child: Text(
-                                  'Reset',
-                                  style: TextStyle(
-                                    color: NGColors.textSecondary,
-                                  ),
-                                ),
+                                child: Text('Reset', style: TextStyle(color: NGColors.textSecondary)),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -711,27 +526,13 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                                 onPressed: _isTrimming ? null : _trimVideo,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: NGColors.accent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                                 child: _isTrimming
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
+                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                                     : Text(
-                                        _trimmedFile != null
-                                            ? 'Retrim'
-                                            : 'Apply Trim',
-                                        style: TextStyle(
-                                          color: NGColors.textPrimary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        _trimmedFile != null ? 'Retrim' : 'Apply Trim',
+                                        style: TextStyle(color: NGColors.textPrimary, fontWeight: FontWeight.bold),
                                       ),
                               ),
                             ),
@@ -740,19 +541,13 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                       ],
                     ),
                   ),
-
                 const SizedBox(height: 12),
               ],
             ),
     );
   }
 
-  Widget _buildToolButton({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
+  Widget _toolButton(IconData icon, String label, bool isActive, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -763,33 +558,14 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
             decoration: BoxDecoration(
               color: isActive ? NGColors.accent.withOpacity(0.15) : NGColors.surfaceLight,
               shape: BoxShape.circle,
-              border: isActive
-                  ? Border.all(color: NGColors.accent)
-                  : null,
+              border: isActive ? Border.all(color: NGColors.accent) : null,
             ),
-            child: Icon(
-              icon,
-              color: isActive ? NGColors.accent : NGColors.textMuted,
-              size: 24,
-            ),
+            child: Icon(icon, color: isActive ? NGColors.accent : NGColors.textMuted, size: 24),
           ),
           const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: isActive ? NGColors.textPrimary : NGColors.textMuted,
-              fontSize: 11,
-            ),
-          ),
+          Text(label, style: TextStyle(color: isActive ? NGColors.textPrimary : NGColors.textMuted, fontSize: 11)),
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    _textController.dispose();
-    super.dispose();
   }
 }
