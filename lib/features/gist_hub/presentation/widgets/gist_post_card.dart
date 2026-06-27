@@ -10,6 +10,7 @@ import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dar
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_comment_sheet.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_hub_features.dart';
+import 'package:nigergram/features/gist_hub/presentation/widgets/gist_text_with_mentions.dart'; // ✅ NEW IMPORT
 
 class GistPostCard extends StatefulWidget {
   final GistPostEntity post;
@@ -257,14 +258,14 @@ class _GistPostCardState extends State<GistPostCard> {
           ),
           const SizedBox(height: 12),
 
-          // Content
-          Text(
-            _post.content,
-            style: const TextStyle(
-              color: NGColors.textPrimary,
-              fontSize: 15,
-              height: 1.6,
-            ),
+          // ✅ REPLACED with clickable mentions widget
+          GistTextWithMentions(
+            text: _post.content,
+            fontSize: 15,
+            maxLines: 10,
+            onMentionTap: (username) {
+              context.push('/profile/$username');
+            },
           ),
           const SizedBox(height: 12),
 
