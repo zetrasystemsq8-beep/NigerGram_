@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:nigergram/features/video_feed/presentation/bloc/video_feed_cubit.dart';
@@ -32,7 +33,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
   /// Track loop counts per video in-session to report loopCount increments
   final Map<String, int> _loopCounts = {};
 
-  // 🔥 FIX: Track initialization status per index
+  /// Track initialization status per index
   final Map<int, bool> _initializationStatus = {};
 
   @override
@@ -133,7 +134,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
       return _controllers[index];
     }
 
-    // 🔥 FIX: Mark as initializing
+    // Mark as initializing
     _initializationStatus[index] = false;
 
     final controller = VideoPlayerController.networkUrl(
@@ -142,7 +143,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
 
     _controllers[index] = controller;
 
-    // 🔥 FIX: Proper initialization with state updates
+    // Proper initialization with state updates
     controller.initialize().then((_) {
       if (!mounted) return;
       
@@ -159,7 +160,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
         controller.play();
       }
       
-      // 🔥 FIX: Force rebuild to update UI
+      // Force rebuild to update UI
       setState(() {});
       
     }).catchError((error) {
@@ -241,143 +242,27 @@ class _VideoFeedViewState extends State<VideoFeedView> {
       builder: (context, state) {
         if (state.isLoading && state.videos.isEmpty) {
           return Scaffold(
-            backgroundColor: const Color(0xFF0F0F11),
-            body: Stack(
-              children: [
-                Positioned.fill(
-                  child: Container(color: const Color(0xFF16161A)),
-                ),
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const CircularProgressIndicator(
-                        color: Color(0xFFFE2C55),
-                        strokeWidth: 3,
-                      ),
-                      SizedBox(height: context.h(20)),
-                      Text(
-                        'Assembling your personalized feed...',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: context.fontSize(14),
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            backgroundColor: NGColors.background,
+            body: _buildSkeletonLoading(context),
           );
         }
 
         if (!state.isSuccess && state.errorMessage.isNotEmpty) {
           return Scaffold(
-            backgroundColor: const Color(0xFF0F0F11),
-            body: Center(
-              child: Padding(
-                padding: context.paddingHorizontal(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: context.paddingAll(16),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.wifi_off_rounded,
-                        color: Colors.redAccent,
-                        size: context.sq(44),
-                      ),
-                    ),
-                    SizedBox(height: context.h(20)),
-                    Text(
-                      'Connection interrupted',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: context.fontSize(18),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: context.h(8)),
-                    Text(
-                      state.errorMessage,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: context.fontSize(13),
-                        height: 1.4,
-                      ),
-                    ),
-                    SizedBox(height: context.h(28)),
-                    GestureDetector(
-                      onTap: () => context.read<VideoFeedCubit>().loadVideos(),
-                      child: Container(
-                        width: double.infinity,
-                        alignment: Alignment.center,
-                        padding: context.paddingVertical(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFE2C55),
-                          borderRadius: context.radiusAll(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFFE2C55).withOpacity(0.3),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            )
-                          ],
-                        ),
-                        child: Text(
-                          'Refresh Feed',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: context.fontSize(15),
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            backgroundColor: NGColors.background,
+            body: _buildErrorState(context, state.errorMessage),
           );
         }
 
         if (state.videos.isEmpty) {
           return Scaffold(
-            backgroundColor: const Color(0xFF0F0F11),
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.video_collection_rounded,
-                    color: Colors.white24,
-                    size: context.sq(64),
-                  ),
-                  SizedBox(height: context.h(16)),
-                  Text(
-                    'No videos uploaded yet',
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: context.fontSize(15),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            backgroundColor: NGColors.background,
+            body: _buildEmptyState(context),
           );
         }
 
         return Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: NGColors.background,
           body: Padding(
             padding: EdgeInsets.only(bottom: bottomNavigationPadding),
             child: PageView.builder(
@@ -386,58 +271,253 @@ class _VideoFeedViewState extends State<VideoFeedView> {
               onPageChanged: (index) => _onPageChanged(index, state.videos),
               itemCount: state.videos.length,
               itemBuilder: (context, index) {
-                // 🔥 FIX: Get or create controller, but we need to rebuild when initialized
                 final controller = _controllers[index];
                 final isInitialized = _initializationStatus[index] ?? false;
                 
-                // 🔥 FIX: If controller doesn't exist yet, create it
                 if (controller == null) {
                   _getOrCreateController(index, state.videos);
                 }
                 
-                // 🔥 FIX: Always use the latest controller from the map
                 final currentController = _controllers[index];
                 
-                return Stack(
-                  children: [
-                    Positioned.fill(
-                      child: VideoFeedViewItem(
-                        key: ValueKey('${state.videos[index].id}_${isInitialized ? 'init' : 'loading'}'),
-                        videoItem: state.videos[index],
-                        controller: currentController,
-                      ),
-                    ),
-                    
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: context.h(180),
-                      child: IgnorePointer(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withOpacity(0.15),
-                                Colors.black.withOpacity(0.50),
-                                Colors.black.withOpacity(0.85),
-                              ],
-                              stops: const [0.0, 0.3, 0.6, 1.0],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                return VideoFeedViewItem(
+                  key: ValueKey('${state.videos[index].id}_${isInitialized ? 'init' : 'loading'}'),
+                  videoItem: state.videos[index],
+                  controller: currentController,
                 );
               },
             ),
           ),
         );
       },
+    );
+  }
+
+  /// 🎨 SKELETON LOADING UI
+  Widget _buildSkeletonLoading(BuildContext context) {
+    return ListView.builder(
+      itemCount: 3,
+      itemBuilder: (context, index) {
+        return Container(
+          height: MediaQuery.of(context).size.height,
+          color: NGColors.surface,
+          child: Stack(
+            children: [
+              // Video placeholder
+              Container(
+                color: NGColors.surfaceLight,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(
+                        color: NGColors.accent,
+                        strokeWidth: 3,
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: 200,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: NGColors.divider,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 150,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: NGColors.divider,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Skeleton overlay
+              Positioned(
+                left: 16,
+                right: 16,
+                top: 48,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: NGColors.divider,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: NGColors.divider,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: 60,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: NGColors.divider,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Skeleton bottom
+              Positioned(
+                bottom: 16,
+                left: 16,
+                right: 96,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: NGColors.divider,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 150,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: NGColors.divider,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// ⚠️ ERROR STATE UI
+  Widget _buildErrorState(BuildContext context, String errorMessage) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: NGColors.error.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.wifi_off_rounded,
+                color: NGColors.error,
+                size: 44,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Connection Interrupted',
+              style: TextStyle(
+                color: NGColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              errorMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: NGColors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 28),
+            GestureDetector(
+              onTap: () => context.read<VideoFeedCubit>().loadVideos(),
+              child: Container(
+                width: double.infinity,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: NGColors.accent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: NGColors.accent.withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  'Refresh Feed',
+                  style: TextStyle(
+                    color: NGColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 📭 EMPTY STATE UI
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.video_collection_rounded,
+            color: NGColors.textMuted,
+            size: 64,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No videos yet',
+            style: TextStyle(
+              color: NGColors.textSecondary,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Be the first to upload!',
+            style: TextStyle(
+              color: NGColors.textMuted,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
