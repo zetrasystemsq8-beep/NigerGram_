@@ -89,27 +89,16 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     setState(() {});
   }
 
-  // ===================== TRIMMING (UPDATED) =====================
+  // ===================== ✅ FIXED TRIMMING =====================
   Future<void> _trimVideo() async {
     if (_controller == null) return;
     setState(() => _isTrimming = true);
     try {
-      final totalDuration = _controller!.value.duration;
-      final start = Duration(
-          milliseconds: (totalDuration.inMilliseconds * _startValue).toInt());
-      final end = Duration(
-          milliseconds: (totalDuration.inMilliseconds * _endValue).toInt());
-
-      // Try using `.trim()` first (v4+)
-      File? trimmed;
-      try {
-        trimmed = await _trimmer.trim(start: start, end: end);
-      } catch (_) {
-        // Fallback to older `trimVideo` with doubles
-        trimmed = await _trimmer.trimVideo(
-            startValue: _startValue, endValue: _endValue);
-      }
-
+      // Use trimVideo with double values (0-1) for v4.x
+      final trimmed = await _trimmer.trimVideo(
+        startValue: _startValue,
+        endValue: _endValue,
+      );
       if (trimmed != null) {
         setState(() => _trimmedFile = trimmed);
       }
@@ -192,7 +181,6 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     Navigator.pop(context, fileToReturn);
   }
 
-  // ===================== EMOJI PICKER =====================
   void _showEmojiPicker() {
     const emojis = [
       '😂', '😍', '🔥', '💯', '🥺', '😭', '❤️', '🙏',
@@ -234,7 +222,6 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     );
   }
 
-  // ===================== TEXT OVERLAY =====================
   void _showTextOverlaySheet() {
     showModalBottomSheet(
       context: context,
@@ -363,7 +350,6 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                           ),
                         ),
                       ),
-                      // Overlays
                       ..._overlays.map((item) {
                         return Positioned(
                           left: item.x * MediaQuery.of(context).size.width - 50,
@@ -430,7 +416,6 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                     ],
                   ),
                 ),
-                // Tools Row
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
@@ -455,7 +440,6 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                     ],
                   ),
                 ),
-                // Trim Section (custom RangeSlider)
                 if (_selectedTool == 'trim')
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -480,7 +464,6 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        // Custom Range Slider
                         RangeSlider(
                           values: RangeValues(_startValue, _endValue),
                           min: 0.0,
