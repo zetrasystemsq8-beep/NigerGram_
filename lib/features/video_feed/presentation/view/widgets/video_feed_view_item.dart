@@ -10,7 +10,8 @@ import 'package:video_player/video_player.dart';
 import 'video_feed_view_optimized_video_player.dart';
 import 'video_feed_view_interaction_buttons.dart';
 import 'comments_viewer_bottom_sheet.dart';
-import 'video_share_bottom_sheet.dart'; // ✅ NEW IMPORT
+import 'video_share_bottom_sheet.dart';
+import 'video_feed_view_user_info_section.dart'; // ✅ NEW IMPORT
 
 class VideoFeedViewItem extends StatefulWidget {
   final VideoEntity videoItem;
@@ -345,188 +346,26 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
             ),
           ),
 
-          // LAYER 4: Top Section - Creator Info + Follow
+          // LAYER 4: Top Section - User Info (NEW WIDGET)
           Positioned(
             top: 48,
             left: 16,
             right: 16,
-            child: Row(
-              children: [
-                // Profile Avatar
-                GestureDetector(
-                  onTap: _navigateToProfile,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: NGColors.accent,
-                        width: 2,
-                      ),
-                      image: widget.videoItem.profileImageUrl != null &&
-                              widget.videoItem.profileImageUrl!.isNotEmpty
-                          ? DecorationImage(
-                              image: NetworkImage(widget.videoItem.profileImageUrl!),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                    ),
-                    child: widget.videoItem.profileImageUrl == null ||
-                            widget.videoItem.profileImageUrl!.isEmpty
-                        ? Container(
-                            decoration: const BoxDecoration(
-                              color: NGColors.surface,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.person_rounded,
-                              color: NGColors.textMuted,
-                              size: 24,
-                            ),
-                          )
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Username + Badges
-                Expanded(
-                  child: GestureDetector(
-                    onTap: _navigateToProfile,
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            '@${widget.videoItem.username}',
-                            style: const TextStyle(
-                              color: NGColors.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black87,
-                                  blurRadius: 4,
-                                  offset: Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        // Verified Badge
-                        if (widget.videoItem.isVerified ?? false)
-                          const Icon(
-                            Icons.verified_rounded,
-                            color: NGColors.verified,
-                            size: 18,
-                          ),
-                        const SizedBox(width: 4),
-                        // Premium Badge
-                        if (widget.videoItem.isPremium ?? false)
-                          const Icon(
-                            Icons.star_rounded,
-                            color: NGColors.premium,
-                            size: 18,
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Follow Button (Emerald Green Accent)
-                if (!isFollowing && !isOwnVideo)
-                  GestureDetector(
-                    onTap: _handleFollow,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: NGColors.accent,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'Follow',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+            child: VideoFeedViewUserInfoSection(
+              profileImageUrl: widget.videoItem.profileImageUrl ?? '',
+              username: widget.videoItem.username,
+              description: widget.videoItem.description,
+              soundName: widget.videoItem.soundName,
+              isVerified: widget.videoItem.isVerified ?? false,
+              isFollowing: isFollowing,
+              isOwnVideo: isOwnVideo,
+              onFollowTap: _handleFollow,
             ),
           ),
 
-          // LAYER 5: Bottom Section - Caption + Hashtags + Sound
-          Positioned(
-            bottom: 16,
-            left: 16,
-            right: 96, // Space for action buttons
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Caption with Hashtags
-                if (widget.videoItem.description.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      widget.videoItem.description,
-                      style: const TextStyle(
-                        color: NGColors.textSecondary,
-                        fontSize: 14,
-                        height: 1.4,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black87,
-                            blurRadius: 4,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-
-                // Sound/Music Tag
-                if (widget.videoItem.soundName != null &&
-                    widget.videoItem.soundName!.isNotEmpty)
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.music_note_rounded,
-                        color: NGColors.textMuted,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          widget.videoItem.soundName!,
-                          style: const TextStyle(
-                            color: NGColors.textMuted,
-                            fontSize: 13,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black87,
-                                blurRadius: 4,
-                                offset: Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
+          // LAYER 5: Bottom Section - Now handled by the new widget (sound, caption, etc.)
+          // But we still keep the caption and sound in the UserInfoSection.
+          // No need for separate bottom section now.
 
           // LAYER 6: Right Action Buttons (Overlay on top)
           Positioned(
@@ -542,7 +381,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
               creatorId: widget.videoItem.creatorId,
               creatorUsername: widget.videoItem.username,
               onCommentTapped: () => _openCommentsModalSheet(context),
-              onShareTapped: () => _showShareBottomSheet(context), // ✅ UPGRADED
+              onShareTapped: () => _showShareBottomSheet(context),
               onBookmarkTapped: () => _handleBookmark(),
             ),
           ),
