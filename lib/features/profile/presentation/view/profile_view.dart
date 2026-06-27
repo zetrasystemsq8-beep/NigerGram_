@@ -415,7 +415,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
           .count()
           .get();
       setState(() {
-        _blockedCount = snap.count;
+        _blockedCount = snap.count ?? 0;
       });
     } catch (_) {}
   }
