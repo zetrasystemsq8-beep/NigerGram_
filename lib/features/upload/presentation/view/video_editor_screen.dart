@@ -94,12 +94,19 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     setState(() {});
   }
 
+  // ===================== FIXED TRIM METHOD =====================
   Future<void> _trimVideo() async {
+    if (_controller == null) return;
     setState(() => _isTrimming = true);
     try {
-      final trimmed = await _trimmer.trimVideo(
-        startValue: _startValue,
-        endValue: _endValue,
+      final totalDuration = _controller!.value.duration;
+      final start = Duration(milliseconds: (totalDuration.inMilliseconds * _startValue).toInt());
+      final end = Duration(milliseconds: (totalDuration.inMilliseconds * _endValue).toInt());
+
+      // ✅ CORRECT METHOD: trim(start:, end:)
+      final trimmed = await _trimmer.trim(
+        start: start,
+        end: end,
       );
       if (trimmed != null) {
         setState(() => _trimmedFile = File(trimmed.path));
@@ -192,7 +199,7 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     Navigator.pop(context, fileToReturn);
   }
 
-  // ===================== EMOJI PICKER BOTTOM SHEET =====================
+  // ===================== EMOJI PICKER =====================
   void _showEmojiPicker() {
     final List<String> emojis = [
       '😂', '😍', '🔥', '💯', '🥺', '😭', '❤️', '🙏',
@@ -259,7 +266,7 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     );
   }
 
-  // ===================== TEXT OVERLAY BOTTOM SHEET =====================
+  // ===================== TEXT OVERLAY SHEET =====================
   void _showTextOverlaySheet() {
     showModalBottomSheet(
       context: context,
@@ -303,7 +310,6 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                 autofocus: true,
               ),
               const SizedBox(height: 16),
-              // Text Color Picker
               Text(
                 'Color',
                 style: TextStyle(color: NGColors.textSecondary, fontSize: 14),
@@ -327,7 +333,6 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Font Size Slider
               Text(
                 'Size: ${_selectedFontSize.toInt()}',
                 style: TextStyle(color: NGColors.textSecondary, fontSize: 14),
@@ -660,10 +665,9 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        TrimEditor(
+                        // ✅ Use the package's TrimViewer widget
+                        TrimViewer(
                           trimmer: _trimmer,
-                          viewerHeight: 60,
-                          viewerWidth: MediaQuery.of(context).size.width - 40,
                           startValue: _startValue,
                           endValue: _endValue,
                           onStartValueChanged: (value) {
@@ -672,6 +676,8 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
                           onEndValueChanged: (value) {
                             setState(() => _endValue = value);
                           },
+                          viewerWidth: MediaQuery.of(context).size.width - 40,
+                          viewerHeight: 60,
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -785,214 +791,5 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
     _controller?.dispose();
     _textController.dispose();
     super.dispose();
-  }
-}
-
-// ===================== TRIM EDITOR WIDGET =====================
-class TrimEditor extends StatelessWidget {
-  final Trimmer trimmer;
-  final double startValue;
-  final double endValue;
-  final Function(double) onStartValueChanged;
-  final Function(double) onEndValueChanged;
-  final double viewerHeight;
-  final double viewerWidth;
-
-  const TrimEditor({
-    super.key,
-    required this.trimmer,
-    required this.startValue,
-    required this.endValue,
-    required this.onStartValueChanged,
-    required this.onEndValueChanged,
-    required this.viewerHeight,
-    required this.viewerWidth,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: viewerHeight + 40,
-      child: Row(
-        children: [
-          Expanded(
-            child: TrimViewer(
-              trimmer: trimmer,
-              startValue: startValue,
-              endValue: endValue,
-              viewerHeight: viewerHeight,
-              viewerWidth: viewerWidth,
-              onStartValueChanged: onStartValueChanged,
-              onEndValueChanged: onEndValueChanged,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class TrimViewer extends StatefulWidget {
-  final Trimmer trimmer;
-  final double startValue;
-  final double endValue;
-  final Function(double) onStartValueChanged;
-  final Function(double) onEndValueChanged;
-  final double viewerHeight;
-  final double viewerWidth;
-
-  const TrimViewer({
-    super.key,
-    required this.trimmer,
-    required this.startValue,
-    required this.endValue,
-    required this.onStartValueChanged,
-    required this.onEndValueChanged,
-    required this.viewerHeight,
-    required this.viewerWidth,
-  });
-
-  @override
-  State<TrimViewer> createState() => _TrimViewerState();
-}
-
-class _TrimViewerState extends State<TrimViewer> {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: widget.viewerHeight + 40,
-      child: Stack(
-        children: [
-          // Video preview frames
-          Container(
-            height: widget.viewerHeight,
-            decoration: BoxDecoration(
-              color: NGColors.surface,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: widget.trimmer.videoPlayerController != null &&
-                    widget.trimmer.videoPlayerController!.value.isInitialized
-                ? TrimVideoWidget(
-                    trimmer: widget.trimmer,
-                    startValue: widget.startValue,
-                    endValue: widget.endValue,
-                    onStartValueChanged: widget.onStartValueChanged,
-                    onEndValueChanged: widget.onEndValueChanged,
-                    viewerHeight: widget.viewerHeight,
-                    viewerWidth: widget.viewerWidth,
-                  )
-                : Center(
-                    child: CircularProgressIndicator(
-                      color: NGColors.accent,
-                      strokeWidth: 2,
-                    ),
-                  ),
-          ),
-          // Left handle
-          Positioned(
-            left: widget.startValue * widget.viewerWidth - 10,
-            top: 0,
-            child: GestureDetector(
-              onHorizontalDragUpdate: (details) {
-                final newValue = (widget.startValue + details.delta.dx / widget.viewerWidth)
-                    .clamp(0.0, widget.endValue - 0.02);
-                widget.onStartValueChanged(newValue);
-              },
-              child: Container(
-                width: 20,
-                height: widget.viewerHeight,
-                decoration: BoxDecoration(
-                  color: NGColors.accent.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Icon(
-                  Icons.drag_handle,
-                  color: Colors.white,
-                  size: 16,
-                ),
-              ),
-            ),
-          ),
-          // Right handle
-          Positioned(
-            left: widget.endValue * widget.viewerWidth - 10,
-            top: 0,
-            child: GestureDetector(
-              onHorizontalDragUpdate: (details) {
-                final newValue = (widget.endValue + details.delta.dx / widget.viewerWidth)
-                    .clamp(widget.startValue + 0.02, 1.0);
-                widget.onEndValueChanged(newValue);
-              },
-              child: Container(
-                width: 20,
-                height: widget.viewerHeight,
-                decoration: BoxDecoration(
-                  color: NGColors.accent.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Icon(
-                  Icons.drag_handle,
-                  color: Colors.white,
-                  size: 16,
-                ),
-              ),
-            ),
-          ),
-          // Trimmed region highlight
-          Positioned(
-            left: widget.startValue * widget.viewerWidth,
-            top: 0,
-            width: (widget.endValue - widget.startValue) * widget.viewerWidth,
-            height: widget.viewerHeight,
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: NGColors.accent,
-                  width: 2,
-                ),
-                color: NGColors.accent.withOpacity(0.05),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class TrimVideoWidget extends StatelessWidget {
-  final Trimmer trimmer;
-  final double startValue;
-  final double endValue;
-  final Function(double) onStartValueChanged;
-  final Function(double) onEndValueChanged;
-  final double viewerHeight;
-  final double viewerWidth;
-
-  const TrimVideoWidget({
-    super.key,
-    required this.trimmer,
-    required this.startValue,
-    required this.endValue,
-    required this.onStartValueChanged,
-    required this.onEndValueChanged,
-    required this.viewerHeight,
-    required this.viewerWidth,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        color: NGColors.surfaceLight,
-        child: Center(
-          child: AspectRatio(
-            aspectRatio: 2,
-            child: VideoPlayer(trimmer.videoPlayerController!),
-          ),
-        ),
-      ),
-    );
   }
 }
