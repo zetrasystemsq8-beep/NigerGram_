@@ -1,4 +1,5 @@
 // lib/features/inbox/presentation/view/chat_view.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -32,10 +33,7 @@ class _ChatViewState extends State<ChatView> {
   final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
   final ScrollController _scrollController = ScrollController();
 
-  // State for image upload
   bool _isSendingImage = false;
-
-  // Typing indicator
   bool _isOtherUserTyping = false;
   bool _isTyping = false;
   Timer? _typingTimer;
@@ -52,12 +50,10 @@ class _ChatViewState extends State<ChatView> {
     _messageController.dispose();
     _scrollController.dispose();
     _typingTimer?.cancel();
-    // Reset typing status when leaving chat
     _setTypingStatus(false);
     super.dispose();
   }
 
-  // ===================== TYPING INDICATOR =====================
   void _listenToTypingStatus() {
     FirebaseFirestore.instance
         .collection('chats')
@@ -95,7 +91,6 @@ class _ChatViewState extends State<ChatView> {
     });
   }
 
-  // ===================== MARK AS READ =====================
   void _markAsRead() async {
     try {
       await FirebaseFirestore.instance.collection('chats').doc(widget.chatId).update({
@@ -104,7 +99,6 @@ class _ChatViewState extends State<ChatView> {
     } catch (_) {}
   }
 
-  // ===================== SEND TEXT MESSAGE =====================
   void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -145,7 +139,6 @@ class _ChatViewState extends State<ChatView> {
     }
   }
 
-  // ===================== SEND IMAGE MESSAGE =====================
   Future<void> _pickAndSendImage() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -166,7 +159,6 @@ class _ChatViewState extends State<ChatView> {
       final fileName =
           'chat_images/${widget.chatId}_${DateTime.now().millisecondsSinceEpoch}_${user.uid}.jpg';
 
-      // Upload to Supabase
       await Supabase.instance.client.storage
           .from('images')
           .uploadBinary(fileName, bytes, fileOptions: const FileOptions(
@@ -178,7 +170,6 @@ class _ChatViewState extends State<ChatView> {
           .from('images')
           .getPublicUrl(fileName);
 
-      // Save message
       await _sendImageMessage(imageUrl);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -220,7 +211,6 @@ class _ChatViewState extends State<ChatView> {
     _scrollToBottom();
   }
 
-  // ===================== IMAGE VIEWER =====================
   void _showFullImage(String imageUrl) {
     showDialog(
       context: context,
@@ -253,7 +243,6 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
-  // ===================== SCROLL =====================
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
@@ -266,7 +255,6 @@ class _ChatViewState extends State<ChatView> {
     });
   }
 
-  // ===================== TIME FORMAT =====================
   String _formatTime(DateTime? date) {
     if (date == null) return '';
     final now = DateTime.now();
@@ -277,7 +265,6 @@ class _ChatViewState extends State<ChatView> {
     return 'Just now';
   }
 
-  // ===================== NAVIGATE TO PROFILE =====================
   void _navigateToProfile() {
     context.push('/profile/${widget.otherUserId}');
   }
@@ -522,7 +509,6 @@ class _ChatViewState extends State<ChatView> {
               },
             ),
           ),
-          // Input row
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -535,7 +521,6 @@ class _ChatViewState extends State<ChatView> {
             ),
             child: Row(
               children: [
-                // Attach image button
                 IconButton(
                   icon: _isSendingImage
                       ? const SizedBox(
