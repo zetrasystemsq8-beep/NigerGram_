@@ -1,39 +1,32 @@
 import 'package:flutter/material.dart';
 
-// Existing color constants (kept for backward compatibility)
-const black = Colors.black;
-const black54 = Colors.black54;
-const white = Colors.white;
-const blue = Colors.blue;
-const orange = Colors.orange;
-const green = Colors.green;
-const red = Colors.red;
-const transparent = Colors.transparent;
-
-/// NigerGram Design System Colors
+/// NigerGram Design System - Unified Colors
 class NGColors {
-  // Backgrounds
-  static const Color background = Color(0xFF0F0F0F);
-  static const Color surface = Color(0xFF1A1A1A);
-  static const Color surfaceLight = Color(0xFF2A2A2A);
+  // Backgrounds - Dark Theme
+  static const Color background = Color(0xFF0D0D0D);  // Almost black
+  static const Color surface = Color(0xFF181818);     // Cards
+  static const Color surfaceLight = Color(0xFF242424); // Hover/Highlights
+  static const Color divider = Color(0xFF2E2E2E);     // Borders
 
   // Text
-  static const Color textPrimary = Colors.white;
-  static const Color textSecondary = Colors.white70;
-  static const Color textMuted = Colors.grey;
+  static const Color textPrimary = Color(0xFFFFFFFF);   // White
+  static const Color textSecondary = Color(0xFFA0A0A0); // Light grey
+  static const Color textMuted = Color(0xFF6A6A74);     // Dark grey
 
-  // Brand / Accent
-  static const Color accent = Color(0xFFFF0050); // NigerGram Red/Pink
-  static const Color accentGold = Color(0xFFFFD700); // 👈 ADD THIS
+  // ONE ACCENT COLOR - Emerald Green
+  static const Color accent = Color(0xFF00C853);
+  static const Color accentLight = Color(0xFF00E676);
+  static const Color accentDark = Color(0xFF009624);
+
+  // Status colors
+  static const Color success = Color(0xFF00C853);
+  static const Color error = Color(0xFFFF1744);
+  static const Color warning = Color(0xFFFFD600);
+
+  // Special (for badges, achievements)
+  static const Color gold = Color(0xFFFFD700);
   static const Color accentBlue = Color(0xFF0088FF);
   static const Color accentPurple = Color(0xFF8B00FF);
   static const Color accentGreen = Color(0xFF00C853);
-
-  // Borders / Dividers
-  static const Color divider = Color(0xFF3A3A3A);
-  
-  // Status
-  static const Color success = Color(0xFF00C853); // 👈 ADD THIS
-  static const Color error = Color(0xFFFF1744); // 👈 ADD THIS
-  static const Color warning = Color(0xFFFFD600); // 👈 ADD THIS
+  static const Color accentGold = Color(0xFFFFD700);
 }
