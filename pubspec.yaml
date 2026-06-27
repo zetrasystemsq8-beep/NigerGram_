@@ -36,12 +36,12 @@ dependencies:
   http: ^1.2.2
   url_launcher: ^6.1.10
   
-  # Structural Additions (Aligned versions to resolve the web package conflict)
+  # Structural Additions
   cached_network_image: ^3.4.1
   share_plus: ^10.1.0
 
-  # NEW: Video Trimming
-  video_trimmer: ^3.1.0
+  # ✅ FIXED: Video Trimming
+  video_trimmer: ^5.0.0  # ✅ Changed from ^3.1.0 to ^5.0.0
 
 dev_dependencies:
   flutter_test:
