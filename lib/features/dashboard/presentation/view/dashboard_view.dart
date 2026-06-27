@@ -1,3 +1,4 @@
+// lib/features/dashboard/presentation/view/dashboard_view.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -7,7 +8,7 @@ import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.dart';
 import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
-import 'package:nigergram/features/inbox/presentation/view/inbox_view.dart'; // ✅ ADD THIS
+import 'package:nigergram/features/inbox/presentation/view/inbox_view.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -23,7 +24,7 @@ class _DashboardViewState extends State<DashboardView> {
     const VideoFeedView(),
     const GistHubView(),
     const SizedBox(),
-    const InboxView(), // ✅ CHANGED: Replaced _InboxPlaceholder
+    const InboxView(),
     const ProfileView(),
   ];
 
@@ -32,7 +33,22 @@ class _DashboardViewState extends State<DashboardView> {
       context.push(RouterEnum.uploadView.routeName);
       return;
     }
-    setState(() => _currentIndex = index);
+
+    // ✅ PAUSE VIDEO WHEN LEAVING VIDEO TAB
+    if (_currentIndex == 0 && index != 0) {
+      videoFeedKey.currentState?.pauseVideo();
+    }
+
+    // ✅ RESUME VIDEO WHEN RETURNING TO VIDEO TAB
+    if (index == 0 && _currentIndex != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        videoFeedKey.currentState?.resumeVideo();
+      });
+    }
+
+    setState(() {
+      _currentIndex = index;
+    });
   }
 
   @override
@@ -224,5 +240,3 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
 }
-
-// ✅ REMOVED _InboxPlaceholder - no longer needed
