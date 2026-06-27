@@ -14,6 +14,9 @@ import 'package:nigergram/features/video_feed/presentation/view/widgets/video_fe
 import 'package:video_player/video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// ✅ GLOBAL KEY TO ACCESS VIDEO FEED STATE
+final GlobalKey<_VideoFeedViewState> videoFeedKey = GlobalKey<_VideoFeedViewState>();
+
 class VideoFeedView extends StatefulWidget {
   const VideoFeedView({super.key});
 
@@ -27,14 +30,22 @@ class _VideoFeedViewState extends State<VideoFeedView> {
   final Map<int, VoidCallback> _activeListeners = {};
   int _focusedIndex = 0;
 
-  /// Track reported view increments so we only increment once per session per video
   final Set<String> _viewReported = {};
-
-  /// Track loop counts per video in-session to report loopCount increments
   final Map<String, int> _loopCounts = {};
-
-  /// Track initialization status per index
   final Map<int, bool> _initializationStatus = {};
+
+  // ✅ EXPOSED METHODS FOR PAUSE/RESUME
+  void pauseVideo() {
+    if (_controllers.containsKey(_focusedIndex)) {
+      _controllers[_focusedIndex]?.pause();
+    }
+  }
+
+  void resumeVideo() {
+    if (_controllers.containsKey(_focusedIndex)) {
+      _controllers[_focusedIndex]?.play();
+    }
+  }
 
   @override
   void initState() {
@@ -68,28 +79,19 @@ class _VideoFeedViewState extends State<VideoFeedView> {
 
   void _onPageChanged(int index, List<VideoEntity> videos) {
     if (!mounted) return;
-
     debugPrint('➡️ Page changed to index $index for videoId=${videos[index].id}');
-
     setState(() {
       _focusedIndex = index;
     });
-
-    // Notify Cubit of page change for state tracking and pagination
     context.read<VideoFeedCubit>().onPageChanged(index);
-
     _manageControllerLifecycle(index, videos);
   }
 
   void _manageControllerLifecycle(int index, List<VideoEntity> videos) {
-    // Play current focused item
     _getOrCreateController(index, videos)?.play();
-
-    // Pause adjacent buffers
     _getOrCreateController(index - 1, videos)?.pause();
     _getOrCreateController(index + 1, videos)?.pause();
 
-    // Aggressively dispose distant players to save cellular data and RAM
     _controllers.removeWhere((key, controller) {
       if ((key - index).abs() > 1) {
         final listener = _activeListeners[key];
@@ -104,7 +106,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
       return false;
     });
 
-    // Prefetch next 2 videos to disk cache (no controller instantiation)
     for (int i = 1; i <= 2; i++) {
       final preIndex = index + i;
       if (preIndex >= 0 && preIndex < videos.length) {
@@ -112,7 +113,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
       }
     }
 
-    // Ensure retention/view reporting attached for focused video
     if (index >= 0 && index < videos.length) {
       _attachViewListener(index, videos[index].id);
     }
@@ -128,41 +128,26 @@ class _VideoFeedViewState extends State<VideoFeedView> {
 
   VideoPlayerController? _getOrCreateController(int index, List<VideoEntity> videos) {
     if (index < 0 || index >= videos.length) return null;
-    
-    // Return existing controller if we have one
     if (_controllers.containsKey(index)) {
       return _controllers[index];
     }
 
-    // Mark as initializing
     _initializationStatus[index] = false;
-
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(videos[index].videoUrl),
     );
-
     _controllers[index] = controller;
 
-    // Proper initialization with state updates
     controller.initialize().then((_) {
       if (!mounted) return;
-      
-      // Only proceed if this controller is still the one for this index
       if (_controllers[index] != controller) return;
-      
       debugPrint('✅ Video initialized for index $index: ${videos[index].id}');
-      
       controller.setLooping(true);
       _initializationStatus[index] = true;
-      
-      // If this is the focused index, play automatically
       if (index == _focusedIndex) {
         controller.play();
       }
-      
-      // Force rebuild to update UI
       setState(() {});
-      
     }).catchError((error) {
       debugPrint('❌ Video initialization failed for index $index: $error');
       if (mounted) {
@@ -170,15 +155,12 @@ class _VideoFeedViewState extends State<VideoFeedView> {
         setState(() {});
       }
     });
-
     return controller;
   }
 
   void _attachViewListener(int index, String videoId) {
     final controller = _controllers[index];
     if (controller == null) return;
-
-    // Remove old listener on this slot if it exists before assigning a new one
     final oldListener = _activeListeners[index];
     if (oldListener != null) {
       controller.removeListener(oldListener);
@@ -186,7 +168,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     }
 
     debugPrint('🔔 Attaching clean view listener for videoId=$videoId at index $index');
-
     Duration lastPosition = Duration.zero;
 
     void currentListener() {
@@ -262,6 +243,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
         }
 
         return Scaffold(
+          key: videoFeedKey, // ✅ ADD THE GLOBAL KEY
           backgroundColor: NGColors.background,
           body: Padding(
             padding: EdgeInsets.only(bottom: bottomNavigationPadding),
@@ -273,13 +255,10 @@ class _VideoFeedViewState extends State<VideoFeedView> {
               itemBuilder: (context, index) {
                 final controller = _controllers[index];
                 final isInitialized = _initializationStatus[index] ?? false;
-                
                 if (controller == null) {
                   _getOrCreateController(index, state.videos);
                 }
-                
                 final currentController = _controllers[index];
-                
                 return VideoFeedViewItem(
                   key: ValueKey('${state.videos[index].id}_${isInitialized ? 'init' : 'loading'}'),
                   videoItem: state.videos[index],
@@ -293,7 +272,7 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     );
   }
 
-  /// 🎨 SKELETON LOADING UI
+  // ===================== LOADING/ERROR/EMPTY STATES =====================
   Widget _buildSkeletonLoading(BuildContext context) {
     return ListView.builder(
       itemCount: 3,
@@ -303,7 +282,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
           color: NGColors.surface,
           child: Stack(
             children: [
-              // Video placeholder
               Container(
                 color: NGColors.surfaceLight,
                 child: Center(
@@ -336,7 +314,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
                   ),
                 ),
               ),
-              // Skeleton overlay
               Positioned(
                 left: 16,
                 right: 16,
@@ -379,7 +356,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
                   ],
                 ),
               ),
-              // Skeleton bottom
               Positioned(
                 bottom: 16,
                 left: 16,
@@ -414,7 +390,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     );
   }
 
-  /// ⚠️ ERROR STATE UI
   Widget _buildErrorState(BuildContext context, String errorMessage) {
     return Center(
       child: Padding(
@@ -488,7 +463,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     );
   }
 
-  /// 📭 EMPTY STATE UI
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
