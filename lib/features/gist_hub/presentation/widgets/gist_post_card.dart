@@ -5,23 +5,27 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_comment_sheet.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_hub_features.dart';
-import 'package:nigergram/features/gist_hub/presentation/widgets/gist_text_with_mentions.dart'; // ✅ NEW IMPORT
+import 'package:nigergram/features/gist_hub/presentation/widgets/gist_text_with_mentions.dart';
+import 'package:nigergram/features/gist_hub/presentation/widgets/gist_edit_sheet.dart';
 
 class GistPostCard extends StatefulWidget {
   final GistPostEntity post;
   final GistService service;
   final VoidCallback? onPostDeleted;
+  final VoidCallback? onPostUpdated; // ✅ ADDED
 
   const GistPostCard({
     super.key,
     required this.post,
     required this.service,
     this.onPostDeleted,
+    this.onPostUpdated, // ✅ ADDED
   });
 
   @override
@@ -184,6 +188,8 @@ class _GistPostCardState extends State<GistPostCard> {
     return const SizedBox.shrink();
   }
 
+  bool get _isOwnPost => _post.userId == _currentUserId;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -254,17 +260,56 @@ class _GistPostCardState extends State<GistPostCard> {
                   fontSize: 11,
                 ),
               ),
+              // Edit/Delete menu (only for own posts)
+              if (_isOwnPost)
+                PopupMenuButton(
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: NGColors.textMuted,
+                    size: 18,
+                  ),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _showEditSheet();
+                    } else if (value == 'delete') {
+                      _deletePost();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 16),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 16, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // ✅ REPLACED with clickable mentions widget
+          // Clickable mentions
           GistTextWithMentions(
             text: _post.content,
             fontSize: 15,
             maxLines: 10,
             onMentionTap: (username) {
-              context.push('/profile/$username');
+              // ✅ FIXED: Use GoRouter
+              GoRouter.of(context).push('/profile/$username');
             },
           ),
           const SizedBox(height: 12),
@@ -312,7 +357,7 @@ class _GistPostCardState extends State<GistPostCard> {
               const SizedBox(width: 4),
               _buildReactionButton('🇳🇬'),
               const Spacer(),
-              // Comment Button with proper count display
+              // Comment Button
               GestureDetector(
                 onTap: () {
                   showModalBottomSheet(
@@ -360,6 +405,74 @@ class _GistPostCardState extends State<GistPostCard> {
         ],
       ),
     );
+  }
+
+  void _showEditSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => GistEditSheet(
+        postId: _post.id,
+        currentContent: _post.content,
+        service: widget.service,
+      ),
+    ).then((updated) {
+      if (updated == true && widget.onPostUpdated != null) {
+        widget.onPostUpdated!();
+      }
+    });
+  }
+
+  void _deletePost() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: NGColors.surface,
+        title: Text(
+          'Delete Gist?',
+          style: TextStyle(color: NGColors.textPrimary),
+        ),
+        content: Text(
+          'This action cannot be undone.',
+          style: TextStyle(color: NGColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: NGColors.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('gist_posts')
+          .doc(_post.id)
+          .delete();
+      if (widget.onPostDeleted != null) {
+        widget.onPostDeleted!();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gist deleted')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete: $e')),
+      );
+    }
   }
 
   Widget _buildReactionButton(String emoji) {
