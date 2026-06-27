@@ -16,7 +16,6 @@ class _InboxViewState extends State<InboxView> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  static const int _pageSize = 30;
 
   String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
   bool get _isUserLoggedIn => _currentUserId.isNotEmpty;
@@ -275,36 +274,14 @@ class _InboxViewState extends State<InboxView> {
                 ),
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
+                    // 🔥 FIX: No .orderBy() - no index needed!
                     stream: _firestore
                         .collection('chats')
                         .where('participants', arrayContains: _currentUserId)
-                        .orderBy('lastMessageTime', descending: true)
-                        .limit(_pageSize)
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         final error = snapshot.error.toString();
-                        if (error.contains('index')) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.info_outline, color: NGColors.textMuted, size: 48),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Creating index...',
-                                  style: TextStyle(color: NGColors.textSecondary),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Firestore is setting up the index.\nPlease wait a moment.',
-                                  style: TextStyle(color: NGColors.textMuted),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          );
-                        }
                         return Center(
                           child: Text(
                             'Error loading chats: $error',
@@ -324,7 +301,23 @@ class _InboxViewState extends State<InboxView> {
                         return _buildEmptyState();
                       }
 
-                      final chatList = docs.map((doc) {
+                      // 🔥 FIX: Sort manually in memory (no index needed!)
+                      final sortedDocs = List<QueryDocumentSnapshot>.from(docs);
+                      sortedDocs.sort((a, b) {
+                        final aData = a.data() as Map<String, dynamic>;
+                        final bData = b.data() as Map<String, dynamic>;
+                        final aTime = aData['lastMessageTime'] as Timestamp?;
+                        final bTime = bData['lastMessageTime'] as Timestamp?;
+                        
+                        // Handle null timestamps - put them at the bottom
+                        if (aTime == null && bTime == null) return 0;
+                        if (aTime == null) return 1;
+                        if (bTime == null) return -1;
+                        
+                        return bTime.compareTo(aTime); // Latest first
+                      });
+
+                      final chatList = sortedDocs.map((doc) {
                         final data = doc.data() as Map<String, dynamic>;
                         data['id'] = doc.id;
                         return data;
