@@ -5,7 +5,9 @@ import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 
 class DiscoverFeedView extends StatefulWidget {
-  const DiscoverFeedView({super.key});
+  final String? tag; // ✅ ADD THIS
+
+  const DiscoverFeedView({super.key, this.tag}); // ✅ ADD THIS
 
   @override
   State<DiscoverFeedView> createState() => _DiscoverFeedViewState();
@@ -24,11 +26,17 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
   Future<void> _loadVideos() async {
     setState(() => _isLoading = true);
     try {
-      final snapshot = await FirebaseFirestore.instance
+      Query query = FirebaseFirestore.instance
           .collection('videos')
           .orderBy('createdAt', descending: true)
-          .limit(20)
-          .get();
+          .limit(20);
+
+      // ✅ If tag is provided, filter by it
+      if (widget.tag != null && widget.tag!.isNotEmpty) {
+        query = query.where('tags', arrayContains: widget.tag);
+      }
+
+      final snapshot = await query.get();
 
       final videos = snapshot.docs.map((doc) {
         final data = doc.data();
@@ -71,7 +79,7 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
       appBar: AppBar(
         backgroundColor: NGColors.background,
         title: Text(
-          'Discover',
+          widget.tag != null ? 'Discover #${widget.tag}' : 'Discover',
           style: TextStyle(
             color: NGColors.textPrimary,
             fontSize: 20,
@@ -88,12 +96,25 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
             )
           : _videos.isEmpty
               ? Center(
-                  child: Text(
-                    'No videos found',
-                    style: TextStyle(
-                      color: NGColors.textSecondary,
-                      fontSize: 16,
-                    ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.search_off_rounded,
+                        color: NGColors.textMuted,
+                        size: 64,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        widget.tag != null
+                            ? 'No videos with #${widget.tag}'
+                            : 'No videos found',
+                        style: TextStyle(
+                          color: NGColors.textSecondary,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
                   ),
                 )
               : ListView.builder(
