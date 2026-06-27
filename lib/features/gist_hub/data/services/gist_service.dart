@@ -80,7 +80,7 @@ class GistService {
               .from('images')
               .getPublicUrl(filePath);
         } catch (e) {
-          print('❌ Image upload error: $e');
+          debugPrint('❌ Image upload error: $e');
           imageUrl = null;
         }
       }
@@ -88,7 +88,6 @@ class GistService {
       final postRef = _firestore.collection('gist_posts').doc();
       final now = FieldValue.serverTimestamp();
       
-      // 🔥 FIX: Dynamic poll votes based on number of options
       final expiryDate = DateTime.now().add(const Duration(days: 7));
       final int optionCount = pollOptions?.length ?? 0;
       final Map<String, int> initialPollVotes = {};
@@ -156,6 +155,7 @@ class GistService {
     }
   }
 
+  // 🔥 FIXED: Correct vote logic with pollVoters
   Future<void> castVote({
     required String postId,
     required int choiceIndex,
@@ -171,15 +171,18 @@ class GistService {
         
         final data = snapshot.data() as Map<String, dynamic>;
         
+        // Check if user already voted
         final voters = Map<String, int>.from(data['pollVoters'] ?? {});
         if (voters.containsKey(user.uid)) {
           throw Exception('You already voted');
         }
         
+        // Update vote counts
         final pollVotes = Map<String, int>.from(data['pollVotes'] ?? {});
         final key = choiceIndex.toString();
         pollVotes[key] = (pollVotes[key] ?? 0) + 1;
         
+        // Store who voted
         voters[user.uid] = choiceIndex;
         
         transaction.update(postRef, {
