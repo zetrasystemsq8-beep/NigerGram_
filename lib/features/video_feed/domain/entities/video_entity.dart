@@ -1,11 +1,12 @@
 // lib/features/video_feed/domain/entities/video_entity.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class VideoEntity {
   final String id;
   final String videoUrl;
   final String creatorId;
   final String username;
-  final String? profileImageUrl; // ✅ CHANGE THIS (was profilePicUrl)
+  final String? profileImageUrl;
   final String description;
   final String? soundName;
   final int likeCount;
@@ -25,7 +26,7 @@ class VideoEntity {
     required this.videoUrl,
     required this.creatorId,
     required this.username,
-    this.profileImageUrl, // ✅ CHANGE THIS (was profilePicUrl)
+    this.profileImageUrl,
     required this.description,
     this.soundName,
     this.likeCount = 0,
@@ -41,6 +42,7 @@ class VideoEntity {
     required this.createdAt,
   });
 
+  // Factory method to create from Firestore
   factory VideoEntity.fromFirestore(
     DocumentSnapshot doc, {
     bool? isLiked,
@@ -53,7 +55,7 @@ class VideoEntity {
       videoUrl: data['videoUrl'] ?? '',
       creatorId: data['creatorId'] ?? '',
       username: data['username'] ?? '',
-      profileImageUrl: data['profileImageUrl'], // ✅ CHANGE THIS
+      profileImageUrl: data['profileImageUrl'],
       description: data['description'] ?? '',
       soundName: data['soundName'],
       likeCount: data['likeCount'] ?? 0,
@@ -75,7 +77,7 @@ class VideoEntity {
     String? videoUrl,
     String? creatorId,
     String? username,
-    String? profileImageUrl, // ✅ CHANGE THIS
+    String? profileImageUrl,
     String? description,
     String? soundName,
     int? likeCount,
@@ -95,7 +97,7 @@ class VideoEntity {
       videoUrl: videoUrl ?? this.videoUrl,
       creatorId: creatorId ?? this.creatorId,
       username: username ?? this.username,
-      profileImageUrl: profileImageUrl ?? this.profileImageUrl, // ✅ CHANGE THIS
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       description: description ?? this.description,
       soundName: soundName ?? this.soundName,
       likeCount: likeCount ?? this.likeCount,
@@ -117,7 +119,7 @@ class VideoEntity {
       'videoUrl': videoUrl,
       'creatorId': creatorId,
       'username': username,
-      'profileImageUrl': profileImageUrl, // ✅ CHANGE THIS
+      'profileImageUrl': profileImageUrl,
       'description': description,
       'soundName': soundName,
       'likeCount': likeCount,
