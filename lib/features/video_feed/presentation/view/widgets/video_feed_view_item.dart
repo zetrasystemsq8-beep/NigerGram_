@@ -348,16 +348,16 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
                         color: NGColors.accent,
                         width: 2,
                       ),
-                      image: widget.videoItem.profilePicUrl != null &&
-                              widget.videoItem.profilePicUrl!.isNotEmpty
+                      image: widget.videoItem.profileImageUrl != null &&
+                              widget.videoItem.profileImageUrl!.isNotEmpty
                           ? DecorationImage(
-                              image: NetworkImage(widget.videoItem.profilePicUrl!),
+                              image: NetworkImage(widget.videoItem.profileImageUrl!),
                               fit: BoxFit.cover,
                             )
                           : null,
                     ),
-                    child: widget.videoItem.profilePicUrl == null ||
-                            widget.videoItem.profilePicUrl!.isEmpty
+                    child: widget.videoItem.profileImageUrl == null ||
+                            widget.videoItem.profileImageUrl!.isEmpty
                         ? Container(
                             decoration: const BoxDecoration(
                               color: NGColors.surface,
