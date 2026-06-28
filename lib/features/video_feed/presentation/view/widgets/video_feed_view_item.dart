@@ -11,7 +11,7 @@ import 'video_feed_view_optimized_video_player.dart';
 import 'video_feed_view_interaction_buttons.dart';
 import 'comments_viewer_bottom_sheet.dart';
 import 'video_share_bottom_sheet.dart';
-import 'video_feed_view_user_info_section.dart'; // ✅ NEW IMPORT
+import 'video_feed_view_user_info_section.dart';
 
 class VideoFeedViewItem extends StatefulWidget {
   final VideoEntity videoItem;
@@ -33,9 +33,8 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   bool _showPlayPause = false;
   late AnimationController _likeAnimationController;
   late AnimationController _heartExplosionController;
-  final List<GlobalKey> _heartKeys = [];
 
-  // Local state for UI updates
+  // Local state
   bool _isLiked = false;
   int _likeCount = 0;
   bool _isFollowing = false;
@@ -46,7 +45,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     _isLiked = widget.videoItem.isLiked ?? false;
     _likeCount = widget.videoItem.likeCount;
     _isFollowing = widget.videoItem.isFollowing ?? false;
-    
+
     _likeAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -55,19 +54,11 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _initializeHeartKeys();
-  }
-
-  void _initializeHeartKeys() {
-    for (int i = 0; i < 12; i++) {
-      _heartKeys.add(GlobalKey());
-    }
   }
 
   @override
   void didUpdateWidget(VideoFeedViewItem oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Update local state when widget updates
     _isLiked = widget.videoItem.isLiked ?? false;
     _likeCount = widget.videoItem.likeCount;
     _isFollowing = widget.videoItem.isFollowing ?? false;
@@ -77,10 +68,11 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   void dispose() {
     _likeAnimationController.dispose();
     _heartExplosionController.dispose();
+    widget.controller?.pause();
     super.dispose();
   }
 
-  /// 📥 COMMENTS MODAL
+  // ===================== COMMENT MODAL =====================
   void _openCommentsModalSheet(BuildContext context) {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
@@ -88,34 +80,11 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withOpacity(0.7),
-      builder: (context) {
-        return CommentsViewerBottomSheet(videoId: widget.videoItem.id);
-      },
+      builder: (context) => CommentsViewerBottomSheet(videoId: widget.videoItem.id),
     );
   }
 
-  /// 🔗 OLD SHARE ACTION (keep if needed)
-  void _executePlatformShareAction(BuildContext context) {
-    HapticFeedback.lightImpact();
-    final String shareUrl = "https://nigergram.app/video/${widget.videoItem.id}";
-    final String shareText =
-        "Check out @${widget.videoItem.username} on NigerGram: $shareUrl";
-
-    try {
-      Clipboard.setData(ClipboardData(text: shareText));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Video link copied to clipboard!'),
-          backgroundColor: NGColors.accent,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      debugPrint('Share error: $e');
-    }
-  }
-
-  /// 🔗 NEW SHARE SHEET (Premium Upgrade)
+  // ===================== SHARE SHEET =====================
   void _showShareBottomSheet(BuildContext context) {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
@@ -130,10 +99,9 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     );
   }
 
-  /// ❤️ HANDLE LIKE WITH ANIMATION
+  // ===================== LIKE =====================
   void _handleLike() async {
     HapticFeedback.mediumImpact();
-    
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -142,30 +110,20 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
       return;
     }
 
-    // Toggle like state locally
     final bool newLikeState = !_isLiked;
-    
-    // Update local state immediately for UI feedback
     setState(() {
       _isLiked = newLikeState;
       _likeCount += newLikeState ? 1 : -1;
       if (_likeCount < 0) _likeCount = 0;
     });
 
-    // Trigger heart explosion on like
-    if (newLikeState) {
-      _heartExplosionController.forward(from: 0);
-    }
-    
-    // Animate the like button
+    if (newLikeState) _heartExplosionController.forward(from: 0);
     _likeAnimationController.forward(from: 0);
 
-    // Update Firebase
     try {
       final docRef = FirebaseFirestore.instance
           .collection('videos')
           .doc(widget.videoItem.id);
-      
       if (newLikeState) {
         await docRef.update({
           'likeCount': FieldValue.increment(1),
@@ -178,8 +136,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
         });
       }
     } catch (e) {
-      debugPrint('Like update error: $e');
-      // Revert on error
       setState(() {
         _isLiked = !newLikeState;
         _likeCount += newLikeState ? -1 : 1;
@@ -188,38 +144,30 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     }
   }
 
-  /// 🎬 TOGGLE PLAY/PAUSE
+  // ===================== PLAY/PAUSE =====================
   void _togglePlayPause() {
     if (widget.controller == null) return;
-    
     setState(() {
       _isPlaying = !_isPlaying;
       _showPlayPause = true;
     });
-    
     if (_isPlaying) {
       widget.controller!.play();
     } else {
       widget.controller!.pause();
     }
-    
-    // Hide play/pause indicator after 1.5 seconds
     Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() {
-          _showPlayPause = false;
-        });
-      }
+      if (mounted) setState(() => _showPlayPause = false);
     });
   }
 
-  /// 👤 NAVIGATE TO PROFILE
+  // ===================== PROFILE NAVIGATION =====================
   void _navigateToProfile() {
     HapticFeedback.lightImpact();
     context.push('/profile/${widget.videoItem.creatorId}');
   }
 
-  /// 🔄 FOLLOW USER
+  // ===================== FOLLOW =====================
   void _handleFollow() async {
     HapticFeedback.lightImpact();
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -229,41 +177,28 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
       );
       return;
     }
-
-    // Update local state immediately
-    setState(() {
-      _isFollowing = true;
-    });
-
+    setState(() => _isFollowing = true);
     try {
-      final docRef = FirebaseFirestore.instance
+      await FirebaseFirestore.instance
           .collection('users')
-          .doc(widget.videoItem.creatorId);
-      
-      await docRef.update({
+          .doc(widget.videoItem.creatorId)
+          .update({
         'followers': FieldValue.increment(1),
         'followersList': FieldValue.arrayUnion([currentUser.uid]),
       });
-      
-      // Also update current user's following list
-      final userRef = FirebaseFirestore.instance
+      await FirebaseFirestore.instance
           .collection('users')
-          .doc(currentUser.uid);
-      
-      await userRef.update({
+          .doc(currentUser.uid)
+          .update({
         'following': FieldValue.increment(1),
         'followingList': FieldValue.arrayUnion([widget.videoItem.creatorId]),
       });
     } catch (e) {
-      debugPrint('Follow error: $e');
-      // Revert on error
-      setState(() {
-        _isFollowing = false;
-      });
+      setState(() => _isFollowing = false);
     }
   }
 
-  /// 📌 HANDLE BOOKMARK
+  // ===================== BOOKMARK =====================
   void _handleBookmark() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
@@ -272,16 +207,10 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
       );
       return;
     }
-
-    // Note: Bookmark state is handled by InteractionButtons widget
-    // This is just a pass-through
-    debugPrint('Bookmark toggled for: ${widget.videoItem.id}');
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isLiked = _isLiked;
-    final bool isFollowing = _isFollowing;
     final bool isOwnVideo = widget.videoItem.creatorId == FirebaseAuth.instance.currentUser?.uid;
 
     return GestureDetector(
@@ -297,7 +226,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
             ),
           ),
 
-          // LAYER 2: Play/Pause Overlay Indicator
+          // LAYER 2: Play/Pause Overlay
           if (_showPlayPause)
             Positioned.fill(
               child: Center(
@@ -325,7 +254,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
               ),
             ),
 
-          // LAYER 3: Top Gradient Overlay (for visibility)
+          // LAYER 3: Gradient Overlay
           Positioned.fill(
             child: IgnorePointer(
               child: Container(
@@ -346,7 +275,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
             ),
           ),
 
-          // LAYER 4: Top Section - User Info (NEW WIDGET)
+          // LAYER 4: User Info Section (null-safe)
           Positioned(
             top: 48,
             left: 16,
@@ -355,25 +284,21 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
               profileImageUrl: widget.videoItem.profileImageUrl ?? '',
               username: widget.videoItem.username,
               description: widget.videoItem.description,
-              soundName: widget.videoItem.soundName,
+              soundName: widget.videoItem.soundName ?? '',
               isVerified: widget.videoItem.isVerified ?? false,
-              isFollowing: isFollowing,
+              isFollowing: _isFollowing,
               isOwnVideo: isOwnVideo,
               onFollowTap: _handleFollow,
             ),
           ),
 
-          // LAYER 5: Bottom Section - Now handled by the new widget (sound, caption, etc.)
-          // But we still keep the caption and sound in the UserInfoSection.
-          // No need for separate bottom section now.
-
-          // LAYER 6: Right Action Buttons (Overlay on top)
+          // LAYER 5: Action Buttons
           Positioned(
             bottom: 40,
             right: 12,
             child: VideoFeedViewInteractionButtons(
               videoId: widget.videoItem.id,
-              isLiked: isLiked,
+              isLiked: _isLiked,
               likeCount: _likeCount,
               commentCount: widget.videoItem.commentCount,
               shareCount: widget.videoItem.shareCount,
@@ -382,12 +307,12 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
               creatorUsername: widget.videoItem.username,
               onCommentTapped: () => _openCommentsModalSheet(context),
               onShareTapped: () => _showShareBottomSheet(context),
-              onBookmarkTapped: () => _handleBookmark(),
+              onBookmarkTapped: _handleBookmark,
             ),
           ),
 
-          // LAYER 7: Heart Explosion Animation (on Double Tap)
-          if (isLiked)
+          // LAYER 6: Heart Explosion
+          if (_isLiked)
             Positioned.fill(
               child: IgnorePointer(
                 child: AnimatedBuilder(
@@ -411,45 +336,36 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   }
 }
 
-/// 🎨 HEART EXPLOSION PAINTER (Custom Animation)
+// ==================== HEART EXPLOSION PAINTER ====================
 class HeartExplosionPainter extends CustomPainter {
   final double progress;
-
   HeartExplosionPainter({required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final random = DateTime.now().millisecondsSinceEpoch % 1000;
-
     for (int i = 0; i < 12; i++) {
       final angle = (i / 12) * 2 * 3.14159 + random * 0.001;
       final distance = 50 + progress * 150;
-      final dx = distance * (progress * 2) * (0.6 + 0.4 * (i % 3) / 3) * 
+      final dx = distance * (progress * 2) * (0.6 + 0.4 * (i % 3) / 3) *
           (i.isEven ? 1 : -1) * (0.5 + 0.5 * (i % 2));
-      final dy = distance * (progress * 2) * (0.6 + 0.4 * (i % 2) / 2) * 
+      final dy = distance * (progress * 2) * (0.6 + 0.4 * (i % 2) / 2) *
           (i.isOdd ? 1 : -1) * (0.5 + 0.5 * (i % 3));
-
       final position = center + Offset(dx, dy);
       final size = 12 + progress * 20 * (0.5 + 0.5 * (i % 3) / 3);
-
       final opacity = 1.0 - progress;
       final color = Colors.red.withOpacity(opacity * 0.8);
-
       _drawHeart(canvas, position, size, color);
     }
   }
 
   void _drawHeart(Canvas canvas, Offset position, double size, Color color) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
+    final paint = Paint()..color = color..style = PaintingStyle.fill;
     final path = Path();
     final x = position.dx;
     final y = position.dy;
     final s = size / 20;
-
     path.moveTo(x, y + s * 5);
     path.cubicTo(
       x - s * 12,
@@ -471,7 +387,5 @@ class HeartExplosionPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
