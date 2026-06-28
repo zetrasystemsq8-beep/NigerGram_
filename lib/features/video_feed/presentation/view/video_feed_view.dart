@@ -12,6 +12,9 @@ import 'package:nigergram/features/video_feed/presentation/view/widgets/video_fe
 import 'package:video_player/video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// ✅ Global Key for Dashboard to access VideoFeed state
+final GlobalKey<_VideoFeedViewState> videoFeedKey = GlobalKey<_VideoFeedViewState>();
+
 class VideoFeedView extends StatefulWidget {
   const VideoFeedView({super.key});
 
@@ -19,9 +22,7 @@ class VideoFeedView extends StatefulWidget {
   State<VideoFeedView> createState() => _VideoFeedViewState();
 }
 
-class _VideoFeedViewState extends State<VideoFeedView>
-    with WidgetsBindingObserver
-    implements VideoFeedViewState {
+class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserver {
   late PageController _pageController;
   final Map<int, VideoPlayerController> _controllers = {};
   final Map<int, VoidCallback> _activeListeners = {};
@@ -47,7 +48,7 @@ class _VideoFeedViewState extends State<VideoFeedView>
     super.dispose();
   }
 
-  // ==================== LIFECYCLE MANAGEMENT ====================
+  // ==================== LIFECYCLE ====================
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
@@ -55,15 +56,14 @@ class _VideoFeedViewState extends State<VideoFeedView>
     }
   }
 
-  // ✅ IMPLEMENT VIDEO FEED STATE (called by Dashboard)
-  @override
+  // ✅ Pause video (called by Dashboard)
   void pauseVideo() {
     if (_controllers.containsKey(_focusedIndex)) {
       _controllers[_focusedIndex]?.pause();
     }
   }
 
-  @override
+  // ✅ Resume video (called by Dashboard)
   void resumeVideo() {
     if (_controllers.containsKey(_focusedIndex)) {
       _controllers[_focusedIndex]?.play();
@@ -76,7 +76,6 @@ class _VideoFeedViewState extends State<VideoFeedView>
     });
   }
 
-  // ==================== PRIVATE METHODS ====================
   void _clearAndDisposeAllControllers() {
     for (var index in _controllers.keys) {
       final controller = _controllers[index];
@@ -204,28 +203,16 @@ class _VideoFeedViewState extends State<VideoFeedView>
     controller.addListener(currentListener);
   }
 
-  // ==================== BUILD – SLIVER-SAFE ====================
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight;
     return BlocBuilder<VideoFeedCubit, VideoFeedState>(
       builder: (context, state) {
-        // ✅ SLIVER-SAFE: Wrap loading/error/empty with SliverToBoxAdapter
         if (state.isLoading && state.videos.isEmpty) {
           return Scaffold(
             backgroundColor: NGColors.background,
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircularProgressIndicator(color: NGColors.accent),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading videos...',
-                    style: TextStyle(color: NGColors.textSecondary),
-                  ),
-                ],
-              ),
+            body: const Center(
+              child: CircularProgressIndicator(color: NGColors.accent),
             ),
           );
         }
@@ -275,8 +262,8 @@ class _VideoFeedViewState extends State<VideoFeedView>
           );
         }
 
-        // ✅ MAIN FEED – uses PageView (not sliver, safe)
         return Scaffold(
+          key: videoFeedKey, // ✅ Global Key for Dashboard access
           backgroundColor: NGColors.background,
           body: Padding(
             padding: EdgeInsets.only(bottom: bottomPadding),
