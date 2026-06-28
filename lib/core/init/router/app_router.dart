@@ -15,7 +15,6 @@ import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/creator_earnings_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
-// ✅ REMOVED: gist_detail_view.dart (doesn't exist yet)
 import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -25,6 +24,72 @@ class AppRouter {
   final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
+    
+    // ✅ FIX 1: Explicitly handle unknown routes globally via errorBuilder
+    errorBuilder: (context, state) => Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Page Not Found', style: TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.go('/dashboard'),
+        ),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              color: Colors.grey.shade600,
+              size: 80,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              '404',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 48,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Page Not Found',
+              style: TextStyle(
+                color: Colors.grey.shade400,
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'The page you are looking for does not exist.',
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () => context.go('/dashboard'),
+              icon: const Icon(Icons.home, color: Colors.white),
+              label: const Text('Go Home'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00C853),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+
     routes: [
       // =============================================
       // ROOT - Redirects based on login status
@@ -61,7 +126,7 @@ class AppRouter {
       GoRoute(
         path: '/dashboard',
         pageBuilder: (context, state) =>
-            customPageBuilderWidget(context, state, const DashboardView()),
+            customPageBuilderWidget(context, state, const DashboardView(key: ValueKey('dashboard_view'))),
       ),
 
       // =============================================
@@ -147,7 +212,6 @@ class AppRouter {
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const GistCreatePost()),
       ),
-      // ✅ REMOVED: /gist/:gistId route (temporarily)
 
       // =============================================
       // DISCOVER
@@ -189,79 +253,88 @@ class AppRouter {
       ),
 
       // =============================================
-      // 404 - Page Not Found (Catch all unknown routes)
+      // ✅ FIX 2: Safely catch unmatched patterns via regex wildcard matcher
       // =============================================
       GoRoute(
-        path: '/:page',
-        pageBuilder: (context, state) =>
-            customPageBuilderWidget(
-              context,
-              state,
-              Scaffold(
-                backgroundColor: Colors.black,
-                appBar: AppBar(
-                  backgroundColor: Colors.black,
-                  iconTheme: const IconThemeData(color: Colors.white),
-                  title: const Text('Page Not Found', style: TextStyle(color: Colors.white)),
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => context.go('/dashboard'),
-                  ),
-                ),
-                body: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.search_off_rounded,
-                        color: Colors.grey.shade600,
-                        size: 80,
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        '404',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Page Not Found',
-                        style: TextStyle(
-                          color: Colors.grey.shade400,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'The page you are looking for does not exist.',
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      ElevatedButton.icon(
-                        onPressed: () => context.go('/dashboard'),
-                        icon: const Icon(Icons.home, color: Colors.white),
-                        label: const Text('Go Home'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00C853),
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+        path: '/:catchAll(.*)',
+        pageBuilder: (context, state) => customPageBuilderWidget(
+          context,
+          state,
+          const Root404Page(),
+        ),
       ),
     ],
   );
+}
+
+// ✅ FIX 3: Isolated stateless fallback wrapper to isolate context and prevent layout tree desyncs
+class Root404Page extends StatelessWidget {
+  const Root404Page({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Page Not Found', style: TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.go('/dashboard'),
+        ),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              color: Colors.grey.shade600,
+              size: 80,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              '404',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 48,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Page Not Found',
+              style: TextStyle(
+                color: Colors.grey.shade400,
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'The page you are looking for does not exist.',
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () => context.go('/dashboard'),
+              icon: const Icon(Icons.home, color: Colors.white),
+              label: const Text('Go Home'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00C853),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
