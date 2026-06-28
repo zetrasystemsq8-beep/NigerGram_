@@ -216,7 +216,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   }
 
   void _handleSignUp() async {
-    // 🔥 Check if terms are accepted
     if (!_termsAccepted) {
       NigerGramError.showSnackBar(context, 'Please agree to Terms & Conditions');
       return;
@@ -281,6 +280,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Brand Logo
               ShaderMask(
                 shaderCallback: (bounds) => const LinearGradient(
                   colors: [NGColors.accent, Colors.white, NGColors.accent],
@@ -341,6 +341,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   strokeWidth: 2,
                 ),
               ),
+              // ✅ ZETRA BRANDING
+              const SizedBox(height: 40),
+              const Text(
+                'Powered by ZETRA',
+                style: TextStyle(
+                  color: NGColors.textMuted,
+                  fontSize: 11,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w300,
+                ),
+              ),
             ],
           ),
         ),
@@ -360,10 +371,71 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         },
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
-                // Logo
+                // ✅ SPACER – pushes content to center
+                const Spacer(flex: 1),
+
+                // ✅ ZETRA BRANDING – like Meta on Instagram
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: NGColors.accent.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: NGColors.accent.withOpacity(0.3),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: NGColors.accent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'ZETRA',
+                            style: TextStyle(
+                              color: NGColors.accent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            '⚡',
+                            style: TextStyle(
+                              fontSize: 11,
+                            ),
+                          ),
+                          const Text(
+                            'NIGERGRAM',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // ✅ LOGO
                 ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
                     colors: [NGColors.accent, Colors.white, NGColors.accent],
@@ -371,11 +443,27 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     end: Alignment.bottomRight,
                   ).createShader(bounds),
                   child: const Text(
-                    '🇳🇬 NIGERGRAM',
+                    '🇳🇬',
+                    style: TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [NGColors.accent, Colors.white, NGColors.accent],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ).createShader(bounds),
+                  child: const Text(
+                    'NIGERGRAM',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
+                      letterSpacing: 4,
                       color: Colors.white,
                     ),
                   ),
@@ -390,9 +478,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
-                // Tabs
+                // ✅ TABS
                 Container(
                   decoration: BoxDecoration(
                     color: NGColors.surface,
@@ -416,9 +504,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                // Form
+                // ✅ FORM
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
@@ -520,7 +608,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ),
                           ),
                           
-                          // 🔥 Terms Checkbox
+                          // Terms Checkbox
                           const SizedBox(height: 12),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,9 +680,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           ),
                         ],
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
-                        // Login / Sign Up Button
+                        // Submit Button
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -636,7 +724,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
                         const SizedBox(height: 12),
 
-                        // Forgot Password (only in Login tab)
+                        // Forgot Password
                         if (_currentTab == 0)
                           GestureDetector(
                             onTap: _showForgotPasswordSheet,
@@ -652,6 +740,21 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                               ),
                             ),
                           ),
+
+                        // ✅ SPACER at bottom
+                        const SizedBox(height: 20),
+
+                        // ✅ ZETRA FOOTER
+                        const Text(
+                          'ZETRA ⚡ NIGERGRAM',
+                          style: TextStyle(
+                            color: NGColors.textMuted,
+                            fontSize: 10,
+                            letterSpacing: 1.5,
+                            fontWeight: FontWeight.w300,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                       ],
                     ),
                   ),
