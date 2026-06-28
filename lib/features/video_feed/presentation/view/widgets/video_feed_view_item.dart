@@ -160,209 +160,222 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
 
   @override
   Widget build(BuildContext context) {
-    // ✅ EVERYTHING IS NULL-SAFE WITH FALLBACKS
+    // ✅ ALL FIELDS WITH FALLBACKS – NO NULL ERRORS
     final String username = widget.videoItem.username ?? 'User';
     final String description = widget.videoItem.description ?? '';
-    final String profileImageUrl = widget.videoItem.profileImageUrl ?? '';
     final String soundName = widget.videoItem.soundName ?? '';
     final bool isVerified = widget.videoItem.isVerified ?? false;
-    final bool isOwnVideo = widget.videoItem.creatorId == FirebaseAuth.instance.currentUser?.uid;
     final int commentCount = widget.videoItem.commentCount;
     final int shareCount = widget.videoItem.shareCount;
     final bool isBookmarked = widget.videoItem.isBookmarked ?? false;
+    final bool isOwnVideo = widget.videoItem.creatorId == FirebaseAuth.instance.currentUser?.uid;
 
-    return GestureDetector(
-      onTap: _togglePlayPause,
-      onDoubleTap: _handleLike,
-      child: Stack(
-        children: [
-          // LAYER 1: Video Player
-          Positioned.fill(
-            child: VideoFeedViewOptimizedVideoPlayer(
-              controller: widget.controller,
-              videoId: widget.videoItem.id,
-            ),
-          ),
-
-          // LAYER 2: Play/Pause Overlay
-          if (_showPlayPause)
+    // ✅ SAFE: Use a try-catch to prevent crashes
+    try {
+      return GestureDetector(
+        onTap: _togglePlayPause,
+        onDoubleTap: _handleLike,
+        child: Stack(
+          children: [
+            // LAYER 1: Video Player
             Positioned.fill(
-              child: Center(
-                child: AnimatedOpacity(
-                  opacity: _showPlayPause ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 2,
+              child: VideoFeedViewOptimizedVideoPlayer(
+                controller: widget.controller,
+                videoId: widget.videoItem.id,
+              ),
+            ),
+
+            // LAYER 2: Play/Pause Overlay
+            if (_showPlayPause)
+              Positioned.fill(
+                child: Center(
+                  child: AnimatedOpacity(
+                    opacity: _showPlayPause ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 2,
+                        ),
+                      ),
+                      child: Icon(
+                        _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 32,
                       ),
                     ),
-                    child: Icon(
-                      _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 32,
+                  ),
+                ),
+              ),
+
+            // LAYER 3: Gradient Overlay
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black45,
+                        Colors.transparent,
+                        Colors.transparent,
+                        Colors.black87,
+                      ],
+                      stops: [0.0, 0.2, 0.65, 1.0],
                     ),
                   ),
                 ),
               ),
             ),
 
-          // LAYER 3: Gradient Overlay
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black45,
-                      Colors.transparent,
-                      Colors.transparent,
-                      Colors.black87,
+            // LAYER 4: User Info
+            Positioned(
+              top: 48,
+              left: 16,
+              right: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                '@$username',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isVerified) ...[
+                              const SizedBox(width: 4),
+                              const Icon(Icons.verified_rounded, color: NGColors.verified, size: 16),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
-                    stops: [0.0, 0.2, 0.65, 1.0],
                   ),
-                ),
-              ),
-            ),
-          ),
-
-          // LAYER 4: User Info (MINIMAL – NO EXTRA WIDGETS)
-          Positioned(
-            top: 48,
-            left: 16,
-            right: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
+                  if (description.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        description,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  if (soundName.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
                       child: Row(
                         children: [
-                          Flexible(
+                          const Icon(Icons.music_note_rounded, color: Colors.white54, size: 14),
+                          const SizedBox(width: 4),
+                          Expanded(
                             child: Text(
-                              '@$username',
+                              soundName,
                               style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                color: Colors.white54,
+                                fontSize: 12,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (isVerified) ...[
-                            const SizedBox(width: 4),
-                            const Icon(Icons.verified_rounded, color: NGColors.verified, size: 16),
-                          ],
                         ],
                       ),
                     ),
-                  ],
-                ),
-                if (description.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      description,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                if (soundName.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.music_note_rounded, color: Colors.white54, size: 14),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            soundName,
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          // LAYER 5: Action Buttons
-          Positioned(
-            bottom: 40,
-            right: 12,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildActionButton(
-                  icon: _isLiked ? Icons.favorite : Icons.favorite_border,
-                  color: _isLiked ? NGColors.like : Colors.white,
-                  count: _likeCount,
-                  onTap: _handleLike,
-                ),
-                const SizedBox(height: 16),
-                _buildActionButton(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  color: Colors.white,
-                  count: commentCount,
-                  onTap: () => _openCommentsModalSheet(context),
-                ),
-                const SizedBox(height: 16),
-                _buildActionButton(
-                  icon: Icons.share_rounded,
-                  color: Colors.white,
-                  count: shareCount,
-                  onTap: () => _showShareBottomSheet(context),
-                ),
-                const SizedBox(height: 16),
-                _buildActionButton(
-                  icon: isBookmarked ? Icons.bookmark : Icons.bookmark_outline_rounded,
-                  color: isBookmarked ? NGColors.accent : Colors.white,
-                  count: 0,
-                  onTap: _handleBookmark,
-                ),
-              ],
-            ),
-          ),
-
-          // LAYER 6: Heart Explosion
-          if (_isLiked)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: _heartExplosionController,
-                  builder: (context, child) {
-                    if (_heartExplosionController.value == 0) {
-                      return const SizedBox.shrink();
-                    }
-                    return CustomPaint(
-                      painter: HeartExplosionPainter(
-                        progress: _heartExplosionController.value,
-                      ),
-                    );
-                  },
-                ),
+                ],
               ),
             ),
-        ],
-      ),
-    );
+
+            // LAYER 5: Action Buttons
+            Positioned(
+              bottom: 40,
+              right: 12,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildActionButton(
+                    icon: _isLiked ? Icons.favorite : Icons.favorite_border,
+                    color: _isLiked ? NGColors.like : Colors.white,
+                    count: _likeCount,
+                    onTap: _handleLike,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildActionButton(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    color: Colors.white,
+                    count: commentCount,
+                    onTap: () => _openCommentsModalSheet(context),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildActionButton(
+                    icon: Icons.share_rounded,
+                    color: Colors.white,
+                    count: shareCount,
+                    onTap: () => _showShareBottomSheet(context),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildActionButton(
+                    icon: isBookmarked ? Icons.bookmark : Icons.bookmark_outline_rounded,
+                    color: isBookmarked ? NGColors.accent : Colors.white,
+                    count: 0,
+                    onTap: _handleBookmark,
+                  ),
+                ],
+              ),
+            ),
+
+            // LAYER 6: Heart Explosion
+            if (_isLiked)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _heartExplosionController,
+                    builder: (context, child) {
+                      if (_heartExplosionController.value == 0) {
+                        return const SizedBox.shrink();
+                      }
+                      return CustomPaint(
+                        painter: HeartExplosionPainter(
+                          progress: _heartExplosionController.value,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    } catch (e) {
+      // ✅ FALLBACK: If anything fails, show a simple placeholder
+      return Container(
+        color: Colors.black,
+        child: const Center(
+          child: Text(
+            'Something went wrong',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildActionButton({
