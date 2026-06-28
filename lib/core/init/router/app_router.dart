@@ -14,6 +14,7 @@ import 'package:nigergram/features/wallet/presentation/view/fund_wallet_view.dar
 import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/creator_earnings_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
 import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -22,10 +23,20 @@ final GlobalKey<NavigatorState> _rootNavigatorKey =
 class AppRouter {
   final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: FirebaseAuth.instance.currentUser != null
-        ? RouterEnum.dashboardView.routeName
-        : '/login',
+    initialLocation: '/', // ✅ FIXED: Always starts at "/"
     routes: [
+      // ✅ FIXED: Root route that decides where to go
+      GoRoute(
+        path: '/',
+        redirect: (context, state) {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            return RouterEnum.dashboardView.routeName;
+          } else {
+            return '/login';
+          }
+        },
+      ),
       GoRoute(
         path: '/login',
         pageBuilder: (context, state) =>
@@ -46,28 +57,59 @@ class AppRouter {
         path: RouterEnum.dashboardView.routeName,
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const DashboardView()),
+        routes: [
+          // ✅ NESTED ROUTES INSIDE DASHBOARD
+          GoRoute(
+            path: 'profile/:userId',
+            pageBuilder: (context, state) {
+              final userId = state.pathParameters['userId'] ?? '';
+              return customPageBuilderWidget(
+                context,
+                state,
+                ProfileView(userId: userId),
+              );
+            },
+          ),
+          GoRoute(
+            path: 'gist-hub',
+            pageBuilder: (context, state) =>
+                customPageBuilderWidget(context, state, const GistHubView()),
+          ),
+          GoRoute(
+            path: 'gist/create',
+            pageBuilder: (context, state) =>
+                customPageBuilderWidget(context, state, const GistCreatePost()),
+          ),
+        ],
       ),
       GoRoute(
         path: RouterEnum.videoFeedView.routeName,
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const VideoFeedView()),
       ),
+      // ✅ FIXED: Profile route (works with or without userId)
       GoRoute(
-        path: RouterEnum.profileView.routeName,
-        pageBuilder: (context, state) =>
-            customPageBuilderWidget(context, state, const ProfileView()),
+        path: '/profile/:userId',
+        pageBuilder: (context, state) {
+          final userId = state.pathParameters['userId'] ?? 
+              FirebaseAuth.instance.currentUser?.uid ?? '';
+          return customPageBuilderWidget(
+            context,
+            state,
+            ProfileView(userId: userId),
+          );
+        },
       ),
       GoRoute(
         path: '/gist-hub',
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const GistHubView()),
       ),
-      // TODO: Uncomment when gist_create_post.dart is created
-      // GoRoute(
-      //   path: '/gist-hub/create',
-      //   pageBuilder: (context, state) =>
-      //       customPageBuilderWidget(context, state, const GistCreatePost()),
-      // ),
+      GoRoute(
+        path: '/gist/create',
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const GistCreatePost()),
+      ),
       GoRoute(
         path: '/video-detail/:videoId',
         pageBuilder: (context, state) {
