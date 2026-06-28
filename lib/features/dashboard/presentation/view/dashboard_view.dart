@@ -10,8 +10,8 @@ import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
 import 'package:nigergram/features/inbox/presentation/view/inbox_view.dart';
 
-final GlobalKey<NavigatorState> _rootNavigatorKey =
-    GlobalKey<NavigatorState>(debugLabel: 'root');
+// ✅ Global Key to access VideoFeed state
+final GlobalKey<_VideoFeedViewState> videoFeedKey = GlobalKey<_VideoFeedViewState>();
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -23,7 +23,7 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   int _currentIndex = 0;
 
-  // ✅ UNIQUE VALUEKEYS TO PREVENT 'child == _child' ASSERTION
+  // ✅ Unique ValueKeys for each tab
   final Map<int, GlobalKey> _tabKeys = {
     0: GlobalKey(debugLabel: 'videoFeedTab'),
     1: GlobalKey(debugLabel: 'gistHubTab'),
@@ -35,13 +35,12 @@ class _DashboardViewState extends State<DashboardView> {
   late final List<Widget> _navigationPages = [
     VideoFeedView(key: _tabKeys[0]),
     GistHubView(key: _tabKeys[1]),
-    const SizedBox(key: _tabKeys[2]),
+    SizedBox(key: _tabKeys[2]), // ✅ Removed 'const'
     InboxView(key: _tabKeys[3]),
     ProfileView(key: _tabKeys[4]),
   ];
 
   void _handleTabSelection(int index) {
-    // ✅ UPLOAD (index 2) – push modal, don't switch
     if (index == 2) {
       context.push(RouterEnum.uploadView.routeName);
       return;
@@ -49,7 +48,7 @@ class _DashboardViewState extends State<DashboardView> {
 
     // ✅ PAUSE VIDEO BEFORE SWITCHING AWAY FROM TAB 0
     if (_currentIndex == 0 && index != 0) {
-      _pauseVideoFeed();
+      videoFeedKey.currentState?.pauseVideo();
     }
 
     setState(() {
@@ -59,22 +58,8 @@ class _DashboardViewState extends State<DashboardView> {
     // ✅ RESUME VIDEO WHEN RETURNING TO TAB 0
     if (index == 0 && _currentIndex != 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _resumeVideoFeed();
+        videoFeedKey.currentState?.resumeVideo();
       });
-    }
-  }
-
-  void _pauseVideoFeed() {
-    final state = _tabKeys[0]?.currentState;
-    if (state is VideoFeedViewState) {
-      state.pauseVideo();
-    }
-  }
-
-  void _resumeVideoFeed() {
-    final state = _tabKeys[0]?.currentState;
-    if (state is VideoFeedViewState) {
-      state.resumeVideo();
     }
   }
 
@@ -86,7 +71,6 @@ class _DashboardViewState extends State<DashboardView> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // ✅ INDEXEDSTACK WITH UNIQUE KEYS
           IndexedStack(
             index: _currentIndex,
             children: _navigationPages,
@@ -265,11 +249,4 @@ class _DashboardViewState extends State<DashboardView> {
       ),
     );
   }
-}
-
-// ===================== VIDEO FEED STATE ACCESS =====================
-// This allows the dashboard to call pause/resume on the video feed
-abstract class VideoFeedViewState {
-  void pauseVideo();
-  void resumeVideo();
 }
