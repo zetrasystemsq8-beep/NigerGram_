@@ -10,9 +10,6 @@ import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
 import 'package:nigergram/features/inbox/presentation/view/inbox_view.dart';
 
-// ✅ Global Key to access VideoFeed state
-final GlobalKey<_VideoFeedViewState> videoFeedKey = GlobalKey<_VideoFeedViewState>();
-
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
 
@@ -23,7 +20,6 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   int _currentIndex = 0;
 
-  // ✅ Unique ValueKeys for each tab
   final Map<int, GlobalKey> _tabKeys = {
     0: GlobalKey(debugLabel: 'videoFeedTab'),
     1: GlobalKey(debugLabel: 'gistHubTab'),
@@ -35,7 +31,7 @@ class _DashboardViewState extends State<DashboardView> {
   late final List<Widget> _navigationPages = [
     VideoFeedView(key: _tabKeys[0]),
     GistHubView(key: _tabKeys[1]),
-    SizedBox(key: _tabKeys[2]), // ✅ Removed 'const'
+    SizedBox(key: _tabKeys[2]),
     InboxView(key: _tabKeys[3]),
     ProfileView(key: _tabKeys[4]),
   ];
@@ -46,7 +42,6 @@ class _DashboardViewState extends State<DashboardView> {
       return;
     }
 
-    // ✅ PAUSE VIDEO BEFORE SWITCHING AWAY FROM TAB 0
     if (_currentIndex == 0 && index != 0) {
       videoFeedKey.currentState?.pauseVideo();
     }
@@ -55,7 +50,6 @@ class _DashboardViewState extends State<DashboardView> {
       _currentIndex = index;
     });
 
-    // ✅ RESUME VIDEO WHEN RETURNING TO TAB 0
     if (index == 0 && _currentIndex != 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         videoFeedKey.currentState?.resumeVideo();
