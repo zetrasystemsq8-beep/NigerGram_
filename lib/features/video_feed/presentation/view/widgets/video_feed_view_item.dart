@@ -11,7 +11,6 @@ import 'video_feed_view_optimized_video_player.dart';
 import 'video_feed_view_interaction_buttons.dart';
 import 'comments_viewer_bottom_sheet.dart';
 import 'video_share_bottom_sheet.dart';
-import 'video_feed_view_user_info_section.dart';
 
 class VideoFeedViewItem extends StatefulWidget {
   final VideoEntity videoItem;
@@ -34,17 +33,14 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   late AnimationController _likeAnimationController;
   late AnimationController _heartExplosionController;
 
-  // Local state
   bool _isLiked = false;
   int _likeCount = 0;
-  bool _isFollowing = false;
 
   @override
   void initState() {
     super.initState();
     _isLiked = widget.videoItem.isLiked ?? false;
     _likeCount = widget.videoItem.likeCount;
-    _isFollowing = widget.videoItem.isFollowing ?? false;
 
     _likeAnimationController = AnimationController(
       vsync: this,
@@ -57,14 +53,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   }
 
   @override
-  void didUpdateWidget(VideoFeedViewItem oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _isLiked = widget.videoItem.isLiked ?? false;
-    _likeCount = widget.videoItem.likeCount;
-    _isFollowing = widget.videoItem.isFollowing ?? false;
-  }
-
-  @override
   void dispose() {
     _likeAnimationController.dispose();
     _heartExplosionController.dispose();
@@ -72,7 +60,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     super.dispose();
   }
 
-  // ===================== COMMENT MODAL =====================
   void _openCommentsModalSheet(BuildContext context) {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
@@ -84,7 +71,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     );
   }
 
-  // ===================== SHARE SHEET =====================
   void _showShareBottomSheet(BuildContext context) {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
@@ -93,13 +79,12 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
       backgroundColor: Colors.transparent,
       builder: (context) => VideoShareBottomSheet(
         videoId: widget.videoItem.id,
-        username: widget.videoItem.username,
-        description: widget.videoItem.description,
+        username: widget.videoItem.username ?? 'User',
+        description: widget.videoItem.description ?? '',
       ),
     );
   }
 
-  // ===================== LIKE =====================
   void _handleLike() async {
     HapticFeedback.mediumImpact();
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -144,7 +129,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     }
   }
 
-  // ===================== PLAY/PAUSE =====================
   void _togglePlayPause() {
     if (widget.controller == null) return;
     setState(() {
@@ -161,57 +145,31 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     });
   }
 
-  // ===================== PROFILE NAVIGATION =====================
   void _navigateToProfile() {
-    HapticFeedback.lightImpact();
     context.push('/profile/${widget.videoItem.creatorId}');
   }
 
-  // ===================== FOLLOW =====================
-  void _handleFollow() async {
-    HapticFeedback.lightImpact();
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to follow')),
-      );
-      return;
-    }
-    setState(() => _isFollowing = true);
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.videoItem.creatorId)
-          .update({
-        'followers': FieldValue.increment(1),
-        'followersList': FieldValue.arrayUnion([currentUser.uid]),
-      });
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .update({
-        'following': FieldValue.increment(1),
-        'followingList': FieldValue.arrayUnion([widget.videoItem.creatorId]),
-      });
-    } catch (e) {
-      setState(() => _isFollowing = false);
-    }
-  }
-
-  // ===================== BOOKMARK =====================
   void _handleBookmark() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please sign in to save')),
       );
-      return;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ EVERYTHING IS NULL-SAFE WITH FALLBACKS
+    final String username = widget.videoItem.username ?? 'User';
+    final String description = widget.videoItem.description ?? '';
+    final String profileImageUrl = widget.videoItem.profileImageUrl ?? '';
+    final String soundName = widget.videoItem.soundName ?? '';
+    final bool isVerified = widget.videoItem.isVerified ?? false;
     final bool isOwnVideo = widget.videoItem.creatorId == FirebaseAuth.instance.currentUser?.uid;
+    final int commentCount = widget.videoItem.commentCount;
+    final int shareCount = widget.videoItem.shareCount;
+    final bool isBookmarked = widget.videoItem.isBookmarked ?? false;
 
     return GestureDetector(
       onTap: _togglePlayPause,
@@ -275,20 +233,73 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
             ),
           ),
 
-          // LAYER 4: User Info Section (null-safe)
+          // LAYER 4: User Info (MINIMAL – NO EXTRA WIDGETS)
           Positioned(
             top: 48,
             left: 16,
             right: 16,
-            child: VideoFeedViewUserInfoSection(
-              profileImageUrl: widget.videoItem.profileImageUrl ?? '',
-              username: widget.videoItem.username,
-              description: widget.videoItem.description,
-              soundName: widget.videoItem.soundName ?? '',
-              isVerified: widget.videoItem.isVerified ?? false,
-              isFollowing: _isFollowing,
-              isOwnVideo: isOwnVideo,
-              onFollowTap: _handleFollow,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '@$username',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isVerified) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.verified_rounded, color: NGColors.verified, size: 16),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (description.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      description,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                if (soundName.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.music_note_rounded, color: Colors.white54, size: 14),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            soundName,
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
 
@@ -296,18 +307,37 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
           Positioned(
             bottom: 40,
             right: 12,
-            child: VideoFeedViewInteractionButtons(
-              videoId: widget.videoItem.id,
-              isLiked: _isLiked,
-              likeCount: _likeCount,
-              commentCount: widget.videoItem.commentCount,
-              shareCount: widget.videoItem.shareCount,
-              isBookmarked: widget.videoItem.isBookmarked ?? false,
-              creatorId: widget.videoItem.creatorId,
-              creatorUsername: widget.videoItem.username,
-              onCommentTapped: () => _openCommentsModalSheet(context),
-              onShareTapped: () => _showShareBottomSheet(context),
-              onBookmarkTapped: _handleBookmark,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildActionButton(
+                  icon: _isLiked ? Icons.favorite : Icons.favorite_border,
+                  color: _isLiked ? NGColors.like : Colors.white,
+                  count: _likeCount,
+                  onTap: _handleLike,
+                ),
+                const SizedBox(height: 16),
+                _buildActionButton(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  color: Colors.white,
+                  count: commentCount,
+                  onTap: () => _openCommentsModalSheet(context),
+                ),
+                const SizedBox(height: 16),
+                _buildActionButton(
+                  icon: Icons.share_rounded,
+                  color: Colors.white,
+                  count: shareCount,
+                  onTap: () => _showShareBottomSheet(context),
+                ),
+                const SizedBox(height: 16),
+                _buildActionButton(
+                  icon: isBookmarked ? Icons.bookmark : Icons.bookmark_outline_rounded,
+                  color: isBookmarked ? NGColors.accent : Colors.white,
+                  count: 0,
+                  onTap: _handleBookmark,
+                ),
+              ],
             ),
           ),
 
@@ -327,6 +357,41 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
                       ),
                     );
                   },
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required int count,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          if (count > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                count > 999 ? '${(count / 1000).toStringAsFixed(1)}K' : '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
