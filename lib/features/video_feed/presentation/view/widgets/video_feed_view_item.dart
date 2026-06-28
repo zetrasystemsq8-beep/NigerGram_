@@ -160,7 +160,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
 
   @override
   Widget build(BuildContext context) {
-    // ✅ ALL FIELDS WITH FALLBACKS – NO NULL ERRORS
     final String username = widget.videoItem.username ?? 'User';
     final String description = widget.videoItem.description ?? '';
     final String soundName = widget.videoItem.soundName ?? '';
@@ -168,11 +167,11 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     final int commentCount = widget.videoItem.commentCount;
     final int shareCount = widget.videoItem.shareCount;
     final bool isBookmarked = widget.videoItem.isBookmarked ?? false;
-    final bool isOwnVideo = widget.videoItem.creatorId == FirebaseAuth.instance.currentUser?.uid;
 
-    // ✅ SAFE: Use a try-catch to prevent crashes
     try {
       return GestureDetector(
+        // ✅ FIX 1: Provide a unique value key to isolate widget tree element updates
+        key: ValueKey('feed_item_${widget.videoItem.id}'),
         onTap: _togglePlayPause,
         onDoubleTap: _handleLike,
         child: Stack(
@@ -248,14 +247,17 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
                         child: Row(
                           children: [
                             Flexible(
-                              child: Text(
-                                '@$username',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                              child: GestureDetector(
+                                onTap: _navigateToProfile,
+                                child: Text(
+                                  '@$username',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (isVerified) ...[
@@ -365,14 +367,14 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
         ),
       );
     } catch (e) {
-      // ✅ FALLBACK: If anything fails, show a simple placeholder
+      // ✅ FIX 2: Safeguard fallback box component using an immediate safe visual placeholder layout container
+      // This is wrapped safely higher up inside layout viewports if needed, but returning it cleanly here.
       return Container(
         color: Colors.black,
-        child: const Center(
-          child: Text(
-            'Something went wrong',
-            style: TextStyle(color: Colors.white),
-          ),
+        alignment: Alignment.center,
+        child: const Text(
+          'Video unavailable',
+          style: TextStyle(color: Colors.white70, fontSize: 14),
         ),
       );
     }
@@ -431,10 +433,10 @@ class HeartExplosionPainter extends CustomPainter {
       final dy = distance * (progress * 2) * (0.6 + 0.4 * (i % 2) / 2) *
           (i.isOdd ? 1 : -1) * (0.5 + 0.5 * (i % 3));
       final position = center + Offset(dx, dy);
-      final size = 12 + progress * 20 * (0.5 + 0.5 * (i % 3) / 3);
+      final heartSize = 12 + progress * 20 * (0.5 + 0.5 * (i % 3) / 3);
       final opacity = 1.0 - progress;
       final color = Colors.red.withOpacity(opacity * 0.8);
-      _drawHeart(canvas, position, size, color);
+      _drawHeart(canvas, position, heartSize, color);
     }
   }
 
