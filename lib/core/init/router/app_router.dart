@@ -15,6 +15,7 @@ import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/creator_earnings_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/gist_detail_view.dart';
 import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -23,20 +24,26 @@ final GlobalKey<NavigatorState> _rootNavigatorKey =
 class AppRouter {
   final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/', // ✅ FIXED: Always starts at "/"
+    initialLocation: '/',
     routes: [
-      // ✅ FIXED: Root route that decides where to go
+      // =============================================
+      // ROOT - Redirects based on login status
+      // =============================================
       GoRoute(
         path: '/',
         redirect: (context, state) {
           final user = FirebaseAuth.instance.currentUser;
           if (user != null) {
-            return RouterEnum.dashboardView.routeName;
+            return '/dashboard';
           } else {
             return '/login';
           }
         },
       ),
+
+      // =============================================
+      // AUTH ROUTES
+      // =============================================
       GoRoute(
         path: '/login',
         pageBuilder: (context, state) =>
@@ -47,47 +54,56 @@ class AppRouter {
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const RegisterPage()),
       ),
+
+      // =============================================
+      // DASHBOARD - Main App
+      // =============================================
       GoRoute(
-        path: RouterEnum.uploadView.routeName,
-        parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) =>
-            customPageBuilderWidget(context, state, const UploadPage()),
-      ),
-      GoRoute(
-        path: RouterEnum.dashboardView.routeName,
+        path: '/dashboard',
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const DashboardView()),
-        routes: [
-          // ✅ NESTED ROUTES INSIDE DASHBOARD
-          GoRoute(
-            path: 'profile/:userId',
-            pageBuilder: (context, state) {
-              final userId = state.pathParameters['userId'] ?? '';
-              return customPageBuilderWidget(
-                context,
-                state,
-                ProfileView(userId: userId),
-              );
-            },
-          ),
-          GoRoute(
-            path: 'gist-hub',
-            pageBuilder: (context, state) =>
-                customPageBuilderWidget(context, state, const GistHubView()),
-          ),
-          GoRoute(
-            path: 'gist/create',
-            pageBuilder: (context, state) =>
-                customPageBuilderWidget(context, state, const GistCreatePost()),
-          ),
-        ],
       ),
+
+      // =============================================
+      // VIDEO ROUTES
+      // =============================================
       GoRoute(
-        path: RouterEnum.videoFeedView.routeName,
+        path: '/video-feed',
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const VideoFeedView()),
       ),
-      // ✅ FIXED: Profile route (works with or without userId)
+      GoRoute(
+        path: '/video/:videoId',
+        pageBuilder: (context, state) {
+          final videoId = state.pathParameters['videoId']!;
+          return customPageBuilderWidget(
+            context,
+            state,
+            Scaffold(
+              backgroundColor: Colors.black,
+              appBar: AppBar(
+                backgroundColor: Colors.black,
+                iconTheme: const IconThemeData(color: Colors.white),
+                title: const Text('Video', style: TextStyle(color: Colors.white)),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => context.pop(),
+                ),
+              ),
+              body: Center(
+                child: Text(
+                  '🎬 Video: $videoId',
+                  style: const TextStyle(color: Colors.white, fontSize: 18),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+
+      // =============================================
+      // PROFILE ROUTES
+      // =============================================
       GoRoute(
         path: '/profile/:userId',
         pageBuilder: (context, state) {
@@ -101,6 +117,27 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/profile',
+        redirect: (context, state) {
+          final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+          return '/profile/$userId';
+        },
+      ),
+
+      // =============================================
+      // UPLOAD
+      // =============================================
+      GoRoute(
+        path: '/upload',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(context, state, const UploadPage()),
+      ),
+
+      // =============================================
+      // GIST ROUTES
+      // =============================================
+      GoRoute(
         path: '/gist-hub',
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const GistHubView()),
@@ -111,29 +148,20 @@ class AppRouter {
             customPageBuilderWidget(context, state, const GistCreatePost()),
       ),
       GoRoute(
-        path: '/video-detail/:videoId',
+        path: '/gist/:gistId',
         pageBuilder: (context, state) {
-          final videoId = state.pathParameters['videoId']!;
+          final gistId = state.pathParameters['gistId']!;
           return customPageBuilderWidget(
             context,
             state,
-            Scaffold(
-              backgroundColor: Colors.black,
-              appBar: AppBar(
-                backgroundColor: Colors.black,
-                iconTheme: const IconThemeData(color: Colors.white),
-                title: const Text('Video', style: TextStyle(color: Colors.white)),
-              ),
-              body: Center(
-                child: Text(
-                  'Loading video: $videoId',
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-            ),
+            GistDetailView(gistId: gistId),
           );
         },
       ),
+
+      // =============================================
+      // DISCOVER
+      // =============================================
       GoRoute(
         path: '/discover',
         pageBuilder: (context, state) {
@@ -145,6 +173,10 @@ class AppRouter {
           );
         },
       ),
+
+      // =============================================
+      // WALLET ROUTES
+      // =============================================
       GoRoute(
         path: '/wallet',
         pageBuilder: (context, state) =>
@@ -164,6 +196,81 @@ class AppRouter {
         path: '/wallet/earnings',
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const CreatorEarningsView()),
+      ),
+
+      // =============================================
+      // 404 - Page Not Found (Catch all unknown routes)
+      // =============================================
+      GoRoute(
+        path: '/:page',
+        pageBuilder: (context, state) =>
+            customPageBuilderWidget(
+              context,
+              state,
+              Scaffold(
+                backgroundColor: Colors.black,
+                appBar: AppBar(
+                  backgroundColor: Colors.black,
+                  iconTheme: const IconThemeData(color: Colors.white),
+                  title: const Text('Page Not Found', style: TextStyle(color: Colors.white)),
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => context.go('/dashboard'),
+                  ),
+                ),
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.search_off_rounded,
+                        color: Colors.grey.shade600,
+                        size: 80,
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        '404',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 48,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Page Not Found',
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'The page you are looking for does not exist.',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      ElevatedButton.icon(
+                        onPressed: () => context.go('/dashboard'),
+                        icon: const Icon(Icons.home, color: Colors.white),
+                        label: const Text('Go Home'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00C853),
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
       ),
     ],
   );
