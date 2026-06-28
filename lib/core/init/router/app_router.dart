@@ -15,7 +15,7 @@ import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/creator_earnings_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
-import 'package:nigergram/features/gist_hub/presentation/view/gist_detail_view.dart';
+// ✅ REMOVED: gist_detail_view.dart (doesn't exist yet)
 import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -147,17 +147,7 @@ class AppRouter {
         pageBuilder: (context, state) =>
             customPageBuilderWidget(context, state, const GistCreatePost()),
       ),
-      GoRoute(
-        path: '/gist/:gistId',
-        pageBuilder: (context, state) {
-          final gistId = state.pathParameters['gistId']!;
-          return customPageBuilderWidget(
-            context,
-            state,
-            GistDetailView(gistId: gistId),
-          );
-        },
-      ),
+      // ✅ REMOVED: /gist/:gistId route (temporarily)
 
       // =============================================
       // DISCOVER
