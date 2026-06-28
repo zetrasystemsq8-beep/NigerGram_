@@ -12,17 +12,18 @@ import 'package:nigergram/features/video_feed/presentation/view/widgets/video_fe
 import 'package:video_player/video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ✅ Global Key for Dashboard to access VideoFeed state
-final GlobalKey<_VideoFeedViewState> videoFeedKey = GlobalKey<_VideoFeedViewState>();
+// ✅ GLOBAL KEY - exported for dashboard access
+final GlobalKey<VideoFeedViewState> videoFeedKey = GlobalKey<VideoFeedViewState>();
 
 class VideoFeedView extends StatefulWidget {
   const VideoFeedView({super.key});
 
   @override
-  State<VideoFeedView> createState() => _VideoFeedViewState();
+  VideoFeedViewState createState() => VideoFeedViewState();
 }
 
-class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserver {
+// ✅ MADE PUBLIC (removed underscore)
+class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserver {
   late PageController _pageController;
   final Map<int, VideoPlayerController> _controllers = {};
   final Map<int, VoidCallback> _activeListeners = {};
@@ -56,14 +57,13 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
     }
   }
 
-  // ✅ Pause video (called by Dashboard)
+  // ✅ PUBLIC METHODS for Dashboard
   void pauseVideo() {
     if (_controllers.containsKey(_focusedIndex)) {
       _controllers[_focusedIndex]?.pause();
     }
   }
 
-  // ✅ Resume video (called by Dashboard)
   void resumeVideo() {
     if (_controllers.containsKey(_focusedIndex)) {
       _controllers[_focusedIndex]?.play();
@@ -263,7 +263,7 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
         }
 
         return Scaffold(
-          key: videoFeedKey, // ✅ Global Key for Dashboard access
+          key: videoFeedKey,
           backgroundColor: NGColors.background,
           body: Padding(
             padding: EdgeInsets.only(bottom: bottomPadding),
