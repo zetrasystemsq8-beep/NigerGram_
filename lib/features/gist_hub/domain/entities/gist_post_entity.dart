@@ -11,10 +11,13 @@ class GistPostEntity {
   final String? imageUrl;
   final List<String> pollOptions;
   final Map<String, int> pollVotes;
+  final Map<String, int> pollVoters;
   final Map<String, int> reactions;
   final int commentCount;
-  final Timestamp? createdAt; // 👈 FIX: Made nullable
+  final Timestamp? createdAt;
+  final Timestamp? expiresAt;
   final bool isAnonymous;
+  final int totalReactions;
 
   GistPostEntity({
     required this.id,
@@ -27,10 +30,13 @@ class GistPostEntity {
     this.imageUrl,
     this.pollOptions = const [],
     this.pollVotes = const {},
+    this.pollVoters = const {},
     this.reactions = const {},
     this.commentCount = 0,
-    this.createdAt, // 👈 FIX: Removed 'required'
+    this.createdAt,
+    this.expiresAt,
     this.isAnonymous = false,
+    this.totalReactions = 0,
   });
 
   factory GistPostEntity.fromMap(Map<String, dynamic> map, String id) {
@@ -45,10 +51,13 @@ class GistPostEntity {
       imageUrl: map['imageUrl'],
       pollOptions: List<String>.from(map['pollOptions'] ?? []),
       pollVotes: Map<String, int>.from(map['pollVotes'] ?? {}),
+      pollVoters: Map<String, int>.from(map['pollVoters'] ?? {}),
       reactions: Map<String, int>.from(map['reactions'] ?? {}),
       commentCount: map['commentCount'] ?? 0,
       createdAt: map['createdAt'] as Timestamp?,
+      expiresAt: map['expiresAt'] as Timestamp?,
       isAnonymous: map['isAnonymous'] ?? false,
+      totalReactions: map['totalReactions'] ?? 0,
     );
   }
 
@@ -63,10 +72,13 @@ class GistPostEntity {
       'imageUrl': imageUrl,
       'pollOptions': pollOptions,
       'pollVotes': pollVotes,
+      'pollVoters': pollVoters,
       'reactions': reactions,
       'commentCount': commentCount,
       'createdAt': createdAt,
+      'expiresAt': expiresAt,
       'isAnonymous': isAnonymous,
+      'totalReactions': totalReactions,
     };
   }
 }
