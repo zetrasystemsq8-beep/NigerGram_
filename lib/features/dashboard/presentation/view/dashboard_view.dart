@@ -10,6 +10,9 @@ import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
 import 'package:nigergram/features/inbox/presentation/view/inbox_view.dart';
 
+// ✅ ADD THIS – GlobalKey for VideoFeed state
+final GlobalKey<VideoFeedViewState> videoFeedKey = GlobalKey<VideoFeedViewState>();
+
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
 
@@ -38,7 +41,8 @@ class _DashboardViewState extends State<DashboardView> {
 
   void _handleTabSelection(int index) {
     if (index == 2) {
-      context.push(RouterEnum.uploadView.routeName);
+      // ✅ FIXED: Use literal '/upload' instead of RouterEnum
+      context.push('/upload');
       return;
     }
 
