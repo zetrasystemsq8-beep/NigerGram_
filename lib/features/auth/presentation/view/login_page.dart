@@ -206,7 +206,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         password: password,
       );
       if (mounted) {
-        context.go(RouterEnum.dashboardView.routeName);
+        // ✅ FIXED: Use literal '/dashboard' instead of RouterEnum
+        context.go('/dashboard');
       }
     } catch (e) {
       NigerGramError.showSnackBar(context, e);
@@ -262,7 +263,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       });
 
       if (mounted) {
-        context.go(RouterEnum.dashboardView.routeName);
+        // ✅ FIXED: Use literal '/dashboard' instead of RouterEnum
+        context.go('/dashboard');
       }
     } catch (e) {
       NigerGramError.showSnackBar(context, e);
@@ -280,7 +282,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Brand Logo
               ShaderMask(
                 shaderCallback: (bounds) => const LinearGradient(
                   colors: [NGColors.accent, Colors.white, NGColors.accent],
@@ -341,7 +342,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   strokeWidth: 2,
                 ),
               ),
-              // ✅ ZETRA BRANDING
               const SizedBox(height: 40),
               const Text(
                 'Powered by ZETRA',
@@ -363,7 +363,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       body: BlocListener<AuthCubit, AuthState>(
         listener: (context, state) {
           if (state is AuthSuccess) {
-            context.go(RouterEnum.dashboardView.routeName);
+            // ✅ FIXED: Use literal '/dashboard' instead of RouterEnum
+            context.go('/dashboard');
           }
           if (state is AuthError) {
             NigerGramError.showSnackBar(context, state.message);
@@ -374,7 +375,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
-                // ✅ SPACER – pushes content to center
                 const Spacer(flex: 1),
 
                 // ✅ ZETRA BRANDING – like Meta on Instagram
@@ -415,9 +415,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           const SizedBox(width: 6),
                           const Text(
                             '⚡',
-                            style: TextStyle(
-                              fontSize: 11,
-                            ),
+                            style: TextStyle(fontSize: 11),
                           ),
                           const Text(
                             'NIGERGRAM',
@@ -435,7 +433,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
                 const SizedBox(height: 24),
 
-                // ✅ LOGO
                 ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
                     colors: [NGColors.accent, Colors.white, NGColors.accent],
@@ -480,7 +477,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
                 const SizedBox(height: 32),
 
-                // ✅ TABS
                 Container(
                   decoration: BoxDecoration(
                     color: NGColors.surface,
@@ -506,12 +502,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
                 const SizedBox(height: 24),
 
-                // ✅ FORM
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        // Email
                         Container(
                           decoration: BoxDecoration(
                             color: NGColors.surface,
@@ -533,7 +527,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         ),
                         const SizedBox(height: 12),
 
-                        // Password
                         Container(
                           decoration: BoxDecoration(
                             color: NGColors.surface,
@@ -566,7 +559,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           ),
                         ),
 
-                        // Sign Up only fields
                         if (_currentTab == 1) ...[
                           const SizedBox(height: 12),
                           Container(
@@ -607,8 +599,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                               ),
                             ),
                           ),
-                          
-                          // Terms Checkbox
                           const SizedBox(height: 12),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -682,7 +672,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
                         const SizedBox(height: 24),
 
-                        // Submit Button
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -724,7 +713,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
                         const SizedBox(height: 12),
 
-                        // Forgot Password
                         if (_currentTab == 0)
                           GestureDetector(
                             onTap: _showForgotPasswordSheet,
@@ -741,10 +729,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ),
                           ),
 
-                        // ✅ SPACER at bottom
                         const SizedBox(height: 20),
 
-                        // ✅ ZETRA FOOTER
                         const Text(
                           'ZETRA ⚡ NIGERGRAM',
                           style: TextStyle(
