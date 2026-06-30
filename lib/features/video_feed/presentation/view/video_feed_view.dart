@@ -137,7 +137,7 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
 
   VideoPlayerController? _getOrCreateController(int index, List<VideoEntity> videos) {
     if (index < 0 || index >= videos.length) return null;
-    if (_controllers.containsKey(index)) return _controllers[index];
+    if (_controllers.containsKey(index)) return controller: _controllers[index]!,
 
     _initializationStatus[index] = false;
     final controller = VideoPlayerController.networkUrl(Uri.parse(videos[index].videoUrl));
