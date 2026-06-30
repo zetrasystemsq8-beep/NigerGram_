@@ -133,7 +133,7 @@ Note: Do not commit large binary files to the main repo if you prefer to store t
 
 See CONTRIBUTING.md for contribution guidelines.
 
-## Contact / Creator
+## Contact / Creator oyedeleconnect@gmail.com or nigergram@gmail.com
 
 Project created by Oyedele Toluwani (Connect Baba).
 
