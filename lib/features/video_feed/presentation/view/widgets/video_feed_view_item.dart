@@ -8,11 +8,12 @@ class VideoFeedViewItem extends StatefulWidget {
   final VideoEntity video;
   final VideoPlayerController controller;
 
+  // Constructor expects 'videoItem' (to match parent), maps it to 'video'
   const VideoFeedViewItem({
     super.key,
-    required this.video,
+    required VideoEntity videoItem,
     required this.controller,
-  });
+  }) : video = videoItem;
 
   @override
   State<VideoFeedViewItem> createState() => _VideoFeedViewItemState();
