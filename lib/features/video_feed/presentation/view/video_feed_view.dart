@@ -1,7 +1,5 @@
 // lib/features/video_feed/presentation/view/video_feed_view.dart
 import 'dart:async';
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -14,16 +12,18 @@ import 'package:nigergram/features/video_feed/presentation/view/widgets/video_fe
 import 'package:video_player/video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-final GlobalKey<_VideoFeedViewState> videoFeedKey = GlobalKey<_VideoFeedViewState>();
+// ✅ GLOBAL KEY - exported for dashboard access
+final GlobalKey<VideoFeedViewState> videoFeedKey = GlobalKey<VideoFeedViewState>();
 
 class VideoFeedView extends StatefulWidget {
   const VideoFeedView({super.key});
 
   @override
-  State<VideoFeedView> createState() => _VideoFeedViewState();
+  VideoFeedViewState createState() => VideoFeedViewState();
 }
 
-class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserver {
+// ✅ MADE PUBLIC (removed underscore)
+class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserver {
   late PageController _pageController;
   final Map<int, VideoPlayerController> _controllers = {};
   final Map<int, VoidCallback> _activeListeners = {};
@@ -38,18 +38,18 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
     super.initState();
     _pageController = PageController();
     WidgetsBinding.instance.addObserver(this);
-    debugPrint('🟢 VideoFeedView initialized');
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pauseAllVideos();
     _clearAndDisposeAllControllers();
     _pageController.dispose();
     super.dispose();
   }
 
-  // ✅ FIX: Pause all on app background or when page is not visible
+  // ==================== LIFECYCLE ====================
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
@@ -57,22 +57,7 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
     }
   }
 
-  // ✅ NEW: Pause all videos when the widget is not in focus (navigation away)
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) {
-      _pauseAllVideos();
-    }
-  }
-
-  void _pauseAllVideos() {
-    _controllers.forEach((_, controller) {
-      controller?.pause();
-    });
-  }
-
+  // ✅ PUBLIC METHODS for Dashboard
   void pauseVideo() {
     if (_controllers.containsKey(_focusedIndex)) {
       _controllers[_focusedIndex]?.pause();
@@ -85,13 +70,11 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
     }
   }
 
-  // ------------------- REST OF THE FILE UNCHANGED -------------------
-  // (Keep all existing methods: _clearAndDisposeAllControllers, _onPageChanged,
-  // _manageControllerLifecycle, _prefetchVideo, _getOrCreateController,
-  // _attachViewListener, etc. - exactly as you had them)
-
-  // I'm including the methods below as a reminder - your existing code already has them.
-  // Just ensure you have the full content from your original file.
+  void _pauseAllVideos() {
+    _controllers.forEach((_, controller) {
+      controller?.pause();
+    });
+  }
 
   void _clearAndDisposeAllControllers() {
     for (var index in _controllers.keys) {
@@ -228,10 +211,13 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
         if (state.isLoading && state.videos.isEmpty) {
           return Scaffold(
             backgroundColor: NGColors.background,
-            body: const Center(child: CircularProgressIndicator(color: NGColors.accent)),
+            body: const Center(
+              child: CircularProgressIndicator(color: NGColors.accent),
+            ),
           );
         }
-        if (!state.isSuccess && state.errorMessage.isNotEmpty) {
+
+        if (state.errorMessage.isNotEmpty) {
           return Scaffold(
             backgroundColor: NGColors.background,
             body: Center(
@@ -239,8 +225,12 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.error_outline, color: NGColors.error, size: 48),
-                  const SizedBox(height: 12),
-                  Text(state.errorMessage, style: TextStyle(color: NGColors.textSecondary)),
+                  const SizedBox(height: 16),
+                  Text(
+                    state.errorMessage,
+                    style: TextStyle(color: NGColors.textSecondary),
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => context.read<VideoFeedCubit>().loadVideos(),
@@ -252,6 +242,7 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
             ),
           );
         }
+
         if (state.videos.isEmpty) {
           return Scaffold(
             backgroundColor: NGColors.background,
@@ -260,8 +251,11 @@ class _VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserv
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.video_collection_rounded, color: NGColors.textMuted, size: 64),
-                  SizedBox(height: 12),
-                  Text('No videos', style: TextStyle(color: NGColors.textSecondary)),
+                  SizedBox(height: 16),
+                  Text(
+                    'No videos yet',
+                    style: TextStyle(color: NGColors.textSecondary),
+                  ),
                 ],
               ),
             ),
