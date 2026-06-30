@@ -25,7 +25,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   late AnimationController _loadingController;
   late AnimationController _actionIconAnimationController;
 
-  // 🎨 NEW: UI-only animation controllers (no backend logic touched)
+  // UI-only animation controllers
   late AnimationController _videoFadeController;
   late Animation<double> _videoFadeAnimation;
   late AnimationController _bufferFadeController;
@@ -46,9 +46,14 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
   bool _showHeart = false;
 
-  // 🔥 FIX: Track initialization state separately
+  // Track initialization state
   bool _isControllerInitialized = false;
   bool _isInitializing = false;
+
+  // ✅ Progress bar state (NO heatmap)
+  bool _isScrubbing = false;
+  Duration _scrubPosition = Duration.zero;
+  bool _showControls = true;
 
   @override
   void initState() {
@@ -60,7 +65,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       duration: const Duration(milliseconds: 400),
     );
 
-    // 🎨 NEW: Smooth video fade-in once ready
+    // Smooth video fade-in once ready
     _videoFadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -70,13 +75,13 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       curve: Curves.easeOut,
     );
 
-    // 🎨 NEW: Buffering glass loader fade
+    // Buffering glass loader fade
     _bufferFadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
 
-    // 🎨 NEW: Double tap heart animation
+    // Double tap heart animation
     _doubleTapHeartController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -122,7 +127,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       CurvedAnimation(parent: _doubleTapHeartController, curve: Curves.easeOut),
     );
 
-    // 🎨 NEW: Premium logo loader rotation/pulse
+    // Premium logo loader rotation/pulse
     _logoLoaderController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1600),
@@ -131,11 +136,20 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     _oldController = widget.controller;
     _currentVideoId = widget.videoId;
     
-    // 🔥 FIX: Check if controller is already initialized
     _checkAndSetupController();
+
+    // Auto-hide controls after 3 seconds
+    _startControlsTimer();
   }
 
-  // 🔥 FIX: New method to handle controller setup with proper state
+  void _startControlsTimer() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && !_isScrubbing) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
   void _checkAndSetupController() {
     final controller = widget.controller;
     if (controller == null) {
@@ -146,22 +160,18 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
-    // If controller is already initialized, set up immediately
     if (controller.value.isInitialized) {
       _setupController(controller);
     } else {
-      // If not initialized, wait for it
       setState(() {
         _isInitializing = true;
         _isControllerInitialized = false;
       });
       
-      // Add listener to catch when initialization completes
       controller.addListener(_onControllerInitListener);
     }
   }
 
-  // 🔥 FIX: Separate listener for initialization
   void _onControllerInitListener() {
     final controller = widget.controller;
     if (controller == null) return;
@@ -174,9 +184,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     }
   }
 
-  // 🔥 FIX: Setup controller once initialized
   void _setupController(VideoPlayerController controller) {
-    // Remove any old listeners
     _oldController?.removeListener(_onControllerUpdate);
     _oldController?.removeListener(_onControllerInitListener);
     
@@ -187,10 +195,8 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     _applyLowDataOptimization(controller);
     _addControllerListener(controller);
     
-    // Play immediately
     _ensureAutoplay(controller);
 
-    // 🎨 NEW: Trigger smooth fade-in once controller is ready
     _videoFadeController.forward(from: 0.0);
     
     if (mounted) {
@@ -226,7 +232,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final bool controllerChanged = widget.controller != _oldController;
 
     if (videoIdChanged || controllerChanged) {
-      // Clean up old controller listeners
       _oldController?.removeListener(_onControllerUpdate);
       _oldController?.removeListener(_onControllerInitListener);
       
@@ -235,11 +240,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       _playerKey = UniqueKey();
       _isBuffering = false;
 
-      // 🎨 NEW: Reset fade for new video so it fades in fresh
       _videoFadeController.reset();
       
-      // 🔥 FIX: Re-check controller setup
       _checkAndSetupController();
+      _startControlsTimer();
     }
   }
 
@@ -264,7 +268,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     if (controller == null) return;
     if (widget.videoId != _currentVideoId) return;
 
-    // 🔥 FIX: Check for initialization
     if (!controller.value.isInitialized) {
       if (mounted) {
         setState(() {
@@ -275,7 +278,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
-    // Update initialized state if needed
     if (!_isControllerInitialized) {
       if (mounted) {
         setState(() {
@@ -295,7 +297,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
 
-    // 🔥 FIX: Only show buffering if playing and buffer is loading
     bool shouldShowBuffering = isBuffering && isPlaying;
 
     if (_isBuffering != shouldShowBuffering || _isPlaying != isPlaying) {
@@ -305,7 +306,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             _isBuffering = shouldShowBuffering;
             _isPlaying = isPlaying;
           });
-          // 🎨 NEW: Drive buffering glass loader fade
           if (shouldShowBuffering) {
             _bufferFadeController.forward();
           } else {
@@ -314,6 +314,11 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
         }
       });
     }
+
+    // Update progress bar if not scrubbing
+    if (!_isScrubbing && mounted) {
+      setState(() {});
+    }
   }
 
   void _handleSingleTapToggle() {
@@ -321,6 +326,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     if (controller == null || !controller.value.isInitialized) return;
 
     HapticFeedback.lightImpact();
+
+    // Show controls on tap
+    setState(() => _showControls = true);
+    _startControlsTimer();
 
     setState(() {
       if (controller.value.isPlaying) {
@@ -342,7 +351,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     });
   }
 
-  // 🎨 NEW: Double tap like — purely visual, no backend call added/removed
   void _handleDoubleTapLike() {
     HapticFeedback.mediumImpact();
     setState(() => _showHeart = true);
@@ -352,7 +360,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  // 🎨 PREMIUM UI BUILDERS (visual only)
+  // PREMIUM UI BUILDERS
   // ─────────────────────────────────────────────────────────────────────
 
   Widget _buildPremiumLoader() {
@@ -490,7 +498,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             TweenSequenceItem(tween: Tween<double>(begin: 0.9, end: 0.0).chain(CurveTween(curve: Curves.easeIn)), weight: 60),
           ]).evaluate(_actionIconAnimationController);
 
-          // Ripple expands slightly beyond the glass circle
           final double rippleScale = TweenSequence<double>([
             TweenSequenceItem(tween: Tween<double>(begin: 0.6, end: 1.6).chain(CurveTween(curve: Curves.easeOut)), weight: 100),
           ]).evaluate(_actionIconAnimationController);
@@ -501,7 +508,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
           return Stack(
             alignment: Alignment.center,
             children: [
-              // Ripple ring
               Opacity(
                 opacity: rippleOpacity,
                 child: Transform.scale(
@@ -519,7 +525,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
                   ),
                 ),
               ),
-              // Glass icon
               Opacity(
                 opacity: opacityFactor,
                 child: Transform.scale(
@@ -700,17 +705,147 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────
+  // ✅ PROGRESS BAR + SCRUBBER + TIME DISPLAY
+  // ─────────────────────────────────────────────────────────────────────
+
+  Widget _buildProgressBar() {
+    final controller = widget.controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return const SizedBox.shrink();
+    }
+
+    final duration = controller.value.duration;
+    if (duration == Duration.zero) {
+      return const SizedBox.shrink();
+    }
+
+    final position = _isScrubbing ? _scrubPosition : controller.value.position;
+    final progress = position.inMilliseconds / duration.inMilliseconds;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+
+        return GestureDetector(
+          onTapDown: (details) {
+            final pos = (details.localPosition.dx / width).clamp(0.0, 1.0);
+            _scrubPosition = Duration(milliseconds: (duration.inMilliseconds * pos).round());
+            controller.seekTo(_scrubPosition);
+            setState(() {});
+          },
+          onTapUp: (_) {
+            controller.play();
+            _startControlsTimer();
+          },
+          onHorizontalDragStart: (_) {
+            _isScrubbing = true;
+            setState(() => _showControls = true);
+            controller.pause();
+          },
+          onHorizontalDragUpdate: (details) {
+            final pos = (details.localPosition.dx / width).clamp(0.0, 1.0);
+            _scrubPosition = Duration(milliseconds: (duration.inMilliseconds * pos).round());
+            controller.seekTo(_scrubPosition);
+            setState(() {});
+          },
+          onHorizontalDragEnd: (_) {
+            _isScrubbing = false;
+            controller.play();
+            setState(() {});
+            _startControlsTimer();
+          },
+          child: Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+            child: Row(
+              children: [
+                // Played portion
+                Container(
+                  width: (width * progress.clamp(0.0, 1.0)),
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: NGColors.accent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Scrubber dot
+                if (_isScrubbing || controller.value.isPlaying)
+                  Container(
+                    width: 12,
+                    height: 12,
+                    margin: const EdgeInsets.only(left: -6),
+                    decoration: BoxDecoration(
+                      color: NGColors.accent,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.6),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTimeDisplay() {
+    final controller = widget.controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return const SizedBox.shrink();
+    }
+
+    final duration = controller.value.duration;
+    if (duration == Duration.zero) {
+      return const SizedBox.shrink();
+    }
+
+    final position = _isScrubbing ? _scrubPosition : controller.value.position;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          _formatDuration(position),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          _formatDuration(duration),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes;
+    final seconds = d.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
 
-    // 🔥 FIX: More comprehensive initialization check
     final bool isNotReady = controller == null || 
                            !controller.value.isInitialized || 
                            _isInitializing;
 
     if (isNotReady) {
-      // 🎨 NEW: Premium loading experience instead of plain spinner
       return _buildPremiumLoader();
     }
 
@@ -721,8 +856,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Hardware Accelerated Media View Box
-          // 🎨 NEW: Smooth fade-in transition instead of instant pop-in
+          // Video player with fade-in
           Positioned.fill(
             child: FadeTransition(
               opacity: _videoFadeAnimation,
@@ -738,20 +872,46 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             ),
           ),
 
-          // Scale and Fade Animation Play/Pause Overlay Engine
-          // 🎨 NEW: Glassmorphism + ripple instead of flat dark circle
+          // Play/Pause overlay
           if (_showPlayIconOverlay) _buildPlayPauseOverlay(),
 
-          // 🎨 NEW: Double tap like heart animation
+          // Double tap heart
           if (_showHeart) _buildDoubleTapHeart(),
 
-          // Low-Data Buffering Spin Segment
-          // 🎨 NEW: Frosted glass premium loader with glow
+          // Buffering loader
           if (_isBuffering && _isControllerInitialized) _buildBufferingLoader(),
 
-          // Connection Error State Layer
-          // 🎨 NEW: Glassmorphism retry card
+          // Error state
           if (controller.value.hasError) _buildErrorState(),
+
+          // ✅ Bottom controls: Progress bar + Time
+          if (_showControls)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.5),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildProgressBar(),
+                    const SizedBox(height: 4),
+                    _buildTimeDisplay(),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

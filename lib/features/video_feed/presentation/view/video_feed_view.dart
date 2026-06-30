@@ -1,4 +1,3 @@
-// lib/features/video_feed/presentation/view/video_feed_view.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -275,11 +274,18 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
               itemBuilder: (context, index) {
                 final controller = _controllers[index];
                 final isInitialized = _initializationStatus[index] ?? false;
-                if (controller == null) _getOrCreateController(index, state.videos);
+
+                if (controller == null) {
+                  _getOrCreateController(index, state.videos);
+                  return const Center(
+                    child: CircularProgressIndicator(color: NGColors.accent),
+                  );
+                }
+
                 return VideoFeedViewItem(
                   key: ValueKey('${state.videos[index].id}_${isInitialized ? 'init' : 'loading'}'),
                   videoItem: state.videos[index],
-                  controller: _controllers[index],
+                  controller: controller,
                 );
               },
             ),
