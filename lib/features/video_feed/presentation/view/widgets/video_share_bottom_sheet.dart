@@ -1,7 +1,7 @@
-// lib/features/video_feed/presentation/view/widgets/video_share_bottom_sheet.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 
 class VideoShareBottomSheet extends StatelessWidget {
@@ -80,7 +80,7 @@ class VideoShareBottomSheet extends StatelessWidget {
                       color: const Color(0xFF25D366),
                       onTap: () {
                         Navigator.pop(context);
-                        // WhatsApp share
+                        Share.share(message);
                       },
                     ),
                     _ShareOption(
@@ -89,7 +89,7 @@ class VideoShareBottomSheet extends StatelessWidget {
                       color: const Color(0xFF1DA1F2),
                       onTap: () {
                         Navigator.pop(context);
-                        // Twitter share
+                        Share.share(message);
                       },
                     ),
                     _ShareOption(
@@ -112,7 +112,10 @@ class VideoShareBottomSheet extends StatelessWidget {
                       icon: Icons.more_horiz_rounded,
                       label: 'More',
                       color: NGColors.textMuted,
-                      onTap: () => Navigator.pop(context),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Share.share(message);
+                      },
                     ),
                   ],
                 ),
