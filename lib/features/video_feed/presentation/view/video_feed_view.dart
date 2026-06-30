@@ -1,4 +1,3 @@
-// lib/features/video_feed/presentation/view/video_feed_view.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -135,9 +134,10 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
     } catch (_) {}
   }
 
+  // ✅ FIX 1: Fixed invalid syntax
   VideoPlayerController? _getOrCreateController(int index, List<VideoEntity> videos) {
     if (index < 0 || index >= videos.length) return null;
-    if (_controllers.containsKey(index)) return controller: _controllers[index]!,
+    if (_controllers.containsKey(index)) return _controllers[index]; // ✅ CORRECT
 
     _initializationStatus[index] = false;
     final controller = VideoPlayerController.networkUrl(Uri.parse(videos[index].videoUrl));
@@ -272,14 +272,24 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
               scrollDirection: Axis.vertical,
               onPageChanged: (index) => _onPageChanged(index, state.videos),
               itemCount: state.videos.length,
+              // ✅ FIX 2: Handle null controllers safely
               itemBuilder: (context, index) {
                 final controller = _controllers[index];
                 final isInitialized = _initializationStatus[index] ?? false;
-                if (controller == null) _getOrCreateController(index, state.videos);
+
+                // If controller is null, create it and show loading state
+                if (controller == null) {
+                  _getOrCreateController(index, state.videos);
+                  return const Center(
+                    child: CircularProgressIndicator(color: NGColors.accent),
+                  );
+                }
+
+                // Controller exists - render the video
                 return VideoFeedViewItem(
                   key: ValueKey('${state.videos[index].id}_${isInitialized ? 'init' : 'loading'}'),
                   videoItem: state.videos[index],
-                  controller: _controllers[index],
+                  controller: controller, // ✅ Now guaranteed non-null
                 );
               },
             ),
