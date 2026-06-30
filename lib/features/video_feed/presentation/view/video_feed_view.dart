@@ -1,315 +1,125 @@
-import 'dart:async';
+// lib/features/video_feed/presentation/view/widgets/video_feed_view_item.dart
+
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:nigergram/core/design_system/colors.dart';
-import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
-import 'package:nigergram/features/video_feed/presentation/bloc/video_feed_cubit.dart';
-import 'package:nigergram/features/video_feed/presentation/bloc/video_feed_state.dart';
-import 'package:nigergram/features/video_feed/presentation/view/widgets/video_feed_view_item.dart'; // ✅ Fixed path
 import 'package:video_player/video_player.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'video_feed_view_optimized_video_player.dart';
+import 'video_action_buttons.dart'; // ✅ Make sure this file exists
 
-// ✅ GLOBAL KEY - exported for dashboard access
-final GlobalKey<VideoFeedViewState> videoFeedKey = GlobalKey<VideoFeedViewState>();
+class VideoFeedViewItem extends StatefulWidget {
+  final VideoEntity video;
+  final VideoPlayerController controller;
 
-class VideoFeedView extends StatefulWidget {
-  const VideoFeedView({super.key});
+  // ✅ ADD THESE CALLBACKS
+  final VoidCallback onLike;
+  final VoidCallback onComment;
+  final VoidCallback onShare;
+
+  const VideoFeedViewItem({
+    super.key,
+    required VideoEntity videoItem,
+    required this.controller,
+    required this.onLike,
+    required this.onComment,
+    required this.onShare,
+  }) : video = videoItem;
 
   @override
-  VideoFeedViewState createState() => VideoFeedViewState();
+  State<VideoFeedViewItem> createState() => _VideoFeedViewItemState();
 }
 
-// ✅ MADE PUBLIC (removed underscore)
-class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserver {
-  late PageController _pageController;
-  final Map<int, VideoPlayerController> _controllers = {};
-  final Map<int, VoidCallback> _activeListeners = {};
-  int _focusedIndex = 0;
+class _VideoFeedViewItemState extends State<VideoFeedViewItem>
+    with SingleTickerProviderStateMixin {
+  bool _showOutro = false;
+  late final VoidCallback _videoListener;
 
-  final Set<String> _viewReported = {};
-  final Map<String, int> _loopCounts = {};
-  final Map<int, bool> _initializationStatus = {};
+  late final AnimationController _pulseController;
+  late final AnimationController _bounceController;
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
-    WidgetsBinding.instance.addObserver(this);
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+
+    _bounceController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    );
+
+    _videoListener = () {
+      if (!widget.controller.value.isInitialized) return;
+
+      final value = widget.controller.value;
+
+      final isAtEnd = value.duration != Duration.zero &&
+          value.position >= value.duration - const Duration(milliseconds: 200);
+
+      if (!mounted) return;
+
+      if (isAtEnd && !value.isPlaying && !_showOutro) {
+        setState(() {
+          _showOutro = true;
+        });
+        _pulseController.repeat(reverse: true);
+        _bounceController.repeat(reverse: true);
+      }
+    };
+
+    widget.controller.addListener(_videoListener);
+  }
+
+  void _replayVideo() {
+    _pulseController.stop();
+    _bounceController.stop();
+    _pulseController.reset();
+    _bounceController.reset();
+
+    setState(() {
+      _showOutro = false;
+    });
+    widget.controller.seekTo(Duration.zero);
+    widget.controller.play();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _pauseAllVideos();
-    _clearAndDisposeAllControllers();
-    _pageController.dispose();
+    widget.controller.removeListener(_videoListener);
+    _pulseController.dispose();
+    _bounceController.dispose();
     super.dispose();
-  }
-
-  // ==================== LIFECYCLE ====================
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      _pauseAllVideos();
-    }
-  }
-
-  // ✅ PUBLIC METHODS for Dashboard
-  void pauseVideo() {
-    if (_controllers.containsKey(_focusedIndex)) {
-      _controllers[_focusedIndex]?.pause();
-    }
-  }
-
-  void resumeVideo() {
-    if (_controllers.containsKey(_focusedIndex)) {
-      _controllers[_focusedIndex]?.play();
-    }
-  }
-
-  void _pauseAllVideos() {
-    _controllers.forEach((_, controller) {
-      controller?.pause();
-    });
-  }
-
-  void _clearAndDisposeAllControllers() {
-    for (var index in _controllers.keys) {
-      final controller = _controllers[index];
-      final listener = _activeListeners[index];
-      if (controller != null) {
-        if (listener != null) {
-          controller.removeListener(listener);
-        }
-        controller.dispose();
-      }
-    }
-    _controllers.clear();
-    _activeListeners.clear();
-    _initializationStatus.clear();
-  }
-
-  void _onPageChanged(int index, List<VideoEntity> videos) {
-    if (!mounted) return;
-    setState(() => _focusedIndex = index);
-    context.read<VideoFeedCubit>().onPageChanged(index);
-    _manageControllerLifecycle(index, videos);
-  }
-
-  void _manageControllerLifecycle(int index, List<VideoEntity> videos) {
-    _getOrCreateController(index, videos)?.play();
-    _getOrCreateController(index - 1, videos)?.pause();
-    _getOrCreateController(index + 1, videos)?.pause();
-
-    _controllers.removeWhere((key, controller) {
-      if ((key - index).abs() > 1) {
-        final listener = _activeListeners[key];
-        if (listener != null) {
-          controller.removeListener(listener);
-          _activeListeners.remove(key);
-        }
-        controller.dispose();
-        _initializationStatus.remove(key);
-        return true;
-      }
-      return false;
-    });
-
-    for (int i = 1; i <= 2; i++) {
-      final preIndex = index + i;
-      if (preIndex >= 0 && preIndex < videos.length) {
-        _prefetchVideo(videos[preIndex].videoUrl);
-      }
-    }
-    if (index >= 0 && index < videos.length) {
-      _attachViewListener(index, videos[index].id);
-    }
-  }
-
-  Future<void> _prefetchVideo(String url) async {
-    try {
-      await DefaultCacheManager().getSingleFile(url);
-    } catch (_) {}
-  }
-
-  // ✅ FIX 1: Fixed invalid syntax
-  VideoPlayerController? _getOrCreateController(int index, List<VideoEntity> videos) {
-    if (index < 0 || index >= videos.length) return null;
-    if (_controllers.containsKey(index)) return _controllers[index]; // ✅ CORRECT
-
-    _initializationStatus[index] = false;
-    final controller = VideoPlayerController.networkUrl(Uri.parse(videos[index].videoUrl));
-    _controllers[index] = controller;
-
-    controller.initialize().then((_) {
-      if (!mounted) return;
-      if (_controllers[index] != controller) return;
-      controller.setLooping(true);
-      _initializationStatus[index] = true;
-      if (index == _focusedIndex) controller.play();
-      setState(() {});
-    }).catchError((error) {
-      debugPrint('❌ Video init failed: $error');
-      if (mounted) setState(() => _initializationStatus[index] = false);
-    });
-    return controller;
-  }
-
-  void _attachViewListener(int index, String videoId) {
-    final controller = _controllers[index];
-    if (controller == null) return;
-    final oldListener = _activeListeners[index];
-    if (oldListener != null) {
-      controller.removeListener(oldListener);
-      _activeListeners.remove(index);
-    }
-    Duration lastPosition = Duration.zero;
-
-    void currentListener() {
-      if (!mounted) return;
-      if (controller.value.isPlaying) {
-        final pos = controller.value.position;
-        if (pos > lastPosition) lastPosition = pos;
-        if (pos.inSeconds >= 3 && !_viewReported.contains(videoId)) {
-          _viewReported.add(videoId);
-          FirebaseFirestore.instance
-              .collection('videos')
-              .doc(videoId)
-              .update({'viewCount': FieldValue.increment(1)})
-              .catchError((_) {});
-        }
-        final duration = controller.value.duration;
-        if (duration.inMilliseconds > 0 && pos >= duration - const Duration(milliseconds: 150)) {
-          Future.microtask(() async {
-            await Future.delayed(const Duration(milliseconds: 300));
-            if (!mounted) return;
-            if (controller.value.position.inMilliseconds < 500) {
-              final current = (_loopCounts[videoId] ?? 0) + 1;
-              _loopCounts[videoId] = current;
-              FirebaseFirestore.instance
-                  .collection('videos')
-                  .doc(videoId)
-                  .update({'loopCount': FieldValue.increment(1)})
-                  .catchError((_) {});
-            }
-          });
-        }
-      }
-    }
-
-    _activeListeners[index] = currentListener;
-    controller.addListener(currentListener);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight;
-    return BlocBuilder<VideoFeedCubit, VideoFeedState>(
-      builder: (context, state) {
-        if (state.isLoading && state.videos.isEmpty) {
-          return Scaffold(
-            backgroundColor: NGColors.background,
-            body: const Center(
-              child: CircularProgressIndicator(color: NGColors.accent),
-            ),
-          );
-        }
+    return Stack(
+      children: [
+        VideoPlayer(widget.controller),
+        VideoFeedViewOptimizedVideoPlayer(
+          controller: widget.controller,
+          videoId: widget.video.id,
+        ),
 
-        if (state.errorMessage.isNotEmpty) {
-          return Scaffold(
-            backgroundColor: NGColors.background,
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, color: NGColors.error, size: 48),
-                  const SizedBox(height: 16),
-                  Text(
-                    state.errorMessage,
-                    style: TextStyle(color: NGColors.textSecondary),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => context.read<VideoFeedCubit>().loadVideos(),
-                    style: ElevatedButton.styleFrom(backgroundColor: NGColors.accent),
-                    child: const Text('Retry', style: TextStyle(color: Colors.white)),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
+        // ✅ Action Buttons – now using the passed callbacks
+        VideoActionButtons(
+          videoUrl: widget.video.videoUrl,
+          videoId: widget.video.id,
+          username: widget.video.username,
+          likeCount: widget.video.likeCount ?? 0,
+          isLiked: widget.video.isLiked ?? false,
+          onLike: widget.onLike,
+          onComment: widget.onComment,
+          onShare: widget.onShare,
+        ),
 
-        if (state.videos.isEmpty) {
-          return Scaffold(
-            backgroundColor: NGColors.background,
-            body: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.video_collection_rounded, color: NGColors.textMuted, size: 64),
-                  SizedBox(height: 16),
-                  Text(
-                    'No videos yet',
-                    style: TextStyle(color: NGColors.textSecondary),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        return Scaffold(
-          key: videoFeedKey,
-          backgroundColor: NGColors.background,
-          body: Padding(
-            padding: EdgeInsets.only(bottom: bottomPadding),
-            child: PageView.builder(
-              controller: _pageController,
-              scrollDirection: Axis.vertical,
-              onPageChanged: (index) => _onPageChanged(index, state.videos),
-              itemCount: state.videos.length,
-              // ✅ FIX 2: Handle null controllers safely
-              itemBuilder: (context, index) {
-                final controller = _controllers[index];
-                final isInitialized = _initializationStatus[index] ?? false;
-
-                // If controller is null, create it and show loading state
-                if (controller == null) {
-                  _getOrCreateController(index, state.videos);
-                  return const Center(
-                    child: CircularProgressIndicator(color: NGColors.accent),
-                  );
-                }
-
-                // Controller exists - render the video
-                // ✅ Pass the callbacks
-                return VideoFeedViewItem(
-                  key: ValueKey('${state.videos[index].id}_${isInitialized ? 'init' : 'loading'}'),
-                  videoItem: state.videos[index],
-                  controller: controller,
-                  // 🔥 Pass the actual functions – you need to implement these
-                  onLike: () {
-                    // Your existing Like logic
-                    context.read<VideoFeedCubit>().toggleLike(state.videos[index].id);
-                  },
-                  onComment: () {
-                    // Your existing Comment logic
-                    // Example: showCommentsBottomSheet(context, state.videos[index].id);
-                  },
-                  onShare: () {
-                    // Your existing Share logic
-                    // Example: showShareBottomSheet(context, state.videos[index].id);
-                  },
-                );
-              },
-            ),
-          ),
-        );
-      },
+        if (_showOutro) _buildOutroScreen(),
+      ],
     );
   }
+
+  // ... (rest of the file unchanged: _buildOutroScreen, _PulsingLogo, _BouncingReplayText)
 }
