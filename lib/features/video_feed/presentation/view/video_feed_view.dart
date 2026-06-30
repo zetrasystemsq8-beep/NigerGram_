@@ -1,5 +1,7 @@
+// lib/features/video_feed/presentation/view/widgets/video_feed_view_item.dart
+
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart'; // ✅ ADD THIS IMPORT
+import 'package:share_plus/share_plus.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 import 'package:video_player/video_player.dart';
@@ -76,7 +78,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
     widget.controller.play();
   }
 
-  // ✅ NEW: Download function
+  // ✅ Download function
   void _downloadVideo() {
     Share.share(
       widget.video.videoUrl,
@@ -102,7 +104,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
           videoId: widget.video.id,
         ),
 
-        // ✅ NEW: Download Button (positioned on the right side)
+        // ✅ Download Button
         Positioned(
           bottom: 120,
           right: 16,
@@ -183,7 +185,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
 }
 
 // ============================================================
-// 🔥 Extracted Widgets
+// Extracted Widgets
 // ============================================================
 
 class _PulsingLogo extends StatelessWidget {
