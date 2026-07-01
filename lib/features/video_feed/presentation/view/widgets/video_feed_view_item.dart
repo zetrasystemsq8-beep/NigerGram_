@@ -93,7 +93,8 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        VideoPlayer(widget.controller),
+        // ONLY the optimized player. It internally creates the VideoPlayer widget
+        // and handles buffering, fade-in, overlays, etc.
         VideoFeedViewOptimizedVideoPlayer(
           controller: widget.controller,
           videoId: widget.video.id,
