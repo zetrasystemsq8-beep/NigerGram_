@@ -44,7 +44,6 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
     super.dispose();
   }
 
-  // ==================== LIFECYCLE ====================
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
@@ -52,7 +51,6 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
     }
   }
 
-  // ✅ PUBLIC METHODS for Dashboard
   void pauseVideo() {
     if (_controllers.containsKey(_focusedIndex)) {
       _controllers[_focusedIndex]?.pause();
@@ -67,7 +65,7 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
 
   void _pauseAllVideos() {
     _controllers.forEach((_, controller) {
-      controller.pause();
+      controller?.pause();
     });
   }
 
@@ -89,6 +87,10 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
 
   void _onPageChanged(int index, List<VideoEntity> videos) {
     if (!mounted) return;
+    
+    // Pause all videos first
+    _pauseAllVideos();
+    
     setState(() => _focusedIndex = index);
     context.read<VideoFeedCubit>().onPageChanged(index);
     _manageControllerLifecycle(index, videos);
@@ -134,7 +136,6 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
     if (index < 0 || index >= videos.length) return null;
     if (_controllers.containsKey(index)) return _controllers[index];
 
-    // ✅ SAFETY CHECK: Skip broken URLs before creating controller
     final videoUrl = videos[index].videoUrl;
     if (videoUrl.isEmpty || videoUrl == 'null' || !videoUrl.startsWith('http')) {
       debugPrint('⚠️ Skipping video with invalid URL at index $index');
@@ -151,12 +152,14 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
       controller.setLooping(true);
       _initializationStatus[index] = true;
       if (index == _focusedIndex) controller.play();
-      // ✅ FIX: no longer feeding init-state into the item's key, so this
-      // setState just repaints in place instead of remounting the item.
-      setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
     }).catchError((error) {
       debugPrint('❌ Video init failed: $error');
-      if (mounted) setState(() => _initializationStatus[index] = false);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _initializationStatus[index] = false);
+      });
     });
     return controller;
   }
@@ -279,12 +282,13 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
                 final video = state.videos[index];
                 final videoUrl = video.videoUrl;
 
-                // ✅ Skip broken videos
                 if (videoUrl.isEmpty || videoUrl == 'null' || !videoUrl.startsWith('http')) {
+                  _pauseAllVideos();
                   return const SizedBox.shrink();
                 }
 
                 final controller = _controllers[index];
+                final isInitialized = _initializationStatus[index] ?? false;
 
                 if (controller == null) {
                   _getOrCreateController(index, state.videos);
@@ -293,16 +297,8 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
                   );
                 }
 
-                // ✅ FIX: key is stable per video and never changes with
-                // initialization state. Previously this key included
-                // 'init'/'loading', which forced Flutter to unmount and
-                // remount this element mid-scroll (inside the PageView's
-                // sliver tree) every time a controller finished
-                // initializing — the root cause of the
-                // "RenderViewport expected a child of type RenderSliver"
-                // and "'child == _child': is not true" crashes.
                 return VideoFeedViewItem(
-                  key: ValueKey(video.id),
+                  key: ValueKey('${video.id}_${isInitialized ? 'init' : 'loading'}'),
                   videoItem: video,
                   controller: controller,
                 );
