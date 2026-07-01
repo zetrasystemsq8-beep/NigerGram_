@@ -39,8 +39,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   VideoPlayerController? _oldController;
   String? _currentVideoId;
   bool _isPlaying = false;
-  Key _playerKey = UniqueKey();
-  
+
   bool _showPlayIconOverlay = false;
   IconData _overlayIconData = Icons.play_arrow_rounded;
 
@@ -237,7 +236,12 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       
       _oldController = widget.controller;
       _currentVideoId = widget.videoId;
-      _playerKey = UniqueKey();
+      // ✅ FIX: no longer reassigning a UniqueKey here. Regenerating a
+      // UniqueKey on every page change forced Flutter to treat the
+      // FittedBox/VideoPlayer subtree as a brand new widget on every
+      // swipe while it was live inside the PageView's sliver tree —
+      // this was the second, more frequent trigger of the
+      // "'child == _child': is not true" crash.
       _isBuffering = false;
 
       _videoFadeController.reset();
@@ -861,7 +865,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             child: FadeTransition(
               opacity: _videoFadeAnimation,
               child: FittedBox(
-                key: _playerKey,
                 fit: BoxFit.cover,
                 child: SizedBox(
                   width: controller.value.size.width,
