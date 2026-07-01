@@ -11,9 +11,6 @@ import 'package:nigergram/features/video_feed/presentation/view/widgets/video_fe
 import 'package:video_player/video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ✅ GLOBAL KEY REMOVED - was causing the error
-// final GlobalKey<VideoFeedViewState> videoFeedKey = GlobalKey<VideoFeedViewState>();
-
 class VideoFeedView extends StatefulWidget {
   const VideoFeedView({super.key});
 
@@ -21,7 +18,6 @@ class VideoFeedView extends StatefulWidget {
   VideoFeedViewState createState() => VideoFeedViewState();
 }
 
-// ✅ MADE PUBLIC (removed underscore)
 class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserver {
   late PageController _pageController;
   final Map<int, VideoPlayerController> _controllers = {};
@@ -71,7 +67,7 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
 
   void _pauseAllVideos() {
     _controllers.forEach((_, controller) {
-      controller?.pause();
+      controller.pause();
     });
   }
 
@@ -155,6 +151,8 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
       controller.setLooping(true);
       _initializationStatus[index] = true;
       if (index == _focusedIndex) controller.play();
+      // ✅ FIX: no longer feeding init-state into the item's key, so this
+      // setState just repaints in place instead of remounting the item.
       setState(() {});
     }).catchError((error) {
       debugPrint('❌ Video init failed: $error');
@@ -269,7 +267,6 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
         }
 
         return Scaffold(
-          // ✅ KEY REMOVED - was causing the error
           backgroundColor: NGColors.background,
           body: Padding(
             padding: EdgeInsets.only(bottom: bottomPadding),
@@ -288,7 +285,6 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
                 }
 
                 final controller = _controllers[index];
-                final isInitialized = _initializationStatus[index] ?? false;
 
                 if (controller == null) {
                   _getOrCreateController(index, state.videos);
@@ -297,8 +293,16 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
                   );
                 }
 
+                // ✅ FIX: key is stable per video and never changes with
+                // initialization state. Previously this key included
+                // 'init'/'loading', which forced Flutter to unmount and
+                // remount this element mid-scroll (inside the PageView's
+                // sliver tree) every time a controller finished
+                // initializing — the root cause of the
+                // "RenderViewport expected a child of type RenderSliver"
+                // and "'child == _child': is not true" crashes.
                 return VideoFeedViewItem(
-                  key: ValueKey('${video.id}_${isInitialized ? 'init' : 'loading'}'),
+                  key: ValueKey(video.id),
                   videoItem: video,
                   controller: controller,
                 );
