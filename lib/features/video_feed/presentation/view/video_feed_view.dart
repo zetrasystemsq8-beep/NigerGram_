@@ -87,13 +87,20 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
 
   void _onPageChanged(int index, List<VideoEntity> videos) {
     if (!mounted) return;
-    
+
     // Pause all videos first
     _pauseAllVideos();
-    
-    setState(() => _focusedIndex = index);
-    context.read<VideoFeedCubit>().onPageChanged(index);
-    _manageControllerLifecycle(index, videos);
+
+    // Defer the state update and controller lifecycle work until after
+    // the current frame finishes mounting/updating. This prevents the
+    // "!_doingMountOrUpdate" viewport assertion that can occur when
+    // the PageView's sliver tree is modified while it is being built.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _focusedIndex = index);
+      context.read<VideoFeedCubit>().onPageChanged(index);
+      _manageControllerLifecycle(index, videos);
+    });
   }
 
   void _manageControllerLifecycle(int index, List<VideoEntity> videos) {
