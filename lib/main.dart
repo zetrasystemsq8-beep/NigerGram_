@@ -13,6 +13,20 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ✅ Show scrollable, copyable error details instead of the broken red box
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: Colors.black,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: SelectableText(
+          details.exceptionAsString(),
+          style: const TextStyle(color: Colors.red, fontSize: 12),
+        ),
+      ),
+    );
+  };
+
   // ✅ FIXED: Add timeout and error handling to Firebase initialization
   try {
     debugPrint('🟡 [STARTUP] Initializing Firebase...');
