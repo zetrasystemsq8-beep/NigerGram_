@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nigergram/core/config/localization/app_localizations.dart';
-import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.dart';
 import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
@@ -32,7 +31,7 @@ class _DashboardViewState extends State<DashboardView> {
   };
 
   late final List<Widget> _navigationPages = [
-    VideoFeedView(key: _tabKeys[0]),
+    VideoFeedView(key: videoFeedKey),
     GistHubView(key: _tabKeys[1]),
     SizedBox(key: _tabKeys[2]),
     InboxView(key: _tabKeys[3]),
