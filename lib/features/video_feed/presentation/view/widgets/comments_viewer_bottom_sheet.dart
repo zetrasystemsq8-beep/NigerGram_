@@ -488,7 +488,10 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
       );
     }
 
+    // ✅ FIXED: Added shrinkWrap + physics to prevent nested scroll crash
     return ListView.separated(
+      shrinkWrap: true, // ✅ ADDED
+      physics: const NeverScrollableScrollPhysics(), // ✅ ADDED
       controller: _scrollController,
       reverse: false,
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -513,7 +516,7 @@ class _CommentsViewerBottomSheetState extends State<CommentsViewerBottomSheet> {
           imageUrl: data['imageUrl'] as String?,
           time: (data['createdAt'] as Timestamp?)?.toDate(),
           likeCount: data['likeCount'] as int? ?? 0,
-          replyCount: replyCount, // ✅ Pass replyCount
+          replyCount: replyCount,
           videoId: widget.videoId,
           onLikeToggle: _toggleLike,
           onReplySubmitted: _addReply,
@@ -592,7 +595,7 @@ class _CommentItem extends StatefulWidget {
   final String? imageUrl;
   final DateTime? time;
   final int likeCount;
-  final int replyCount; // ✅ New
+  final int replyCount;
   final String videoId;
   final Future<void> Function(String, bool) onLikeToggle;
   final Future<void> Function(String, String) onReplySubmitted;
@@ -896,7 +899,6 @@ class _CommentItemState extends State<_CommentItem> {
             child: _ReplyList(
               videoId: widget.videoId,
               commentId: widget.commentId,
-              // ✅ Pass replyCount for pagination
               replyCount: widget.replyCount,
             ),
           ),
