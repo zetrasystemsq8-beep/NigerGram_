@@ -305,7 +305,12 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
                 }
 
                 return VideoFeedViewItem(
-                  key: ValueKey('${video.id}_${isInitialized ? 'init' : 'loading'}'),
+                  // Use a stable key that does NOT flip when transient state like
+                  // initialization changes. Including isInitialized in the key
+                  // previously caused Flutter to treat the same item as a different
+                  // widget while the PageView sliver tree was mounting, triggering
+                  // the RenderViewport / _doingMountOrUpdate assertion.
+                  key: ValueKey(video.id),
                   videoItem: video,
                   controller: controller,
                 );
