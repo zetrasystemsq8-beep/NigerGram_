@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/media/repository/media_repository.dart';
+import 'video_editor_screen.dart'; // ✅ IMPORT VIDEO EDITOR
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -29,7 +30,6 @@ class _UploadPageState extends State<UploadPage> {
   ];
 
   final MediaRepository _mediaRepository = MediaRepository();
-
   double _qualitySlider = 1.0;
 
   @override
@@ -39,6 +39,7 @@ class _UploadPageState extends State<UploadPage> {
     super.dispose();
   }
 
+  // ===================== VIDEO PICKER (WITH EDITOR) =====================
   Future<void> _pickVideo(ImageSource source) async {
     final picker = ImagePicker();
     final picked = await picker.pickVideo(
@@ -46,10 +47,24 @@ class _UploadPageState extends State<UploadPage> {
       maxDuration: const Duration(minutes: 3),
     );
     if (picked != null) {
-      setState(() => _videoFile = File(picked.path));
+      final file = File(picked.path);
+      // ✅ Open editor immediately after picking
+      final editedFile = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => VideoEditorScreen(videoFile: file),
+        ),
+      );
+      if (editedFile != null) {
+        setState(() => _videoFile = editedFile);
+      } else {
+        // User cancelled editing, keep original
+        setState(() => _videoFile = file);
+      }
     }
   }
 
+  // ===================== SUPABASE SESSION =====================
   Future<void> _ensureSupabaseSession() async {
     final supabaseUser = Supabase.instance.client.auth.currentUser;
     if (supabaseUser == null) {
@@ -72,6 +87,7 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
+  // ===================== UPLOAD VIDEO =====================
   Future<void> _uploadVideo() async {
     if (_videoFile == null) return;
     if (_descriptionController.text.trim().isEmpty) {
@@ -175,6 +191,7 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
+  // ===================== BUILD =====================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -287,6 +304,7 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
+  // ===================== UPLOADING SCREEN =====================
   Widget _buildUploadingScreen() {
     return Center(
       child: Column(
@@ -344,6 +362,7 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
+  // ===================== VIDEO SELECTOR =====================
   Widget _buildVideoSelector() {
     if (_videoFile != null) {
       return Container(
@@ -374,13 +393,49 @@ class _UploadPageState extends State<UploadPage> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () => setState(() => _videoFile = null),
-              child: Text(
-                'Change video',
-                style: TextStyle(color: NGColors.accent),
+            const SizedBox(height: 4),
+            Text(
+              _videoFile!.path.split('/').last.length > 30
+                  ? '...${_videoFile!.path.split('/').last.substring(_videoFile!.path.split('/').last.length - 30)}'
+                  : _videoFile!.path.split('/').last,
+              style: TextStyle(
+                color: NGColors.textMuted,
+                fontSize: 11,
               ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () => setState(() => _videoFile = null),
+                  child: Text(
+                    'Change video',
+                    style: TextStyle(color: NGColors.textMuted),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                TextButton(
+                  onPressed: () async {
+                    final editedFile = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => VideoEditorScreen(
+                          videoFile: _videoFile!,
+                        ),
+                      ),
+                    );
+                    if (editedFile != null) {
+                      setState(() => _videoFile = editedFile);
+                    }
+                  },
+                  child: Text(
+                    '✂️ Edit',
+                    style: TextStyle(color: NGColors.accent),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -465,6 +520,7 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
+  // ===================== DESCRIPTION FIELD =====================
   Widget _buildDescriptionField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,6 +557,7 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
+  // ===================== TAGS FIELD =====================
   Widget _buildTagsField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -539,6 +596,7 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
+  // ===================== CATEGORY SELECTOR =====================
   Widget _buildCategorySelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -589,6 +647,7 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
+  // ===================== POST BUTTON =====================
   Widget _buildPostButton() {
     return SizedBox(
       width: double.infinity,
@@ -614,6 +673,7 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
+  // ===================== QUALITY LABEL =====================
   String _qualityLabel(int q) {
     switch (q) {
       case 0:

@@ -25,7 +25,8 @@ class VideoFeedViewUserHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      spacing: context.w(8),
+      // `Row` does not support a `spacing` named parameter. Use an explicit
+      // SizedBox between children for consistent spacing.
       children: [
         // Profile Avatar with NGColors
         GestureDetector(
@@ -33,8 +34,8 @@ class VideoFeedViewUserHeader extends StatelessWidget {
           child: CircleAvatar(
             radius: context.sq(20),
             backgroundColor: NGColors.surface, // ✅ Not hardcoded
-            foregroundImage: profileImageUrl.isNotEmpty 
-                ? NetworkImage(profileImageUrl) 
+            foregroundImage: profileImageUrl.isNotEmpty
+                ? NetworkImage(profileImageUrl)
                 : null,
             onForegroundImageError: (exception, stackTrace) {
               debugPrint('NigerGram Log: Profile Image failed - $exception');
@@ -46,7 +47,10 @@ class VideoFeedViewUserHeader extends StatelessWidget {
             ),
           ),
         ),
-        
+
+        // Explicit spacing replacing the unsupported `spacing:` parameter
+        SizedBox(width: context.w(8)),
+
         // Username
         Flexible(
           child: GestureDetector(
@@ -70,7 +74,7 @@ class VideoFeedViewUserHeader extends StatelessWidget {
             ),
           ),
         ),
-        
+
         // Follow Button (only if not own video)
         if (!isOwnVideo)
           VideoFeedViewFollowButton(

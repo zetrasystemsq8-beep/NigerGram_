@@ -2487,7 +2487,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // GRID BUILDER
+  // GRID BUILDER — FIXED (replaced CustomScrollView with GridView.builder)
   // ─────────────────────────────────────────────────────────────────────────
   
   Widget _buildGrid(List<Map<String, dynamic>> items, String tabName) {
@@ -2539,100 +2539,95 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
     return RefreshIndicator(
       color: NGColors.accent,
       onRefresh: _refreshCurrentTab,
-      child: CustomScrollView(
+      child: GridView.builder(
         key: PageStorageKey(tabName),
-        slivers: [
-          SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 9 / 14,
-              crossAxisSpacing: 1,
-              mainAxisSpacing: 1,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, idx) {
-                final item = items[idx];
-                return GestureDetector(
-                  onTap: () => context.push('/video/${item['videoId']}'),
-                  onLongPress: _isCurrentUser && item['userId'] == _currentUid
-                      ? () => _showVideoOptions(item)
-                      : null,
-                  child: Container(
-                    color: NGColors.surface,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        item['thumbnailUrl'] != null && item['thumbnailUrl'].toString().isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: item['thumbnailUrl'],
-                                fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(color: NGColors.surfaceLight),
-                                errorWidget: (_, __, ___) => const Center(
-                                  child: Icon(
-                                    Icons.play_circle_outline,
-                                    color: NGColors.textMuted,
-                                    size: 28,
-                                  ),
-                                ),
-                              )
-                            : const Center(
-                                child: Icon(
-                                  Icons.play_circle_outline,
-                                  color: NGColors.textMuted,
-                                  size: 28,
-                                ),
-                              ),
-                        if (item['isPrivate'] == true)
-                          Positioned(
-                            top: 4,
-                            right: 4,
+        padding: const EdgeInsets.all(1),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 9 / 14,
+          crossAxisSpacing: 1,
+          mainAxisSpacing: 1,
+        ),
+        itemCount: items.length,
+        itemBuilder: (context, idx) {
+          final item = items[idx];
+          return GestureDetector(
+            onTap: () => context.push('/video/${item['videoId']}'),
+            onLongPress: _isCurrentUser && item['userId'] == _currentUid
+                ? () => _showVideoOptions(item)
+                : null,
+            child: Container(
+              color: NGColors.surface,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  item['thumbnailUrl'] != null && item['thumbnailUrl'].toString().isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: item['thumbnailUrl'],
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(color: NGColors.surfaceLight),
+                          errorWidget: (_, __, ___) => const Center(
                             child: Icon(
-                              Icons.lock,
-                              color: _accentColor.withOpacity(0.7),
-                              size: 12,
+                              Icons.play_circle_outline,
+                              color: NGColors.textMuted,
+                              size: 28,
                             ),
                           ),
-                        if (item['isPinned'] == true)
-                          Positioned(
-                            top: 4,
-                            left: 4,
-                            child: const Icon(
-                              Icons.push_pin,
-                              color: NGColors.premium,
-                              size: 12,
-                            ),
+                        )
+                      : const Center(
+                          child: Icon(
+                            Icons.play_circle_outline,
+                            color: NGColors.textMuted,
+                            size: 28,
                           ),
-                        Positioned(
-                          left: 4,
-                          bottom: 4,
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.play_arrow_rounded,
-                                color: NGColors.textPrimary,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                '${item['viewCount'] ?? 0}',
-                                style: const TextStyle(
-                                  color: NGColors.textPrimary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                        ),
+                  if (item['isPrivate'] == true)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Icon(
+                        Icons.lock,
+                        color: _accentColor.withOpacity(0.7),
+                        size: 12,
+                      ),
+                    ),
+                  if (item['isPinned'] == true)
+                    Positioned(
+                      top: 4,
+                      left: 4,
+                      child: const Icon(
+                        Icons.push_pin,
+                        color: NGColors.premium,
+                        size: 12,
+                      ),
+                    ),
+                  Positioned(
+                    left: 4,
+                    bottom: 4,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.play_arrow_rounded,
+                          color: NGColors.textPrimary,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${item['viewCount'] ?? 0}',
+                          style: const TextStyle(
+                            color: NGColors.textPrimary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                   ),
-                );
-              },
-              childCount: items.length,
+                ],
+              ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
