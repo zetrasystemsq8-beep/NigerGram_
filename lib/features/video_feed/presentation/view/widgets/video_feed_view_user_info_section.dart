@@ -8,22 +8,22 @@ class VideoFeedViewUserInfoSection extends StatefulWidget {
     required this.profileImageUrl,
     required this.username,
     required this.description,
-    required this.soundName, // ✅ NEW: actual sound name
-    required this.isVerified, // ✅ NEW: verified status
-    required this.isFollowing, // ✅ NEW: follow status
-    required this.isOwnVideo, // ✅ NEW: check if own video
-    required this.onFollowTap, // ✅ NEW: follow callback
+    required this.soundName,
+    required this.isVerified,
+    required this.isFollowing,
+    required this.isOwnVideo,
+    required this.onFollowTap,
     super.key,
   });
 
   final String profileImageUrl;
   final String username;
   final String description;
-  final String? soundName; // ✅ NEW
-  final bool isVerified; // ✅ NEW
-  final bool isFollowing; // ✅ NEW
-  final bool isOwnVideo; // ✅ NEW
-  final VoidCallback onFollowTap; // ✅ NEW
+  final String? soundName;
+  final bool isVerified;
+  final bool isFollowing;
+  final bool isOwnVideo;
+  final VoidCallback onFollowTap;
 
   @override
   State<VideoFeedViewUserInfoSection> createState() => _VideoFeedViewUserInfoSectionState();
@@ -43,7 +43,7 @@ class _VideoFeedViewUserInfoSectionState extends State<VideoFeedViewUserInfoSect
             text: '$word ',
             style: TextStyle(
               fontWeight: FontWeight.w800,
-              color: NGColors.accent, // ✅ Emerald Green for tags
+              color: NGColors.accent,
             ),
           ),
         );
@@ -51,7 +51,7 @@ class _VideoFeedViewUserInfoSectionState extends State<VideoFeedViewUserInfoSect
         spans.add(TextSpan(
           text: '$word ',
           style: TextStyle(
-            color: NGColors.textSecondary, // ✅ Not hardcoded white
+            color: NGColors.textSecondary,
           ),
         ));
       }
@@ -77,7 +77,7 @@ class _VideoFeedViewUserInfoSectionState extends State<VideoFeedViewUserInfoSect
                     child: Text(
                       '@${widget.username}',
                       style: TextStyle(
-                        color: NGColors.textPrimary, // ✅ Not hardcoded white
+                        color: NGColors.textPrimary,
                         fontSize: context.fontSize(17),
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.3,
@@ -87,18 +87,16 @@ class _VideoFeedViewUserInfoSectionState extends State<VideoFeedViewUserInfoSect
                     ),
                   ),
                   const SizedBox(width: 4),
-                  // ✅ Verified Badge with NGColors
                   if (widget.isVerified)
                     Icon(
                       Icons.verified_rounded,
-                      color: NGColors.verified, // ✅ #1DA1F2
+                      color: NGColors.verified,
                       size: context.sq(16),
                     ),
                 ],
               ),
             ),
             
-            // ✅ Follow Button (only if not own video and not following)
             if (!widget.isOwnVideo && !widget.isFollowing)
               GestureDetector(
                 onTap: widget.onFollowTap,
@@ -122,7 +120,6 @@ class _VideoFeedViewUserInfoSectionState extends State<VideoFeedViewUserInfoSect
                 ),
               ),
             
-            // ✅ If following, show "Following" text (greyed out)
             if (!widget.isOwnVideo && widget.isFollowing)
               Text(
                 'Following',
@@ -152,7 +149,7 @@ class _VideoFeedViewUserInfoSectionState extends State<VideoFeedViewUserInfoSect
                     overflow: TextOverflow.ellipsis,
                     text: TextSpan(
                       style: TextStyle(
-                        color: NGColors.textSecondary, // ✅ Not hardcoded white
+                        color: NGColors.textSecondary,
                         fontSize: context.fontSize(15),
                         height: 1.3,
                         shadows: const [Shadow(blurRadius: 2, color: Colors.black26)],
@@ -166,7 +163,7 @@ class _VideoFeedViewUserInfoSectionState extends State<VideoFeedViewUserInfoSect
                       child: Text(
                         'See more',
                         style: TextStyle(
-                          color: NGColors.accent, // ✅ Emerald Green
+                          color: NGColors.accent,
                           fontWeight: FontWeight.w800,
                           fontSize: context.fontSize(14),
                         ),
@@ -181,7 +178,7 @@ class _VideoFeedViewUserInfoSectionState extends State<VideoFeedViewUserInfoSect
 
         // 3. Immersive Audio Track Marquee
         if (widget.soundName != null && widget.soundName!.isNotEmpty)
-          _MusicMarqueeTicker(trackName: widget.soundName!), // ✅ Uses actual sound name
+          _MusicMarqueeTicker(trackName: widget.soundName!),
       ],
     );
   }
@@ -236,7 +233,7 @@ class _MusicMarqueeTickerState extends State<_MusicMarqueeTicker> with SingleTic
       children: [
         Icon(
           Icons.music_note_rounded,
-          color: NGColors.textMuted, // ✅ Not hardcoded white
+          color: NGColors.textMuted,
           size: context.sq(18),
         ),
         SizedBox(width: context.w(8)),
@@ -244,6 +241,7 @@ class _MusicMarqueeTickerState extends State<_MusicMarqueeTicker> with SingleTic
           width: context.w(200),
           height: context.h(22),
           child: ListView.builder(
+            shrinkWrap: true,  // ✅ FIXED: Added this line
             controller: _scrollController,
             scrollDirection: Axis.horizontal,
             physics: const NeverScrollableScrollPhysics(),
@@ -253,7 +251,7 @@ class _MusicMarqueeTickerState extends State<_MusicMarqueeTicker> with SingleTic
                 child: Text(
                   widget.trackName,
                   style: TextStyle(
-                    color: NGColors.textSecondary, // ✅ Not hardcoded white
+                    color: NGColors.textSecondary,
                     fontSize: context.fontSize(14),
                     fontWeight: FontWeight.w500,
                   ),
