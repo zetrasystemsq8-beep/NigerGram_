@@ -8,7 +8,6 @@ class VideoFeedViewItem extends StatefulWidget {
   final VideoEntity video;
   final VideoPlayerController controller;
 
-  // Constructor expects 'videoItem' (to match parent), maps it to 'video'
   const VideoFeedViewItem({
     super.key,
     required VideoEntity videoItem,
@@ -24,7 +23,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   bool _showOutro = false;
   late final VoidCallback _videoListener;
 
-  // Animation controllers (created but NOT started yet)
   late final AnimationController _pulseController;
   late final AnimationController _bounceController;
 
@@ -32,7 +30,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   void initState() {
     super.initState();
 
-    // Create controllers but don't start them
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -43,7 +40,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
       duration: const Duration(seconds: 1),
     );
 
-    // Video listener
     _videoListener = () {
       if (!widget.controller.value.isInitialized) return;
 
@@ -58,7 +54,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
         setState(() {
           _showOutro = true;
         });
-        // Start animations ONLY when outro appears
         _pulseController.repeat(reverse: true);
         _bounceController.repeat(reverse: true);
       }
@@ -68,7 +63,6 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   }
 
   void _replayVideo() {
-    // Stop animations when replaying
     _pulseController.stop();
     _bounceController.stop();
     _pulseController.reset();
@@ -93,8 +87,8 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // ONLY the optimized player. It internally creates the VideoPlayer widget
-        // and handles buffering, fade-in, overlays, etc.
+        // ✅ Only ONE VideoPlayer – the optimized one handles loading states
+        // ❌ Removed duplicate raw VideoPlayer here
         VideoFeedViewOptimizedVideoPlayer(
           controller: widget.controller,
           videoId: widget.video.id,
@@ -119,12 +113,8 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Pulsing Logo with dynamic glow
-                  _PulsingLogo(
-                    pulseController: _pulseController,
-                  ),
+                  _PulsingLogo(pulseController: _pulseController),
                   const SizedBox(height: 24),
-                  // Slide-in Username (once, then stays readable)
                   TweenAnimationBuilder(
                     tween: Tween<Offset>(
                       begin: const Offset(-1.5, 0),
@@ -150,10 +140,7 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
                     },
                   ),
                   const SizedBox(height: 20),
-                  // Bouncing replay text (with child optimization)
-                  _BouncingReplayText(
-                    bounceController: _bounceController,
-                  ),
+                  _BouncingReplayText(bounceController: _bounceController),
                 ],
               ),
             ),
@@ -165,19 +152,16 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem>
 }
 
 // ============================================================
-// 🔥 Extracted Widgets (Never rebuilt unnecessarily)
+// Extracted Widgets (unchanged)
 // ============================================================
 
 class _PulsingLogo extends StatelessWidget {
   final AnimationController pulseController;
 
-  const _PulsingLogo({
-    required this.pulseController,
-  });
+  const _PulsingLogo({required this.pulseController});
 
   @override
   Widget build(BuildContext context) {
-    // Static logo child (never rebuilt)
     const logoChild = SizedBox(
       width: 80,
       height: 80,
@@ -201,7 +185,6 @@ class _PulsingLogo extends StatelessWidget {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Glowing ring
               Container(
                 width: 120,
                 height: 120,
@@ -222,7 +205,6 @@ class _PulsingLogo extends StatelessWidget {
                   ],
                 ),
               ),
-              // Logo (reused, not rebuilt)
               child!,
             ],
           ),
@@ -235,13 +217,10 @@ class _PulsingLogo extends StatelessWidget {
 class _BouncingReplayText extends StatelessWidget {
   final AnimationController bounceController;
 
-  const _BouncingReplayText({
-    required this.bounceController,
-  });
+  const _BouncingReplayText({required this.bounceController});
 
   @override
   Widget build(BuildContext context) {
-    // Static text child (never rebuilt)
     const replayText = Text(
       'Tap to replay',
       style: TextStyle(
