@@ -11,8 +11,8 @@ import 'package:nigergram/features/video_feed/presentation/view/widgets/video_fe
 import 'package:video_player/video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ✅ GLOBAL KEY - exported for dashboard access
-final GlobalKey<VideoFeedViewState> videoFeedKey = GlobalKey<VideoFeedViewState>();
+// ✅ GLOBAL KEY REMOVED - was causing the error
+// final GlobalKey<VideoFeedViewState> videoFeedKey = GlobalKey<VideoFeedViewState>();
 
 class VideoFeedView extends StatefulWidget {
   const VideoFeedView({super.key});
@@ -138,8 +138,15 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
     if (index < 0 || index >= videos.length) return null;
     if (_controllers.containsKey(index)) return _controllers[index];
 
+    // ✅ SAFETY CHECK: Skip broken URLs before creating controller
+    final videoUrl = videos[index].videoUrl;
+    if (videoUrl.isEmpty || videoUrl == 'null' || !videoUrl.startsWith('http')) {
+      debugPrint('⚠️ Skipping video with invalid URL at index $index');
+      return null;
+    }
+
     _initializationStatus[index] = false;
-    final controller = VideoPlayerController.networkUrl(Uri.parse(videos[index].videoUrl));
+    final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
     _controllers[index] = controller;
 
     controller.initialize().then((_) {
@@ -262,7 +269,7 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
         }
 
         return Scaffold(
-          key: videoFeedKey,
+          // ✅ KEY REMOVED - was causing the error
           backgroundColor: NGColors.background,
           body: Padding(
             padding: EdgeInsets.only(bottom: bottomPadding),
@@ -271,13 +278,11 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
               scrollDirection: Axis.vertical,
               onPageChanged: (index) => _onPageChanged(index, state.videos),
               itemCount: state.videos.length,
-              // ✅ SAFE: Skip broken videos
               itemBuilder: (context, index) {
-                // ✅ SAFETY CHECK: Ensure video exists
                 final video = state.videos[index];
                 final videoUrl = video.videoUrl;
 
-                // If URL is invalid, skip it (return empty container)
+                // ✅ Skip broken videos
                 if (videoUrl.isEmpty || videoUrl == 'null' || !videoUrl.startsWith('http')) {
                   return const SizedBox.shrink();
                 }
