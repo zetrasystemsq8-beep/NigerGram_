@@ -271,7 +271,17 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
               scrollDirection: Axis.vertical,
               onPageChanged: (index) => _onPageChanged(index, state.videos),
               itemCount: state.videos.length,
+              // ✅ SAFE: Skip broken videos
               itemBuilder: (context, index) {
+                // ✅ SAFETY CHECK: Ensure video exists
+                final video = state.videos[index];
+                final videoUrl = video.videoUrl;
+
+                // If URL is invalid, skip it (return empty container)
+                if (videoUrl.isEmpty || videoUrl == 'null' || !videoUrl.startsWith('http')) {
+                  return const SizedBox.shrink();
+                }
+
                 final controller = _controllers[index];
                 final isInitialized = _initializationStatus[index] ?? false;
 
@@ -283,8 +293,8 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
                 }
 
                 return VideoFeedViewItem(
-                  key: ValueKey('${state.videos[index].id}_${isInitialized ? 'init' : 'loading'}'),
-                  videoItem: state.videos[index],
+                  key: ValueKey('${video.id}_${isInitialized ? 'init' : 'loading'}'),
+                  videoItem: video,
                   controller: controller,
                 );
               },
