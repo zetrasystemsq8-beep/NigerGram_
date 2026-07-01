@@ -32,7 +32,7 @@ class _DashboardViewState extends State<DashboardView> {
   };
 
   late final List<Widget> _navigationPages = [
-    VideoFeedView(key: _tabKeys[0]),
+    VideoFeedView(key: videoFeedKey),
     GistHubView(key: _tabKeys[1]),
     SizedBox(key: _tabKeys[2]),
     InboxView(key: _tabKeys[3]),
