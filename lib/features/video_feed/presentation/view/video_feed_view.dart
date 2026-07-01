@@ -75,9 +75,13 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
       final listener = _activeListeners[index];
       if (controller != null) {
         if (listener != null) {
-          controller.removeListener(listener);
+          try {
+            controller.removeListener(listener);
+          } catch (_) {}
         }
-        controller.dispose();
+        try {
+          controller.dispose();
+        } catch (_) {}
       }
     }
     _controllers.clear();
@@ -104,23 +108,59 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
   }
 
   void _manageControllerLifecycle(int index, List<VideoEntity> videos) {
-    _getOrCreateController(index, videos)?.play();
-    _getOrCreateController(index - 1, videos)?.pause();
-    _getOrCreateController(index + 1, videos)?.pause();
+    // Ensure focused controller is played and audible, neighbors are muted.
+    final current = _getOrCreateController(index, videos);
+    final prev = _getOrCreateController(index - 1, videos);
+    final next = _getOrCreateController(index + 1, videos);
+
+    if (current != null) {
+      try {
+        current.setVolume(1.0);
+      } catch (_) {}
+      current.play();
+    }
+    if (prev != null) {
+      try {
+        prev.setVolume(0.0);
+      } catch (_) {}
+      prev.pause();
+    }
+    if (next != null) {
+      try {
+        next.setVolume(0.0);
+      } catch (_) {}
+      next.pause();
+    }
+
+    // Collect controllers that should be disposed, but dispose them after
+    // the current frame to avoid racing with child State.dispose/removeListener.
+    final List<VideoPlayerController> toDispose = [];
 
     _controllers.removeWhere((key, controller) {
       if ((key - index).abs() > 1) {
         final listener = _activeListeners[key];
         if (listener != null) {
-          controller.removeListener(listener);
+          try {
+            controller.removeListener(listener);
+          } catch (_) {}
           _activeListeners.remove(key);
         }
-        controller.dispose();
+        toDispose.add(controller);
         _initializationStatus.remove(key);
         return true;
       }
       return false;
     });
+
+    if (toDispose.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final c in toDispose) {
+          try {
+            c.dispose();
+          } catch (_) {}
+        }
+      });
+    }
 
     for (int i = 1; i <= 2; i++) {
       final preIndex = index + i;
@@ -151,6 +191,12 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
 
     _initializationStatus[index] = false;
     final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+
+    // Start muted by default to avoid audio bleed during initialization.
+    try {
+      controller.setVolume(0.0);
+    } catch (_) {}
+
     _controllers[index] = controller;
 
     controller.initialize().then((_) {
@@ -158,7 +204,12 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
       if (_controllers[index] != controller) return;
       controller.setLooping(true);
       _initializationStatus[index] = true;
-      if (index == _focusedIndex) controller.play();
+      if (index == _focusedIndex) {
+        try {
+          controller.setVolume(1.0);
+        } catch (_) {}
+        controller.play();
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() {});
       });
@@ -176,7 +227,9 @@ class VideoFeedViewState extends State<VideoFeedView> with WidgetsBindingObserve
     if (controller == null) return;
     final oldListener = _activeListeners[index];
     if (oldListener != null) {
-      controller.removeListener(oldListener);
+      try {
+        controller.removeListener(oldListener);
+      } catch (_) {}
       _activeListeners.remove(index);
     }
     Duration lastPosition = Duration.zero;
