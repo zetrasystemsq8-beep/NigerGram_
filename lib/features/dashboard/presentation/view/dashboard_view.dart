@@ -1,13 +1,16 @@
+// lib/features/dashboard/presentation/view/dashboard_view.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nigergram/core/config/localization/app_localizations.dart';
-import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.dart';
 import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
-import 'package:nigergram/features/inbox/presentation/view/inbox_view.dart'; // ✅ ADD THIS
+import 'package:nigergram/features/inbox/presentation/view/inbox_view.dart';
+
+// ✅ ADD THIS – GlobalKey for VideoFeed state
+final GlobalKey<VideoFeedViewState> videoFeedKey = GlobalKey<VideoFeedViewState>();
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -19,20 +22,42 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   int _currentIndex = 0;
 
+  final Map<int, GlobalKey> _tabKeys = {
+    0: GlobalKey(debugLabel: 'videoFeedTab'),
+    1: GlobalKey(debugLabel: 'gistHubTab'),
+    2: GlobalKey(debugLabel: 'uploadTab'),
+    3: GlobalKey(debugLabel: 'inboxTab'),
+    4: GlobalKey(debugLabel: 'profileTab'),
+  };
+
   late final List<Widget> _navigationPages = [
-    const VideoFeedView(),
-    const GistHubView(),
-    const SizedBox(),
-    const InboxView(), // ✅ CHANGED: Replaced _InboxPlaceholder
-    const ProfileView(),
+    VideoFeedView(key: videoFeedKey),
+    GistHubView(key: _tabKeys[1]),
+    SizedBox(key: _tabKeys[2]),
+    InboxView(key: _tabKeys[3]),
+    ProfileView(key: _tabKeys[4]),
   ];
 
   void _handleTabSelection(int index) {
     if (index == 2) {
-      context.push(RouterEnum.uploadView.routeName);
+      // ✅ FIXED: Use literal '/upload' instead of RouterEnum
+      context.push('/upload');
       return;
     }
-    setState(() => _currentIndex = index);
+
+    if (_currentIndex == 0 && index != 0) {
+      videoFeedKey.currentState?.pauseVideo();
+    }
+
+    setState(() {
+      _currentIndex = index;
+    });
+
+    if (index == 0 && _currentIndex != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        videoFeedKey.currentState?.resumeVideo();
+      });
+    }
   }
 
   @override
@@ -43,11 +68,9 @@ class _DashboardViewState extends State<DashboardView> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          Positioned.fill(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _navigationPages,
-            ),
+          IndexedStack(
+            index: _currentIndex,
+            children: _navigationPages,
           ),
           Positioned(
             left: 0,
@@ -224,5 +247,3 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
 }
-
-// ✅ REMOVED _InboxPlaceholder - no longer needed

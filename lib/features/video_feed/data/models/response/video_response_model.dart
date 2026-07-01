@@ -1,61 +1,87 @@
+// lib/features/video_feed/data/models/response/video_response_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 
 class VideoResponseModel {
   final String id;
-  final String username;
-  final String description;
   final String videoUrl;
-  final String profileImageUrl;
+  final String creatorId;
+  final String username;
+  final String? profileImageUrl;
+  final String description;
+  final String? soundName;
   final int likeCount;
   final int commentCount;
   final int shareCount;
-  final DateTime timestamp;
+  final int viewCount;
+  final int loopCount;
+  final bool? isVerified;
+  final bool? isPremium;
+  final DateTime createdAt;
 
-  const VideoResponseModel({
+  VideoResponseModel({
     required this.id,
-    required this.username,
-    required this.description,
     required this.videoUrl,
-    required this.profileImageUrl,
-    required this.likeCount,
-    required this.commentCount,
-    required this.shareCount,
-    required this.timestamp,
+    required this.creatorId,
+    required this.username,
+    this.profileImageUrl,
+    required this.description,
+    this.soundName,
+    this.likeCount = 0,
+    this.commentCount = 0,
+    this.shareCount = 0,
+    this.viewCount = 0,
+    this.loopCount = 0,
+    this.isVerified = false,
+    this.isPremium = false,
+    required this.createdAt,
   });
 
   factory VideoResponseModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-
-    DateTime parsedDate = DateTime.now();
-    if (data['timestamp'] != null && data['timestamp'] is Timestamp) {
-      parsedDate = (data['timestamp'] as Timestamp).toDate();
-    }
-
+    final data = doc.data() as Map<String, dynamic>;
     return VideoResponseModel(
       id: doc.id,
-      username: data['username'] as String? ?? '',
-      description: data['description'] as String? ?? '',
-      videoUrl: data['videoUrl'] as String? ?? '',
-      profileImageUrl: data['profileImageUrl'] as String? ?? '',
-      likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
-      commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
-      shareCount: (data['shareCount'] as num?)?.toInt() ?? 0,
-      timestamp: parsedDate,
+      videoUrl: data['videoUrl'] ?? '',
+      creatorId: data['creatorId'] ?? '',
+      username: data['username'] ?? '',
+      profileImageUrl: data['profileImageUrl'],
+      description: data['description'] ?? '',
+      soundName: data['soundName'],
+      likeCount: data['likeCount'] ?? 0,
+      commentCount: data['commentCount'] ?? 0,
+      shareCount: data['shareCount'] ?? 0,
+      viewCount: data['viewCount'] ?? 0,
+      loopCount: data['loopCount'] ?? 0,
+      isVerified: data['isVerified'] ?? false,
+      isPremium: data['isPremium'] ?? false,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
-  VideoEntity toEntity() {
+  VideoEntity toEntity({
+    bool? isLiked,
+    bool? isBookmarked,
+    bool? isFollowing,
+  }) {
     return VideoEntity(
       id: id,
-      username: username,
-      description: description,
       videoUrl: videoUrl,
+      creatorId: creatorId,
+      username: username,
       profileImageUrl: profileImageUrl,
+      description: description,
+      soundName: soundName,
       likeCount: likeCount,
       commentCount: commentCount,
       shareCount: shareCount,
-      timestamp: timestamp,
+      viewCount: viewCount,
+      loopCount: loopCount,
+      isLiked: isLiked ?? false,
+      isBookmarked: isBookmarked ?? false,
+      isFollowing: isFollowing ?? false,
+      isVerified: isVerified ?? false,
+      isPremium: isPremium ?? false,
+      createdAt: createdAt,
     );
   }
 }

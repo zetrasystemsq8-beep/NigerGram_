@@ -1,3 +1,4 @@
+// lib/features/video_feed/presentation/widgets/video_feed_view_user_header.dart
 import 'package:flutter/material.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
@@ -7,48 +8,79 @@ class VideoFeedViewUserHeader extends StatelessWidget {
   const VideoFeedViewUserHeader({
     required this.profileImageUrl,
     required this.username,
+    required this.isFollowing,
+    required this.isOwnVideo,
+    required this.onFollowTap,
+    this.onProfileTap,
     super.key,
   });
 
   final String profileImageUrl;
   final String username;
+  final bool isFollowing;
+  final bool isOwnVideo;
+  final VoidCallback onFollowTap;
+  final VoidCallback? onProfileTap;
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      spacing: context.w(8),
+      // `Row` does not support a `spacing` named parameter. Use an explicit
+      // SizedBox between children for consistent spacing.
       children: [
-        // Optimized Profile Avatar with structured image streaming safety checks
-        CircleAvatar(
-          radius: context.sq(20),
-          backgroundColor: Colors.grey[900], 
-          foregroundImage: profileImageUrl.isNotEmpty ? NetworkImage(profileImageUrl) : null,
-          onForegroundImageError: (exception, stackTrace) {
-            debugPrint('NigerGram Log: Profile Image streaming timed out or failed - $exception');
-          },
-          child: Icon(
-            Icons.person,
-            color: white.withAlpha(128),
-            size: context.sq(20),
-          ),
-        ),
-        
-        // Flexible bounds container prevents long creator handles from creating row layout crashes
-        Flexible(
-          child: Text(
-            username,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: white,
-              fontWeight: FontWeight.bold,
-              fontSize: context.fontSize(18),
+        // Profile Avatar with NGColors
+        GestureDetector(
+          onTap: onProfileTap,
+          child: CircleAvatar(
+            radius: context.sq(20),
+            backgroundColor: NGColors.surface, // ✅ Not hardcoded
+            foregroundImage: profileImageUrl.isNotEmpty
+                ? NetworkImage(profileImageUrl)
+                : null,
+            onForegroundImageError: (exception, stackTrace) {
+              debugPrint('NigerGram Log: Profile Image failed - $exception');
+            },
+            child: Icon(
+              Icons.person_rounded,
+              color: NGColors.textMuted, // ✅ Not hardcoded
+              size: context.sq(20),
             ),
           ),
         ),
-        
-        // Immersive Action Element
-        const VideoFeedViewFollowButton(),
+
+        // Explicit spacing replacing the unsupported `spacing:` parameter
+        SizedBox(width: context.w(8)),
+
+        // Username
+        Flexible(
+          child: GestureDetector(
+            onTap: onProfileTap,
+            child: Text(
+              '@$username',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: NGColors.textPrimary, // ✅ Not hardcoded
+                fontWeight: FontWeight.bold,
+                fontSize: context.fontSize(18),
+                shadows: const [
+                  Shadow(
+                    color: Colors.black87,
+                    blurRadius: 4,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Follow Button (only if not own video)
+        if (!isOwnVideo)
+          VideoFeedViewFollowButton(
+            isFollowing: isFollowing,
+            onTap: onFollowTap,
+          ),
       ],
     );
   }

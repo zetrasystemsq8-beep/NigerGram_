@@ -1,25 +1,31 @@
+// lib/features/gist_hub/presentation/widgets/gist_post_card.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_comment_sheet.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_hub_features.dart';
+import 'package:nigergram/features/gist_hub/presentation/widgets/gist_text_with_mentions.dart';
+import 'package:nigergram/features/gist_hub/presentation/widgets/gist_edit_sheet.dart';
 
 class GistPostCard extends StatefulWidget {
   final GistPostEntity post;
   final GistService service;
   final VoidCallback? onPostDeleted;
+  final VoidCallback? onPostUpdated; // ✅ ADDED
 
   const GistPostCard({
     super.key,
     required this.post,
     required this.service,
     this.onPostDeleted,
+    this.onPostUpdated, // ✅ ADDED
   });
 
   @override
@@ -48,9 +54,7 @@ class _GistPostCardState extends State<GistPostCard> {
     }
   }
 
-  // 🔥 FIX: Prevent multiple reactions
   void _addReaction(String emoji) {
-    // Check if user already reacted with this emoji
     if (_reactedEmojis.contains(emoji)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -184,6 +188,8 @@ class _GistPostCardState extends State<GistPostCard> {
     return const SizedBox.shrink();
   }
 
+  bool get _isOwnPost => _post.userId == _currentUserId;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -254,18 +260,57 @@ class _GistPostCardState extends State<GistPostCard> {
                   fontSize: 11,
                 ),
               ),
+              // Edit/Delete menu (only for own posts)
+              if (_isOwnPost)
+                PopupMenuButton(
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: NGColors.textMuted,
+                    size: 18,
+                  ),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _showEditSheet();
+                    } else if (value == 'delete') {
+                      _deletePost();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 16),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 16, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // Content
-          Text(
-            _post.content,
-            style: const TextStyle(
-              color: NGColors.textPrimary,
-              fontSize: 15,
-              height: 1.6,
-            ),
+          // Clickable mentions
+          GistTextWithMentions(
+            text: _post.content,
+            fontSize: 15,
+            maxLines: 10,
+            onMentionTap: (username) {
+              // ✅ FIXED: Use GoRouter
+              GoRouter.of(context).push('/profile/$username');
+            },
           ),
           const SizedBox(height: 12),
 
@@ -334,7 +379,9 @@ class _GistPostCardState extends State<GistPostCard> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${_post.commentCount}',
+                      _post.commentCount == 0
+                          ? '0 Comments'
+                          : '${_post.commentCount} ${_post.commentCount == 1 ? 'Comment' : 'Comments'}',
                       style: TextStyle(
                         color: NGColors.textMuted,
                         fontSize: 13,
@@ -358,6 +405,74 @@ class _GistPostCardState extends State<GistPostCard> {
         ],
       ),
     );
+  }
+
+  void _showEditSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => GistEditSheet(
+        postId: _post.id,
+        currentContent: _post.content,
+        service: widget.service,
+      ),
+    ).then((updated) {
+      if (updated == true && widget.onPostUpdated != null) {
+        widget.onPostUpdated!();
+      }
+    });
+  }
+
+  void _deletePost() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: NGColors.surface,
+        title: Text(
+          'Delete Gist?',
+          style: TextStyle(color: NGColors.textPrimary),
+        ),
+        content: Text(
+          'This action cannot be undone.',
+          style: TextStyle(color: NGColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: NGColors.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('gist_posts')
+          .doc(_post.id)
+          .delete();
+      if (widget.onPostDeleted != null) {
+        widget.onPostDeleted!();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gist deleted')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete: $e')),
+      );
+    }
   }
 
   Widget _buildReactionButton(String emoji) {
@@ -402,7 +517,7 @@ class _GistPostCardState extends State<GistPostCard> {
     );
   }
 
-  // 🔥 FIXED: Premium Poll with immediate UI update
+  // Premium Poll
   Widget _buildPremiumPoll() {
     final pollOptions = _post.pollOptions ?? [];
     final totalVotes = _post.pollVotes.values.fold(0, (sum, val) => sum + val);
@@ -535,7 +650,6 @@ class _GistPostCardState extends State<GistPostCard> {
                       postId: _post.id,
                       choiceIndex: index,
                     ).then((_) {
-                      // 🔥 FIX: Immediate UI update
                       setState(() {
                         _post.pollVotes[index.toString()] = (_post.pollVotes[index.toString()] ?? 0) + 1;
                         _post.pollVoters[_currentUserId] = index;
@@ -576,143 +690,71 @@ class _GistPostCardState extends State<GistPostCard> {
                               width: 22,
                               height: 22,
                               decoration: BoxDecoration(
-                                color: isSelected
-                                    ? NGColors.accent
-                                    : Colors.transparent,
                                 shape: BoxShape.circle,
+                                color: isSelected ? NGColors.accent : Colors.transparent,
                                 border: Border.all(
-                                  color: isSelected
-                                      ? NGColors.accent
-                                      : NGColors.textMuted,
-                                  width: isSelected ? 0 : 2,
+                                  color: isSelected ? NGColors.accent : NGColors.divider,
+                                  width: 2,
                                 ),
                               ),
                               child: isSelected
-                                  ? const Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 14,
-                                    )
+                                  ? const Icon(Icons.check, color: Colors.white, size: 14)
                                   : null,
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 option,
                                 style: TextStyle(
-                                  color: isSelected
-                                      ? NGColors.accent
-                                      : isUnselected
-                                          ? NGColors.textMuted
-                                          : NGColors.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
+                                  color: isSelected || isUnselected
+                                      ? NGColors.textPrimary
+                                      : NGColors.textSecondary,
+                                  fontSize: 14,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                                 ),
                               ),
                             ),
                             Text(
                               '${percentage.toStringAsFixed(0)}%',
                               style: TextStyle(
-                                color: isSelected
-                                    ? NGColors.accent
-                                    : NGColors.textSecondary,
-                                fontSize: 16,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.w500,
+                                color: isSelected ? NGColors.accent : NGColors.textMuted,
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: totalVotes > 0 ? votes / totalVotes : 0,
-                            minHeight: 8,
-                            backgroundColor: NGColors.divider.withOpacity(0.2),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              isSelected
-                                  ? NGColors.accent
-                                  : NGColors.accent.withOpacity(0.3),
+                        if (totalVotes > 0) ...[
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: percentage / 100,
+                              backgroundColor: NGColors.surfaceLight,
+                              color: isSelected ? NGColors.accent : Colors.grey.shade600,
+                              minHeight: 4,
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Text(
-                              '$votes ${votes == 1 ? 'vote' : 'votes'}',
-                              style: TextStyle(
-                                color: NGColors.textMuted,
-                                fontSize: 11,
-                              ),
-                            ),
-                            const Spacer(),
-                            if (isSelected)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: NGColors.accent.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: NGColors.accent,
-                                      size: 12,
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Voted',
-                                      style: TextStyle(
-                                        color: NGColors.accent,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
+                        ],
                       ],
                     ),
                   ),
                 ),
               ),
             );
-          }).toList(),
+          }),
           
-          const SizedBox(height: 12),
-          
-          // Poll footer
-          Row(
-            children: [
-              Icon(
-                Icons.people_outline,
-                color: NGColors.textMuted,
-                size: 14,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                totalVotes > 0
-                    ? '${totalVotes > 1000 ? '${(totalVotes / 1000).toStringAsFixed(1)}K' : totalVotes} ${totalVotes == 1 ? 'person voted' : 'people voted'}'
-                    : 'Be the first to vote',
+          if (totalVotes > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '$totalVotes vote${totalVotes > 1 ? 's' : ''}',
                 style: TextStyle(
                   color: NGColors.textMuted,
-                  fontSize: 12,
+                  fontSize: 11,
                 ),
               ),
-            ],
-          ),
+            ),
         ],
       ),
     );

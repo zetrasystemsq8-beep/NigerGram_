@@ -1,3 +1,4 @@
+// lib/features/video_feed/presentation/widgets/video_feed_view_overlay_section.dart
 import 'package:flutter/material.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
@@ -17,6 +18,11 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
     required this.onCommentTapped,
     required this.onShareTapped,
     required this.isPaused,
+    this.isVerified = false,
+    this.isFollowing = false,
+    this.isOwnVideo = false,
+    this.onFollowTap,
+    this.onProfileTap,
     super.key,
   });
 
@@ -33,6 +39,11 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
   final VoidCallback onCommentTapped;
   final VoidCallback onShareTapped;
   final bool isPaused;
+  final bool isVerified;
+  final bool isFollowing;
+  final bool isOwnVideo;
+  final VoidCallback? onFollowTap;
+  final VoidCallback? onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -47,40 +58,113 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              GestureDetector(
-                onTap: () {},
-                child: Row(
-                  children: [
-                    CircleAvatar(
+              // User row: Avatar + Username + Follow
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: onProfileTap,
+                    child: CircleAvatar(
                       radius: context.sq(18),
                       backgroundImage: profileImageUrl.isNotEmpty
                           ? NetworkImage(profileImageUrl)
                           : null,
-                      backgroundColor: Colors.white12,
+                      backgroundColor: NGColors.surfaceLight,
                       child: profileImageUrl.isEmpty
-                          ? const Icon(Icons.person, color: Colors.white54)
+                          ? Icon(
+                              Icons.person_rounded,
+                              color: NGColors.textMuted,
+                              size: context.sq(18),
+                            )
                           : null,
                     ),
-                    SizedBox(width: context.w(10)),
-                    Text(
-                      username,
-                      style: TextStyle(
-                        color: white,
-                        fontSize: context.fontSize(15),
-                        fontWeight: FontWeight.bold,
+                  ),
+                  SizedBox(width: context.w(10)),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: onProfileTap,
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '@$username',
+                              style: TextStyle(
+                                color: NGColors.textPrimary,
+                                fontSize: context.fontSize(15),
+                                fontWeight: FontWeight.bold,
+                                shadows: const [
+                                  Shadow(
+                                    color: Colors.black87,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isVerified) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.verified_rounded,
+                              color: NGColors.verified,
+                              size: context.sq(14),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  // Follow button (if not own video)
+                  if (!isOwnVideo && onFollowTap != null)
+                    GestureDetector(
+                      onTap: onFollowTap,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: context.w(10),
+                          vertical: context.h(4),
+                        ),
+                        decoration: BoxDecoration(
+                          color: isFollowing
+                              ? NGColors.surfaceLight
+                              : NGColors.accent,
+                          borderRadius: BorderRadius.circular(16),
+                          border: isFollowing
+                              ? Border.all(
+                                  color: NGColors.divider,
+                                  width: 1,
+                                )
+                              : null,
+                        ),
+                        child: Text(
+                          isFollowing ? 'Following' : 'Follow',
+                          style: TextStyle(
+                            color: isFollowing
+                                ? NGColors.textSecondary
+                                : NGColors.textPrimary,
+                            fontSize: context.fontSize(11),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               SizedBox(height: context.h(8)),
+              // Description
               Text(
                 description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: white,
+                  color: NGColors.textSecondary,
                   fontSize: context.fontSize(14),
+                  shadows: const [
+                    Shadow(
+                      color: Colors.black87,
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -102,24 +186,33 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
                     Container(
                       padding: EdgeInsets.all(context.sq(8)),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.black.withOpacity(0.3),
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1,
+                        ),
                       ),
                       child: Icon(
-                        isLiked ? Icons.favorite : Icons.favorite_outline,
-                        color: isLiked ? const Color(0xFFFF0050) : white,
+                        isLiked ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+                        color: isLiked ? NGColors.like : NGColors.textPrimary,
                         size: context.sq(28),
                       ),
                     ),
                     SizedBox(height: context.h(4)),
                     Text(
-                      likeCount > 999
-                          ? '${(likeCount / 1000).toStringAsFixed(1)}k'
-                          : '$likeCount',
+                      _formatCount(likeCount),
                       style: TextStyle(
-                        color: white,
+                        color: NGColors.textPrimary,
                         fontSize: context.fontSize(12),
                         fontWeight: FontWeight.w600,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black87,
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -127,7 +220,7 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
               ),
               SizedBox(height: context.h(16)),
 
-              // ✅ FIXED: Comments button with count badge
+              // Comment button with badge
               GestureDetector(
                 onTap: onCommentTapped,
                 child: Column(
@@ -138,16 +231,19 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
                         Container(
                           padding: EdgeInsets.all(context.sq(8)),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.black.withOpacity(0.3),
                             shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                              width: 1,
+                            ),
                           ),
                           child: Icon(
-                            Icons.message_outlined,
-                            color: white,
+                            Icons.chat_bubble_outline_rounded,
+                            color: NGColors.textPrimary,
                             size: context.sq(28),
                           ),
                         ),
-                        // ✅ NEW: Red badge with comment count
                         if (commentCount > 0)
                           Positioned(
                             right: -4,
@@ -158,15 +254,13 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
                                 vertical: context.h(2),
                               ),
                               decoration: const BoxDecoration(
-                                color: Color(0xFFFF0050),
+                                color: NGColors.like,
                                 shape: BoxShape.circle,
                               ),
                               child: Text(
-                                commentCount > 99
-                                    ? '99+'
-                                    : '$commentCount',
+                                commentCount > 99 ? '99+' : '$commentCount',
                                 style: TextStyle(
-                                  color: white,
+                                  color: NGColors.textPrimary,
                                   fontSize: context.fontSize(10),
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -177,13 +271,18 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
                     ),
                     SizedBox(height: context.h(4)),
                     Text(
-                      commentCount > 999
-                          ? '${(commentCount / 1000).toStringAsFixed(1)}k'
-                          : '$commentCount',
+                      _formatCount(commentCount),
                       style: TextStyle(
-                        color: white,
+                        color: NGColors.textPrimary,
                         fontSize: context.fontSize(12),
                         fontWeight: FontWeight.w600,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black87,
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -199,24 +298,33 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
                     Container(
                       padding: EdgeInsets.all(context.sq(8)),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.black.withOpacity(0.3),
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1,
+                        ),
                       ),
                       child: Icon(
                         Icons.share_rounded,
-                        color: white,
+                        color: NGColors.textPrimary,
                         size: context.sq(28),
                       ),
                     ),
                     SizedBox(height: context.h(4)),
                     Text(
-                      shareCount > 999
-                          ? '${(shareCount / 1000).toStringAsFixed(1)}k'
-                          : '$shareCount',
+                      _formatCount(shareCount),
                       style: TextStyle(
-                        color: white,
+                        color: NGColors.textPrimary,
                         fontSize: context.fontSize(12),
                         fontWeight: FontWeight.w600,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black87,
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -229,12 +337,16 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.all(context.sq(8)),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.black.withOpacity(0.3),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
+                    ),
                   ),
                   child: Icon(
                     Icons.pause_rounded,
-                    color: white.withOpacity(0.6),
+                    color: NGColors.textPrimary.withOpacity(0.6),
                     size: context.sq(28),
                   ),
                 ),
@@ -243,5 +355,14 @@ class VideoFeedViewOverlaySection extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _formatCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    }
+    return count.toString();
   }
 }

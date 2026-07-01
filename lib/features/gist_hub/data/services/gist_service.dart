@@ -1,14 +1,29 @@
+// lib/features/gist_hub/data/services/gist_service.dart
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 
+// ===================== PAGINATION HELPER =====================
+class PaginatedGists {
+  final List<Map<String, dynamic>> posts;
+  final DocumentSnapshot? lastDocument;
+  final bool hasMore;
+
+  PaginatedGists({
+    required this.posts,
+    this.lastDocument,
+    required this.hasMore,
+  });
+}
+
 class GistService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  // ===================== STREAM FEED (LEGACY - KEPT FOR BACKWARD COMPAT) =====================
   Stream<List<Map<String, dynamic>>> getGistFeedStream({required String filter}) {
     Query<Map<String, dynamic>> query = _firestore.collection('gist_posts');
 
@@ -31,6 +46,45 @@ class GistService {
     });
   }
 
+  // ===================== PAGINATION (NEW) =====================
+  Future<PaginatedGists> getGistsPaginated({
+    required String filter,
+    int limit = 10,
+    DocumentSnapshot? lastDoc,
+  }) async {
+    Query<Map<String, dynamic>> query = _firestore.collection('gist_posts');
+
+    if (filter == 'trending') {
+      query = query.orderBy('totalReactions', descending: true);
+    } else if (filter == 'polls') {
+      query = query.where('type', isEqualTo: 'poll');
+    } else {
+      query = query.orderBy('createdAt', descending: true);
+    }
+
+    query = query.limit(limit);
+
+    if (lastDoc != null) {
+      query = query.startAfterDocument(lastDoc);
+    }
+
+    final snap = await query.get();
+    final posts = snap.docs.map((d) {
+      final data = d.data();
+      return {
+        'id': d.id,
+        ...data,
+      };
+    }).toList();
+
+    return PaginatedGists(
+      posts: posts,
+      lastDocument: snap.docs.isNotEmpty ? snap.docs.last : null,
+      hasMore: snap.docs.length == limit,
+    );
+  }
+
+  // ===================== CREATE POST =====================
   Future<void> createPost({
     required String type,
     required String content,
@@ -104,12 +158,14 @@ class GistService {
         "🇳🇬": 0,
       };
 
+      final actualType = (pollOptions != null && pollOptions.isNotEmpty) ? 'poll' : type;
+
       await postRef.set({
         'userId': userId,
         'displayName': displayName,
         'username': username,
         'profilePic': profilePic,
-        'type': type,
+        'type': actualType,
         'content': content,
         'imageUrl': imageUrl,
         'pollOptions': pollOptions,
@@ -127,6 +183,27 @@ class GistService {
     }
   }
 
+  // ===================== UPDATE POST (EDIT) =====================
+  Future<void> updatePost({
+    required String postId,
+    required String newContent,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not logged in');
+
+    final postRef = _firestore.collection('gist_posts').doc(postId);
+    final doc = await postRef.get();
+    if (!doc.exists) throw Exception('Post not found');
+    final data = doc.data()!;
+    if (data['userId'] != user.uid) throw Exception('You can only edit your own posts');
+
+    await postRef.update({
+      'content': newContent,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ===================== REACTIONS =====================
   Future<void> addReaction({
     required String postId,
     required String emoji,
@@ -155,7 +232,7 @@ class GistService {
     }
   }
 
-  // 🔥 FIXED: Correct vote logic with pollVoters
+  // ===================== POLL VOTE =====================
   Future<void> castVote({
     required String postId,
     required int choiceIndex,
@@ -171,18 +248,15 @@ class GistService {
         
         final data = snapshot.data() as Map<String, dynamic>;
         
-        // Check if user already voted
         final voters = Map<String, int>.from(data['pollVoters'] ?? {});
         if (voters.containsKey(user.uid)) {
           throw Exception('You already voted');
         }
         
-        // Update vote counts
         final pollVotes = Map<String, int>.from(data['pollVotes'] ?? {});
         final key = choiceIndex.toString();
         pollVotes[key] = (pollVotes[key] ?? 0) + 1;
         
-        // Store who voted
         voters[user.uid] = choiceIndex;
         
         transaction.update(postRef, {
@@ -195,6 +269,7 @@ class GistService {
     }
   }
 
+  // ===================== COMMENTS =====================
   Stream<QuerySnapshot<Map<String, dynamic>>> getCommentsStream(String postId) {
     return _firestore
         .collection('gist_comments')

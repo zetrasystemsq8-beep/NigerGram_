@@ -1,44 +1,63 @@
 // lib/features/video_feed/presentation/view/discover_feed_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/video_feed/domain/entities/video_entity.dart';
 
 class DiscoverFeedView extends StatefulWidget {
-  final String tag;
-  const DiscoverFeedView({required this.tag, super.key});
+  final String? tag;
+  const DiscoverFeedView({super.key, this.tag});
 
   @override
   State<DiscoverFeedView> createState() => _DiscoverFeedViewState();
 }
 
 class _DiscoverFeedViewState extends State<DiscoverFeedView> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<VideoEntity> _videos = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadByTag();
+    _loadVideos();
   }
 
-  Future<void> _loadByTag() async {
+  Future<void> _loadVideos() async {
     setState(() => _isLoading = true);
     try {
-      final snap = await _firestore.collection('videos').where('tags', arrayContains: widget.tag).limit(50).get();
-      final videos = snap.docs.map((d) {
-        final data = d.data();
+      Query query = FirebaseFirestore.instance
+          .collection('videos')
+          .orderBy('createdAt', descending: true)
+          .limit(20);
+
+      if (widget.tag != null && widget.tag!.isNotEmpty) {
+        query = query.where('tags', arrayContains: widget.tag);
+      }
+
+      final snapshot = await query.get();
+
+      final videos = snapshot.docs.map((doc) {
+        // ✅ THE FIX: cast to Map<String, dynamic>
+        final data = doc.data() as Map<String, dynamic>;
         return VideoEntity(
-          id: d.id,
-          username: data['username'] ?? '',
-          description: data['description'] ?? '',
+          id: doc.id,
           videoUrl: data['videoUrl'] ?? '',
-          profileImageUrl: data['profileImageUrl'] ?? '',
-          likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
-          commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
-          shareCount: (data['shareCount'] as num?)?.toInt() ?? 0,
-          timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          creatorId: data['creatorId'] ?? '',
+          username: data['username'] ?? '',
+          profileImageUrl: data['profileImageUrl'],
+          description: data['description'] ?? '',
+          soundName: data['soundName'],
+          likeCount: data['likeCount'] ?? 0,
+          commentCount: data['commentCount'] ?? 0,
+          shareCount: data['shareCount'] ?? 0,
+          viewCount: data['viewCount'] ?? 0,
+          loopCount: data['loopCount'] ?? 0,
+          isLiked: false,
+          isBookmarked: false,
+          isFollowing: false,
+          isVerified: data['isVerified'] ?? false,
+          isPremium: data['isPremium'] ?? false,
+          createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         );
       }).toList();
 
@@ -47,30 +66,87 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Error loading videos: $e');
       setState(() => _isLoading = false);
-      rethrow;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     return Scaffold(
-      appBar: AppBar(title: Text('#${widget.tag}')),
-      body: ListView.builder(
-        itemCount: _videos.length,
-        itemBuilder: (context, index) {
-          final v = _videos[index];
-          return ListTile(
-            leading: v.profileImageUrl.isNotEmpty ? CircleAvatar(backgroundImage: NetworkImage(v.profileImageUrl)) : const CircleAvatar(child: Icon(Icons.person)),
-            title: Text('@${v.username}'),
-            subtitle: Text(v.description, maxLines: 2, overflow: TextOverflow.ellipsis),
-            onTap: () {
-              // navigate to video detail or play
-            },
-          );
-        },
+      backgroundColor: NGColors.background,
+      appBar: AppBar(
+        backgroundColor: NGColors.background,
+        title: Text(
+          widget.tag != null ? 'Discover #${widget.tag}' : 'Discover',
+          style: const TextStyle(
+            color: NGColors.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        elevation: 0,
       ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: NGColors.accent),
+            )
+          : _videos.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.search_off_rounded,
+                        color: NGColors.textMuted,
+                        size: 64,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        widget.tag != null
+                            ? 'No videos with #${widget.tag}'
+                            : 'No videos found',
+                        style: const TextStyle(
+                          color: NGColors.textSecondary,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _videos.length,
+                  itemBuilder: (context, index) {
+                    final v = _videos[index];
+                    return ListTile(
+                      leading: v.profileImageUrl != null && v.profileImageUrl!.isNotEmpty
+                          ? CircleAvatar(
+                              backgroundImage: NetworkImage(v.profileImageUrl!),
+                            )
+                          : const CircleAvatar(
+                              child: Icon(Icons.person),
+                            ),
+                      title: Text(
+                        v.username,
+                        style: const TextStyle(
+                          color: NGColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Text(
+                        v.description,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: NGColors.textSecondary),
+                      ),
+                      trailing: Text(
+                        '❤️ ${v.likeCount}',
+                        style: const TextStyle(color: NGColors.textMuted),
+                      ),
+                      onTap: () {},
+                    );
+                  },
+                ),
     );
   }
 }

@@ -1,3 +1,4 @@
+// lib/features/gist_hub/presentation/view/gist_hub_view.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/core/design_system/colors.dart';
@@ -18,11 +19,35 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
   final GistService _service = GistService();
   int _totalGists = 0;
 
+  // Pagination state per tab
+  final Map<String, List<GistPostEntity>> _postsMap = {};
+  final Map<String, DocumentSnapshot?> _lastDocMap = {};
+  final Map<String, bool> _hasMoreMap = {};
+  final Map<String, bool> _loadingMap = {};
+  final Map<String, bool> _initialLoadingMap = {};
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      // Load data when switching to a tab that hasn't loaded yet
+      final filter = _getFilterForIndex(_tabController.index);
+      if (!_postsMap.containsKey(filter)) {
+        _loadInitial(filter);
+      }
+    });
     _loadGistCount();
+    _loadInitial('trending');
+  }
+
+  String _getFilterForIndex(int index) {
+    switch (index) {
+      case 0: return 'trending';
+      case 1: return 'latest';
+      case 2: return 'polls';
+      default: return 'latest';
+    }
   }
 
   Future<void> _loadGistCount() async {
@@ -32,6 +57,74 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
         _totalGists = snap.docs.length;
       });
     } catch (_) {}
+  }
+
+  Future<void> _loadInitial(String filter) async {
+    if (_initialLoadingMap[filter] == true) return;
+    setState(() {
+      _initialLoadingMap[filter] = true;
+      _loadingMap[filter] = true;
+    });
+
+    try {
+      final result = await _service.getGistsPaginated(filter: filter, limit: 10);
+      final posts = result.posts.map((data) {
+        return GistPostEntity.fromMap(data, data['id'] ?? '');
+      }).toList();
+
+      setState(() {
+        _postsMap[filter] = posts;
+        _lastDocMap[filter] = result.lastDocument;
+        _hasMoreMap[filter] = result.hasMore;
+        _initialLoadingMap[filter] = false;
+        _loadingMap[filter] = false;
+      });
+    } catch (e) {
+      setState(() {
+        _initialLoadingMap[filter] = false;
+        _loadingMap[filter] = false;
+      });
+    }
+  }
+
+  Future<void> _loadMore(String filter) async {
+    if (_loadingMap[filter] == true || _hasMoreMap[filter] == false) return;
+    if (_lastDocMap[filter] == null) return;
+
+    setState(() {
+      _loadingMap[filter] = true;
+    });
+
+    try {
+      final result = await _service.getGistsPaginated(
+        filter: filter,
+        limit: 10,
+        lastDoc: _lastDocMap[filter],
+      );
+      final newPosts = result.posts.map((data) {
+        return GistPostEntity.fromMap(data, data['id'] ?? '');
+      }).toList();
+
+      setState(() {
+        _postsMap[filter] = [...(_postsMap[filter] ?? []), ...newPosts];
+        _lastDocMap[filter] = result.lastDocument;
+        _hasMoreMap[filter] = result.hasMore;
+        _loadingMap[filter] = false;
+      });
+    } catch (e) {
+      setState(() {
+        _loadingMap[filter] = false;
+      });
+    }
+  }
+
+  Future<void> _refreshFeed(String filter) async {
+    _postsMap.remove(filter);
+    _lastDocMap.remove(filter);
+    _hasMoreMap.remove(filter);
+    _loadingMap.remove(filter);
+    _initialLoadingMap.remove(filter);
+    await _loadInitial(filter);
   }
 
   @override
@@ -138,7 +231,9 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
               MaterialPageRoute(builder: (context) => const GistCreatePost()),
             ).then((_) {
               _loadGistCount();
-              setState(() {});
+              // Refresh the current tab
+              final filter = _getFilterForIndex(_tabController.index);
+              _refreshFeed(filter);
             });
           },
         ),
@@ -147,165 +242,131 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
   }
 
   Widget _buildFeed(String filter) {
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _service.getGistFeedStream(filter: filter),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  color: NGColors.textMuted,
-                  size: 56,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Can\'t load feed right now',
-                  style: TextStyle(
-                    color: NGColors.textSecondary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Check your connection and try again',
-                  style: TextStyle(
-                    color: NGColors.textMuted,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () => setState(() {}),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: NGColors.accent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 14,
-                    ),
-                  ),
-                  child: const Text(
-                    'Retry',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
+    final posts = _postsMap[filter] ?? [];
+    final isLoading = _initialLoadingMap[filter] == true;
+    final isLoadingMore = _loadingMap[filter] == true && posts.isNotEmpty;
+    final hasMore = _hasMoreMap[filter] ?? false;
 
-        if (!snapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(
-              color: NGColors.accent,
-            ),
-          );
-        }
-
-        final rawData = snapshot.data!;
-
-        if (rawData.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  filter == 'trending'
-                      ? Icons.whatshot_outlined
-                      : filter == 'polls'
-                          ? Icons.poll_outlined
-                          : Icons.chat_bubble_outline,
-                  color: NGColors.textMuted,
-                  size: 56,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  filter == 'trending'
-                      ? 'Nothing trending yet 🔥'
-                      : filter == 'polls'
-                          ? 'No polls yet 📊'
-                          : 'No gist yet',
-                  style: TextStyle(
-                    color: NGColors.textSecondary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  filter == 'trending'
-                      ? 'Be the first to start a trend!'
-                      : filter == 'polls'
-                          ? 'Create a poll and get opinions!'
-                          : 'Drop your first gist now 🇳🇬',
-                  style: TextStyle(
-                    color: NGColors.textMuted,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const GistCreatePost()),
-                    ).then((_) {
-                      _loadGistCount();
-                      setState(() {});
-                    });
-                  },
-                  icon: const Icon(Icons.add, color: Colors.white, size: 18),
-                  label: const Text('Drop Gist'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: NGColors.accent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final posts = rawData.map((data) {
-          return GistPostEntity.fromMap(data, data['id'] ?? '');
-        }).toList();
-
-        return RefreshIndicator(
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
           color: NGColors.accent,
-          backgroundColor: NGColors.surface,
-          onRefresh: () async {
-            _loadGistCount();
-            setState(() {});
-          },
-          child: ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 100),
-            itemCount: posts.length,
-            itemBuilder: (context, index) {
-              final post = posts[index];
-              return GistPostCard(
-                post: post,
-                service: _service,
-                onPostDeleted: () {
+        ),
+      );
+    }
+
+    if (posts.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              filter == 'trending'
+                  ? Icons.whatshot_outlined
+                  : filter == 'polls'
+                      ? Icons.poll_outlined
+                      : Icons.chat_bubble_outline,
+              color: NGColors.textMuted,
+              size: 56,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              filter == 'trending'
+                  ? 'Nothing trending yet 🔥'
+                  : filter == 'polls'
+                      ? 'No polls yet 📊'
+                      : 'No gist yet',
+              style: TextStyle(
+                color: NGColors.textSecondary,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              filter == 'trending'
+                  ? 'Be the first to start a trend!'
+                  : filter == 'polls'
+                      ? 'Create a poll and get opinions!'
+                      : 'Drop your first gist now 🇳🇬',
+              style: TextStyle(
+                color: NGColors.textMuted,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const GistCreatePost()),
+                ).then((_) {
                   _loadGistCount();
-                  setState(() {});
-                },
+                  _refreshFeed(filter);
+                });
+              },
+              icon: const Icon(Icons.add, color: Colors.white, size: 18),
+              label: const Text('Drop Gist'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: NGColors.accent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: NGColors.accent,
+      backgroundColor: NGColors.surface,
+      onRefresh: () => _refreshFeed(filter),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (ScrollNotification scrollInfo) {
+          if (scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 100) {
+            if (hasMore && !isLoadingMore) {
+              _loadMore(filter);
+            }
+          }
+          return false;
+        },
+        child: ListView.builder(
+          padding: const EdgeInsets.only(top: 8, bottom: 100),
+          itemCount: posts.length + (isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == posts.length) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: NGColors.accent,
+                    strokeWidth: 2,
+                  ),
+                ),
               );
-            },
-          ),
-        );
-      },
+            }
+            final post = posts[index];
+            return GistPostCard(
+              post: post,
+              service: _service,
+              onPostDeleted: () {
+                _loadGistCount();
+                _refreshFeed(filter);
+              },
+              onPostUpdated: () {
+                // Re-fetch this tab to reflect changes
+                _refreshFeed(filter);
+              },
+            );
+          },
+        ),
+      ),
     );
   }
 }

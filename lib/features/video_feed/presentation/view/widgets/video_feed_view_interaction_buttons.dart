@@ -1,9 +1,12 @@
+// lib/features/video_feed/presentation/view/widgets/video_feed_view_interaction_buttons.dart
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/video_feed/repository/interaction_repository.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nigergram/features/wallet/presentation/widgets/tip_bottom_sheet.dart';
@@ -18,11 +21,12 @@ class VideoFeedViewInteractionButtons extends StatefulWidget {
     required this.commentCount,
     required this.shareCount,
     this.isBookmarked = false,
-    this.onCommentTapped, // Added explicit functional hook parameter
+    this.onCommentTapped,
     this.onShareTapped,
     this.onBookmarkTapped,
     this.creatorId,
     this.creatorUsername,
+    this.onDoubleTapLike, // NEW: Double-tap callback
     super.key,
   });
 
@@ -32,23 +36,29 @@ class VideoFeedViewInteractionButtons extends StatefulWidget {
   final int commentCount;
   final int shareCount;
   final bool isBookmarked;
-  final VoidCallback? onCommentTapped; // Captured into class state
+  final VoidCallback? onCommentTapped;
   final VoidCallback? onShareTapped;
   final VoidCallback? onBookmarkTapped;
   final String? creatorId;
   final String? creatorUsername;
+  final VoidCallback? onDoubleTapLike; // NEW
 
   @override
   State<VideoFeedViewInteractionButtons> createState() => _VideoFeedViewInteractionButtonsState();
 }
 
-class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteractionButtons> {
+class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteractionButtons>
+    with SingleTickerProviderStateMixin {
   late bool _isLiked;
   late bool _isSaved;
   late int _likeCount;
   late int _commentCount;
   bool _likePending = false;
   bool _savePending = false;
+
+  // Animation controllers
+  late AnimationController _likeScaleController;
+  late AnimationController _heartExplosionController;
 
   final InteractionRepository _repo = InteractionRepository();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -62,6 +72,17 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     _isSaved = widget.isBookmarked;
     _likeCount = widget.likeCount;
     _commentCount = widget.commentCount;
+
+    // Initialize animations
+    _likeScaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _heartExplosionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
     _startVideoListener(widget.videoId);
   }
 
@@ -126,6 +147,14 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
 
     if (_likePending) return;
     _likePending = true;
+
+    // Animate like button
+    _likeScaleController.forward(from: 0);
+
+    // Trigger heart explosion if liking
+    if (!_isLiked) {
+      _heartExplosionController.forward(from: 0);
+    }
 
     setState(() {
       _isLiked = !_isLiked;
@@ -194,7 +223,6 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
       return;
     }
 
-    // Direct performance redirect pipeline back up to layout controller level
     if (widget.onCommentTapped != null) {
       widget.onCommentTapped!();
       return;
@@ -222,7 +250,7 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
 
   Future<void> _handleShare() async {
     HapticFeedback.mediumImpact();
-    
+
     try {
       final doc = await _firestore.collection('videos').doc(widget.videoId).get();
       final data = doc.data();
@@ -231,10 +259,11 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
       final username = data['username'] ?? 'NigerGram Creator';
       final description = data['description'] ?? 'Check out this video';
       final deepLink = 'nigergram://video/${widget.videoId}';
-      
+
       if (mounted) {
         await showModalBottomSheet(
           context: context,
+          backgroundColor: Colors.transparent,
           builder: (ctx) => ShareBottomSheet(
             videoId: widget.videoId,
             username: username,
@@ -242,7 +271,7 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
             deepLink: deepLink,
           ),
         );
-        
+
         await _firestore
             .collection('videos')
             .doc(widget.videoId)
@@ -262,25 +291,26 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Like Button
-        VideoFeedViewInteractionButton(
-          icon: _isLiked ? Icons.favorite : Icons.favorite_border,
+        // Like Button with Animation
+        _buildAnimatedButton(
+          icon: _isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
           label: _formatCount(_likeCount),
-          iconColor: _isLiked ? const Color(0xFFFE2C55) : Colors.white,
+          iconColor: _isLiked ? NGColors.like : NGColors.textPrimary,
           onTap: _handleLike,
+          scaleController: _likeScaleController,
         ),
         SizedBox(height: screenHeight * 0.02),
 
         // Comment Button
-        VideoFeedViewInteractionButton(
-          icon: Icons.chat_bubble_rounded,
+        _buildActionButton(
+          icon: Icons.chat_bubble_outline_rounded,
           label: _formatCount(_commentCount),
           onTap: _openComments,
         ),
         SizedBox(height: screenHeight * 0.02),
 
         // Tag Button
-        VideoFeedViewInteractionButton(
+        _buildActionButton(
           icon: Icons.label_rounded,
           label: 'Tags',
           onTap: _handleTagTap,
@@ -288,7 +318,7 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
         SizedBox(height: screenHeight * 0.02),
 
         // Share Button
-        VideoFeedViewInteractionButton(
+        _buildActionButton(
           icon: Icons.reply_rounded,
           label: _formatCount(widget.shareCount),
           onTap: _handleShare,
@@ -296,16 +326,16 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
         SizedBox(height: screenHeight * 0.02),
 
         // Save/Bookmark Button
-        VideoFeedViewInteractionButton(
-          icon: _isSaved ? Icons.bookmark : Icons.bookmark_border,
+        _buildActionButton(
+          icon: _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
           label: 'Save',
-          iconColor: _isSaved ? Colors.amber : Colors.white,
+          iconColor: _isSaved ? NGColors.premium : NGColors.textPrimary,
           onTap: _handleSave,
         ),
         SizedBox(height: screenHeight * 0.02),
 
         // Wallet Button
-        VideoFeedViewInteractionButton(
+        _buildActionButton(
           icon: Icons.account_balance_wallet_rounded,
           label: 'Wallet',
           onTap: () {
@@ -316,7 +346,7 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
         SizedBox(height: screenHeight * 0.02),
 
         // Tip Button
-        VideoFeedViewInteractionButton(
+        _buildActionButton(
           icon: Icons.card_giftcard_rounded,
           label: 'Tip',
           onTap: () {
@@ -343,6 +373,115 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     );
   }
 
+  /// Premium Action Button with Glassmorphism
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color iconColor = NGColors.textPrimary,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: NGColors.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              shadows: const [
+                Shadow(
+                  color: Colors.black87,
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Animated Like Button with Scale Effect
+  Widget _buildAnimatedButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required Color iconColor,
+    required AnimationController scaleController,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ScaleTransition(
+            scale: Tween<double>(begin: 1.0, end: 1.3).animate(
+              CurvedAnimation(
+                parent: scaleController,
+                curve: Curves.elasticOut,
+              ),
+            ),
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: iconColor.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: 28,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: NGColors.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              shadows: const [
+                Shadow(
+                  color: Colors.black87,
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _formatCount(int count) {
     if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
     if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
@@ -352,47 +491,13 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
   @override
   void dispose() {
     _stopVideoListener();
+    _likeScaleController.dispose();
+    _heartExplosionController.dispose();
     super.dispose();
   }
 }
 
-class VideoFeedViewInteractionButton extends StatelessWidget {
-  const VideoFeedViewInteractionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.iconColor = Colors.white,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: iconColor, size: 32),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
+/// 📤 SHARE BOTTOM SHEET (Upgraded with NGColors)
 class ShareBottomSheet extends StatelessWidget {
   final String videoId;
   final String username;
@@ -409,68 +514,93 @@ class ShareBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF16161A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Share Video',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: NGColors.surface.withOpacity(0.9),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _ShareOption(
-                  icon: Icons.send,
-                  label: 'WhatsApp',
-                  color: const Color(0xFF25D366),
-                  onTap: () {
-                    final message = '📱 Check out this NigerGram video by @$username: $description\n$deepLink';
-                    _share('whatsapp', message);
-                    Navigator.pop(context);
-                  },
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: NGColors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-                _ShareOption(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  label: 'Twitter',
-                  color: const Color(0xFF1DA1F2),
-                  onTap: () {
-                    final message = '🎬 Check out @$username on NigerGram: $description #NigerGram';
-                    _share('twitter', message);
-                    Navigator.pop(context);
-                  },
+                const SizedBox(height: 16),
+                Text(
+                  'Share Video',
+                  style: TextStyle(
+                    color: NGColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                _ShareOption(
-                  icon: Icons.copy,
-                  label: 'Copy Link',
-                  color: Colors.blue,
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: deepLink));
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Link copied to clipboard')),
-                    );
-                  },
+                const SizedBox(height: 20),
+                GridView.count(
+                  crossAxisCount: 4,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _ShareOption(
+                      icon: Icons.send,
+                      label: 'WhatsApp',
+                      color: const Color(0xFF25D366),
+                      onTap: () {
+                        final message = '📱 Check out this NigerGram video by @$username: $description\n$deepLink';
+                        _share('whatsapp', message);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _ShareOption(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      label: 'Twitter',
+                      color: const Color(0xFF1DA1F2),
+                      onTap: () {
+                        final message = '🎬 Check out @$username on NigerGram: $description #NigerGram';
+                        _share('twitter', message);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _ShareOption(
+                      icon: Icons.copy,
+                      label: 'Copy Link',
+                      color: NGColors.accent,
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: deepLink));
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Link copied to clipboard'),
+                            backgroundColor: NGColors.accent,
+                          ),
+                        );
+                      },
+                    ),
+                    _ShareOption(
+                      icon: Icons.more_horiz_rounded,
+                      label: 'More',
+                      color: NGColors.textMuted,
+                      onTap: () {
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
                 ),
-                _ShareOption(
-                  icon: Icons.more_horiz_rounded,
-                  label: 'More',
-                  color: Colors.grey,
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                ),
+                const SizedBox(height: 20),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -481,6 +611,7 @@ class ShareBottomSheet extends StatelessWidget {
   }
 }
 
+/// 🎯 SHARE OPTION WIDGET
 class _ShareOption extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -504,15 +635,23 @@ class _ShareOption extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withOpacity(0.15),
               shape: BoxShape.circle,
+              border: Border.all(
+                color: color.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(height: 8),
           Text(
             label,
-            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              color: NGColors.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
             textAlign: TextAlign.center,
           ),
         ],

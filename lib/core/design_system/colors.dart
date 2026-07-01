@@ -46,6 +46,15 @@ class NGColors {
 
   // Keep for backward compatibility
   static const Color gold = Color(0xFFFFD700);
+
+  // Compatibility aliases
+  static const Color cardBackground = surface;
+  static const Color surfaceVariant = surfaceLight;
+  static const Color borderOption = divider;
+
+  static const Color fireRed = error;
+  static const Color interactiveBlue = info;
+  static const Color brandPurple = accentPurple;
 }
 
 // Keep for files that use them directly
