@@ -2,10 +2,10 @@ name: Build NigerGram APK
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
-# Grant active API permissions to the workflow runner to delete old items
 permissions:
   actions: write
   contents: read
@@ -18,74 +18,69 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Automatic Storage Quota Purge
+      - name: Delete old artifacts
         uses: actions/github-script@v7
-        continue-on-error: true # Keeps the pipeline moving if there are no old files to clean
+        continue-on-error: true
         with:
           script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            console.log("Scanning repository storage for matching NigerGram-debug artifacts...");
-            
             const response = await github.rest.actions.listArtifactsForRepo({
-              owner: owner,
-              repo: repo,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               per_page: 100
             });
-            
-            const artifacts = response.data.artifacts;
-            for (const artifact of artifacts) {
-              if (artifact.name === 'NigerGram-debug') {
-                console.log(`Force deleting artifact: ${artifact.name} (ID: ${artifact.id}) to clear space`);
+
+            for (const artifact of response.data.artifacts) {
+              if (artifact.name === "NigerGram-debug") {
                 await github.rest.actions.deleteArtifact({
-                  owner: owner,
-                  repo: repo,
-                  artifact_id: artifact.id,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id
                 });
               }
             }
-            console.log("Storage optimization step completed.");
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
+          java-version: "17"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.4'
-          channel: 'stable'
+          flutter-version: "3.35.4"
+          channel: stable
+          cache: true
+
+      - name: Install Android SDK Components
+        uses: android-actions/setup-android@v3
+
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Inject google-services.json
         run: |
           echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
-      - name: Fix ALL package names in ALL dart files
+      - name: Fix package names
         run: |
           find lib -name "*.dart" -exec sed -i 's/package:flutter_video_feed/package:nigergram/g' {} +
 
-      - name: Fix package folder structure
+      - name: Fix package folder
         run: |
           mkdir -p android/app/src/main/kotlin/com/nigergram/app
-          cp android/app/src/main/kotlin/com/example/flutter_video_feed/MainActivity.kt android/app/src/main/kotlin/com/nigergram/app/MainActivity.kt
-          rm android/app/src/main/kotlin/com/example/flutter_video_feed/MainActivity.kt
+          if [ -f android/app/src/main/kotlin/com/example/flutter_video_feed/MainActivity.kt ]; then
+            cp android/app/src/main/kotlin/com/example/flutter_video_feed/MainActivity.kt android/app/src/main/kotlin/com/nigergram/app/MainActivity.kt
+          fi
 
-      - name: Fix app icon
-        run: |
-          mkdir -p android/app/src/main/res/mipmap-hdpi
-          mkdir -p android/app/src/main/res/mipmap-mdpi
-          mkdir -p android/app/src/main/res/mipmap-xhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-
-      - name: Get dependencies
+      - name: Flutter Pub Get
         run: flutter pub get
 
       - name: Build APK
@@ -96,5 +91,5 @@ jobs:
         with:
           name: NigerGram-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
+          overwrite: true
           retention-days: 1
-          overwrite: true # Forces upload-artifact v4 to safely overwrite files instead of crashing
