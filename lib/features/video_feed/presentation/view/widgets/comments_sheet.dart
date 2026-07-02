@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import 'comment_item.dart';
 import 'comment_composer.dart';
 
@@ -32,6 +33,9 @@ class _CommentsSheetState extends State<CommentsSheet> {
   late Set<String> _expandedReplies;
   late Map<String, bool> _likeOptimisticStates;
   int _commentCount = 0;
+  
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _videoSub;
 
   @override
   void initState() {
@@ -42,12 +46,40 @@ class _CommentsSheetState extends State<CommentsSheet> {
     _expandedReplies = {};
     _likeOptimisticStates = {};
     _commentCount = widget.initialCommentCount;
+    _startVideoListener(widget.videoId);
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _stopVideoListener();
     super.dispose();
+  }
+
+  /// ✅ Listen to video document for real-time commentCount updates
+  /// Mirrors the pattern from video_feed_view_interaction_buttons.dart
+  void _startVideoListener(String videoId) {
+    _stopVideoListener();
+    try {
+      _videoSub = _firestore.collection('videos').doc(videoId).snapshots().listen((doc) {
+        if (!mounted) return;
+        final data = doc.data();
+        if (data == null) return;
+
+        setState(() {
+          _commentCount = (data['commentCount'] as num?)?.toInt() ?? _commentCount;
+        });
+      }, onError: (e) {
+        debugPrint('❌ Video listener error in CommentsSheet: $e');
+      });
+    } catch (e) {
+      debugPrint('❌ Failed to start video listener in CommentsSheet: $e');
+    }
+  }
+
+  void _stopVideoListener() {
+    _videoSub?.cancel();
+    _videoSub = null;
   }
 
   /// ✅ Optimistic comment posting
