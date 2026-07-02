@@ -7,6 +7,7 @@ import 'package:video_player/video_player.dart';
 import 'video_feed_view_optimized_video_player.dart';
 import 'video_feed_view_interaction_buttons.dart';
 import 'comments_viewer_bottom_sheet.dart';
+import 'package:share_plus/share_plus.dart';
 
 class VideoFeedViewItem extends StatelessWidget {
   final VideoEntity videoItem;
@@ -32,23 +33,31 @@ class VideoFeedViewItem extends StatelessWidget {
     );
   }
 
-  /// 🔗 STREAMLINED LOW-DATA DISPATCH SHARE SYSTEM
-  void _executePlatformShareAction(BuildContext context) {
+  /// 🔗 Use native share sheet via share_plus
+  Future<void> _executePlatformShareAction(BuildContext context) async {
     HapticFeedback.lightImpact();
-    final String shareUrl = "https://nigergram.app/video/${videoItem.id}";
-    final String shareText = "Check out @${videoItem.username} on NigerGram: $shareUrl";
+
+    final String? videoId = videoItem.id;
+    final String? creator = videoItem.username;
+    final String videoUrl = (videoId != null && videoId.isNotEmpty)
+        ? 'https://nigergram.app/video/$videoId'
+        : '';
+
+    final bool hasUrl = videoUrl.isNotEmpty;
+    final String subject = (creator != null && creator.isNotEmpty) ? '@$creator on NigerGram' : 'NigerGram';
+    final String content = hasUrl
+        ? 'Watch this on NigerGram: $videoUrl'
+        : 'Check out this video on NigerGram!';
 
     try {
-      Clipboard.setData(ClipboardData(text: shareText));
-      ScaffoldMessenger.of(context).showSnackBar(
+      await Share.share(content, subject: subject);
+    } catch (error) {
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      messenger?.showSnackBar(
         const SnackBar(
-          content: Text('Video payload link secured to clipboard workspace!'),
-          backgroundColor: Colors.blueAccent,
-          duration: Duration(seconds: 2),
+          content: Text('Could not share the video. Please try again.'),
         ),
       );
-    } catch (e) {
-      debugPrint('Share bridge invocation error: $e');
     }
   }
 
@@ -143,7 +152,6 @@ class VideoFeedViewItem extends StatelessWidget {
             onShareTapped: () => _executePlatformShareAction(context),
             onBookmarkTapped: () {
               HapticFeedback.selectionClick();
-              debugPrint('Persisted compilation collection updated dynamically for: ${videoItem.id}');
             },
           ),
         ),
