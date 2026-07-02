@@ -23,17 +23,11 @@ class AppWidget extends StatelessWidget {
           create: (context) => AuthCubit(),
         ),
       ],
-      child: MaterialApp.router(
-        debugShowCheckedModeBanner: false,
-        routerConfig: appRouter.router,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: NGColors.background,
-          primaryColor: NGColors.accent,
-        ),
-      ),
-    );
-  }
-}
+      child: MaterialApp(
+  debugShowCheckedModeBanner: false,
+  home: Scaffold(
+    body: Center(
+      child: Text("NigerGram Test"),
+    ),
+  ),
+),
