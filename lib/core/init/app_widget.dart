@@ -1,33 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:nigergram/core/config/localization/app_localizations.dart';
-import 'package:nigergram/core/design_system/colors.dart';
-import 'package:nigergram/core/di/dependency_injector.dart';
-import 'package:nigergram/core/init/router/app_router.dart';
-import 'package:nigergram/features/auth/presentation/bloc/auth_cubit.dart';
-import 'package:nigergram/features/video_feed/presentation/bloc/video_feed_cubit.dart';
 
 class AppWidget extends StatelessWidget {
   const AppWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final appRouter = getIt<AppRouter>();
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          lazy: false,
-          create: (context) => getIt<VideoFeedCubit>(),
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: const Scaffold(
+        body: Center(
+          child: Text('NigerGram Test'),
         ),
-        BlocProvider(
-          create: (context) => AuthCubit(),
-        ),
-      ],
-      child: MaterialApp(
-  debugShowCheckedModeBanner: false,
-  home: Scaffold(
-    body: Center(
-      child: Text("NigerGram Test"),
-    ),
-  ),
-),
+      ),
+    );
+  }
+}
