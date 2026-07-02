@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:animations/animations.dart';
 import 'comment_item.dart';
 import 'comment_composer.dart';
 
@@ -319,7 +318,7 @@ class CommentData {
       avatarUrl: data['userAvatar'] ?? '',
       text: data['text'] ?? '',
       // ✅ Handles both 'createdAt' and 'timestamp' field names
-      timestamp: ((data['createdAt'] ?? data['timestamp']) as Timestamp?)?. toDate() ?? DateTime.now(),
+      timestamp: ((data['createdAt'] ?? data['timestamp']) as Timestamp?)?.toDate() ?? DateTime.now(),
       likes: (data['likeCount'] as num?)?.toInt() ?? 0,
       replyCount: (data['replyCount'] as num?)?.toInt() ?? 0,
       isLikedByCurrentUser:

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'comments_sheet.dart';
@@ -172,7 +173,7 @@ class _CommentActionsSheetState extends State<CommentActionsSheet> {
                     isLoading: _isDeleting,
                   ),
                 _buildActionTile(
-                  icon: Icons.flag_outline,
+                  icon: Icons.flag,
                   label: 'Report comment',
                   color: Colors.orange,
                   onTap: _reportComment,
