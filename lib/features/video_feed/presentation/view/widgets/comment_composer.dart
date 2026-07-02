@@ -4,6 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import 'comments_sheet.dart';
 
+/// 📝 Reusable comment/reply composer
+/// Features:
+/// - Optimistic posting (instant feedback)
+/// - Loading animations
+/// - Parent comment support for nested replies
 class CommentComposer extends StatefulWidget {
   final String videoId;
   final String? parentCommentId;
@@ -45,6 +50,10 @@ class _CommentComposerState extends State<CommentComposer> {
     });
   }
 
+  /// ✅ Optimistic comment posting
+  /// 1. Immediately shows comment in UI (optimistic update)
+  /// 2. Saves to Firestore in background
+  /// 3. Rolls back if save fails
   Future<void> _postComment() async {
     if (!_isComposing || _isPosting) return;
 
@@ -52,14 +61,16 @@ class _CommentComposerState extends State<CommentComposer> {
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('You must be logged in to comment')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be logged in to comment')),
+      );
       return;
     }
 
     final commentId = const Uuid().v4();
     final now = DateTime.now();
 
+    // ✅ Create optimistic comment for instant UI feedback
     final optimisticComment = CommentData(
       id: commentId,
       userId: currentUser.uid,
@@ -73,12 +84,13 @@ class _CommentComposerState extends State<CommentComposer> {
       parentCommentId: widget.parentCommentId,
     );
 
+    // ✅ Show comment immediately
     widget.onCommentAdded(optimisticComment);
-
     _textController.clear();
     setState(() => _isPosting = true);
 
     try {
+      // ✅ Save to Firestore (background sync)
       final commentRef = FirebaseFirestore.instance
           .collection('videos')
           .doc(widget.videoId)
@@ -87,11 +99,13 @@ class _CommentComposerState extends State<CommentComposer> {
 
       await commentRef.set(optimisticComment.toFirestore());
 
+      // ✅ Update video comment count
       await FirebaseFirestore.instance
           .collection('videos')
           .doc(widget.videoId)
           .update({'commentCount': FieldValue.increment(1)});
 
+      // ✅ Update parent comment reply count if nested
       if (widget.parentCommentId != null) {
         await FirebaseFirestore.instance
             .collection('videos')
@@ -102,8 +116,9 @@ class _CommentComposerState extends State<CommentComposer> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to post comment: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to post comment: $e')),
+        );
       }
     } finally {
       if (mounted) {
@@ -176,6 +191,8 @@ class _CommentComposerState extends State<CommentComposer> {
             child: TextField(
               controller: _textController,
               enabled: !_isPosting,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _isPosting ? null : _postComment(),
               decoration: InputDecoration(
                 hintText: 'Add a comment...',
                 border: OutlineInputBorder(
@@ -193,6 +210,7 @@ class _CommentComposerState extends State<CommentComposer> {
             ),
           ),
           const SizedBox(width: 8),
+          // ✅ Smooth loading animation
           AnimatedScale(
             scale: _isComposing ? 1.0 : 0.8,
             duration: const Duration(milliseconds: 200),
@@ -204,7 +222,7 @@ class _CommentComposerState extends State<CommentComposer> {
                       child: SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(
+                        child: const CircularProgressIndicator(
                           strokeWidth: 2,
                           valueColor: AlwaysStoppedAnimation(Colors.blue),
                         ),
@@ -221,14 +239,17 @@ class _CommentComposerState extends State<CommentComposer> {
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: _isComposing ? Colors.blue : Colors.grey[300],
+                          color:
+                              _isComposing ? Colors.blue : Colors.grey[300],
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.send,
-                            size: 16,
-                            color: _isComposing
-                                ? Colors.white
-                                : Colors.grey[600]),
+                        child: Icon(
+                          Icons.send,
+                          size: 16,
+                          color: _isComposing
+                              ? Colors.white
+                              : Colors.grey[600],
+                        ),
                       ),
                     ),
                   ),

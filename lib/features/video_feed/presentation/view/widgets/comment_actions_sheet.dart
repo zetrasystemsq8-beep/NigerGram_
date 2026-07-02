@@ -3,6 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'comments_sheet.dart';
 
+/// ⚙️ Comment actions menu (long-press)
+/// Options:
+/// - Copy comment text
+/// - Delete comment (if owner)
+/// - Report comment
 class CommentActionsSheet extends StatefulWidget {
   final CommentData comment;
   final String videoId;
@@ -42,12 +47,15 @@ class _CommentActionsSheetState extends State<CommentActionsSheet> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Comment deleted')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Comment deleted')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to delete comment: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete comment: $e')),
+        );
       }
     } finally {
       if (mounted) {
@@ -73,12 +81,15 @@ class _CommentActionsSheetState extends State<CommentActionsSheet> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Comment reported')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Comment reported')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to report comment: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to report comment: $e')),
+        );
       }
     } finally {
       if (mounted) {
@@ -93,7 +104,9 @@ class _CommentActionsSheetState extends State<CommentActionsSheet> {
 
     if (mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Comment copied')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Comment copied')),
+      );
     }
   }
 
@@ -133,7 +146,10 @@ class _CommentActionsSheetState extends State<CommentActionsSheet> {
                             fontWeight: FontWeight.bold,
                           )),
                 ),
-                GestureDetector(onTap: () => Navigator.pop(context), child: const Icon(Icons.close)),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.close),
+                ),
               ],
             ),
           ),
@@ -142,7 +158,11 @@ class _CommentActionsSheetState extends State<CommentActionsSheet> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Column(
               children: [
-                _buildActionTile(icon: Icons.content_copy, label: 'Copy comment', onTap: _copyComment),
+                _buildActionTile(
+                  icon: Icons.content_copy,
+                  label: 'Copy comment',
+                  onTap: _copyComment,
+                ),
                 if (isOwner)
                   _buildActionTile(
                     icon: Icons.delete_outline,
@@ -183,8 +203,18 @@ class _CommentActionsSheetState extends State<CommentActionsSheet> {
             children: [
               Icon(icon, color: color ?? Colors.blue, size: 24),
               const SizedBox(width: 16),
-              Expanded(child: Text(label, style: TextStyle(fontSize: 16, color: color))),
-              if (isLoading) SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(fontSize: 16, color: color),
+                ),
+              ),
+              if (isLoading)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
             ],
           ),
         ),

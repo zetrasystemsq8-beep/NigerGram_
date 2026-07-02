@@ -5,6 +5,13 @@ import 'package:animations/animations.dart';
 import 'comment_item.dart';
 import 'comment_composer.dart';
 
+/// 🎬 TikTok-quality comments sheet with modular architecture
+/// Features:
+/// - Smooth animations for list transitions
+/// - Real-time Firestore sync
+/// - Optimistic comment posting
+/// - Reply thread expand/collapse
+/// - Performance optimizations (const constructors, RepaintBoundary)
 class CommentsSheet extends StatefulWidget {
   final String videoId;
   final int initialCommentCount;
@@ -44,12 +51,15 @@ class _CommentsSheetState extends State<CommentsSheet> {
     super.dispose();
   }
 
+  /// ✅ Optimistic comment posting
+  /// Adds comment to UI immediately, then syncs to Firestore
   void _onCommentAdded(CommentData comment) {
     setState(() {
       _pendingComments.insert(0, comment);
       _commentCount++;
     });
 
+    // Smooth scroll to top to show new comment
     Future.delayed(const Duration(milliseconds: 300), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -121,149 +131,152 @@ class _CommentsSheetState extends State<CommentsSheet> {
     );
   }
 
-  Widget _buildHandle() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
-      child: Container(
-        width: 40,
-        height: 4,
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.grey[700]
-              : Colors.grey[300],
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Semantics(
-            label: 'Comments section',
-            child: Text(
-              'Comments',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
+  Widget _buildHandle() => Padding(
+        padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+        child: Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey[700]
+                : Colors.grey[300],
+            borderRadius: BorderRadius.circular(2),
           ),
-          Semantics(
-            label: 'Total comments: $_commentCount',
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.grey[800]
-                    : Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
-              ),
+        ),
+      );
+
+  Widget _buildHeader() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Semantics(
+              label: 'Comments section',
               child: Text(
-                _commentCount.toString(),
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+                'Comments',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+            Semantics(
+              label: 'Total comments: $_commentCount',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey[800]
+                      : Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _commentCount.toString(),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+      );
 
-  Widget _buildCommentsList(ScrollController scrollController) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('videos')
-          .doc(widget.videoId)
-          .collection('comments')
-          .orderBy('timestamp', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            _pendingComments.isEmpty) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
+  Widget _buildCommentsList(ScrollController scrollController) =>
+      StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('videos')
+            .doc(widget.videoId)
+            .collection('comments')
+            .where('parentCommentId', isNull: true) // ✅ Top-level comments only
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              _pendingComments.isEmpty) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-        final comments = snapshot.data?.docs ?? [];
-        final allComments = [
-          ..._pendingComments,
-          ...comments
-              .map((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final commentId = doc.id;
-                if (!_commentCache.containsKey(commentId)) {
-                  _commentCache[commentId] = CommentData.fromFirestore(data);
-                }
-                return _commentCache[commentId]!;
-              })
-              .toList()
-              .where((c) => !_pendingComments.any((p) => p.id == c.id))
-              .toList(),
-        ];
+          final comments = snapshot.data?.docs ?? [];
+          final allComments = [
+            ..._pendingComments,
+            ...comments
+                .map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final commentId = doc.id;
+                  if (!_commentCache.containsKey(commentId)) {
+                    _commentCache[commentId] = CommentData.fromFirestore(data, commentId);
+                  }
+                  return _commentCache[commentId]!;
+                })
+                .toList()
+                .where((c) => !_pendingComments.any((p) => p.id == c.id))
+                .toList(),
+          ];
 
-        if (allComments.isEmpty) {
-          return Center(
-            child: Semantics(
-              label: 'No comments yet',
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.comment_outlined,
-                    size: 48,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.grey[600]
-                        : Colors.grey[300],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No comments yet',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        return ListView.separated(
-          controller: scrollController,
-          itemCount: allComments.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 8),
-          itemBuilder: (context, index) {
-            final comment = allComments[index];
-            final isExpanded = _expandedReplies.contains(comment.id);
-
-            return RepaintBoundary(
-              child: CommentItem(
-                key: ValueKey(comment.id),
-                comment: comment,
-                videoId: widget.videoId,
-                isExpanded: isExpanded,
-                onToggleExpanded: () => _toggleRepliesExpanded(comment.id),
-                onLikeToggled: (isLiked) =>
-                    _onLikeToggled(comment.id, isLiked),
-                onReplyCountUpdated: (newCount) =>
-                    _onReplyCountUpdated(comment.id, newCount),
+          if (allComments.isEmpty) {
+            return Center(
+              child: Semantics(
+                label: 'No comments yet',
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.comment_outlined,
+                      size: 48,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey[600]
+                          : Colors.grey[300],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No comments yet',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey,
+                          ),
+                    ),
+                  ],
+                ),
               ),
             );
-          },
-        );
-      },
-    );
-  }
+          }
+
+          return ListView.separated(
+            controller: scrollController,
+            itemCount: allComments.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final comment = allComments[index];
+              final isExpanded = _expandedReplies.contains(comment.id);
+
+              // ✅ Performance optimization: Prevent unnecessary rebuilds
+              return RepaintBoundary(
+                key: ValueKey(comment.id),
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                  child: CommentItem(
+                    comment: comment,
+                    videoId: widget.videoId,
+                    isExpanded: isExpanded,
+                    onToggleExpanded: () => _toggleRepliesExpanded(comment.id),
+                    onLikeToggled: (isLiked) =>
+                        _onLikeToggled(comment.id, isLiked),
+                    onReplyCountUpdated: (newCount) =>
+                        _onReplyCountUpdated(comment.id, newCount),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
 }
 
+/// 📊 Reusable comment data model
+/// Converts between Firestore docs and UI representation
 class CommentData {
   final String id;
   final String userId;
@@ -274,10 +287,10 @@ class CommentData {
   int likes;
   int replyCount;
   bool isLikedByCurrentUser;
-  bool isVerified;
-  bool isCreator;
-  bool isPinned;
-  String? parentCommentId;
+  final bool isVerified;
+  final bool isCreator;
+  final bool isPinned;
+  final String? parentCommentId;
 
   CommentData({
     required this.id,
@@ -295,15 +308,18 @@ class CommentData {
     this.parentCommentId,
   });
 
-  factory CommentData.fromFirestore(Map<String, dynamic> data) {
+  /// ✅ Creates CommentData from Firestore document
+  /// Handles all field name variations
+  factory CommentData.fromFirestore(Map<String, dynamic> data, String commentId) {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
     return CommentData(
-      id: data['id'] ?? '',
+      id: commentId,
       userId: data['userId'] ?? '',
       username: data['username'] ?? 'Anonymous',
       avatarUrl: data['userAvatar'] ?? '',
       text: data['text'] ?? '',
-      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      // ✅ Handles both 'createdAt' and 'timestamp' field names
+      timestamp: ((data['createdAt'] ?? data['timestamp']) as Timestamp?)?. toDate() ?? DateTime.now(),
       likes: (data['likeCount'] as num?)?.toInt() ?? 0,
       replyCount: (data['replyCount'] as num?)?.toInt() ?? 0,
       isLikedByCurrentUser:
@@ -315,20 +331,20 @@ class CommentData {
     );
   }
 
-  Map<String, dynamic> toFirestore() {
-    return {
-      'id': id,
-      'userId': userId,
-      'username': username,
-      'userAvatar': avatarUrl,
-      'text': text,
-      'timestamp': Timestamp.fromDate(timestamp),
-      'likeCount': likes,
-      'replyCount': replyCount,
-      'isVerified': isVerified,
-      'isCreator': isCreator,
-      'isPinned': isPinned,
-      if (parentCommentId != null) 'parentCommentId': parentCommentId,
-    };
-  }
+  /// ✅ Converts to Firestore document format
+  Map<String, dynamic> toFirestore() => {
+        'id': id,
+        'userId': userId,
+        'username': username,
+        'userAvatar': avatarUrl,
+        'text': text,
+        'createdAt': Timestamp.fromDate(timestamp),
+        'timestamp': Timestamp.fromDate(timestamp), // Backward compatibility
+        'likeCount': likes,
+        'replyCount': replyCount,
+        'isVerified': isVerified,
+        'isCreator': isCreator,
+        'isPinned': isPinned,
+        if (parentCommentId != null) 'parentCommentId': parentCommentId,
+      };
 }

@@ -4,6 +4,12 @@ import 'comment_item.dart';
 import 'comment_composer.dart';
 import 'comments_sheet.dart';
 
+/// 🔗 Threaded replies section with smooth expand/collapse animation
+/// Features:
+/// - SizeTransition for smooth animation
+/// - Reply caching to prevent rebuilds
+/// - Nested comment composer
+/// - Real-time sync with Firestore
 class RepliesSection extends StatefulWidget {
   final String videoId;
   final String parentCommentId;
@@ -48,6 +54,7 @@ class _RepliesSectionState extends State<RepliesSection>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Smooth expand/collapse animation
     return SizeTransition(
       sizeFactor: CurvedAnimation(
         parent: _expandAnimationController,
@@ -73,7 +80,7 @@ class _RepliesSectionState extends State<RepliesSection>
                   .doc(widget.videoId)
                   .collection('comments')
                   .where('parentCommentId', isEqualTo: widget.parentCommentId)
-                  .orderBy('timestamp', descending: false)
+                  .orderBy('createdAt', descending: false)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -110,7 +117,8 @@ class _RepliesSectionState extends State<RepliesSection>
                       final data = doc.data() as Map<String, dynamic>;
                       final replyId = doc.id;
                       if (!_replyCache.containsKey(replyId)) {
-                        _replyCache[replyId] = CommentData.fromFirestore(data);
+                        _replyCache[replyId] =
+                            CommentData.fromFirestore(data, replyId);
                       }
                       return RepaintBoundary(
                         key: ValueKey(replyId),
