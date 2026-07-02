@@ -215,11 +215,12 @@ class _CommentsSheetState extends State<CommentsSheet> {
 
   Widget _buildCommentsList(ScrollController scrollController) =>
       StreamBuilder<QuerySnapshot>(
+        // ✅ Matches InteractionRepository.getCommentsStream():
+        // No parentCommentId filter - returns ALL comments ordered by createdAt
         stream: FirebaseFirestore.instance
             .collection('videos')
             .doc(widget.videoId)
             .collection('comments')
-            .where('parentCommentId', isNull: true) // ✅ Top-level comments only
             .orderBy('createdAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -231,9 +232,19 @@ class _CommentsSheetState extends State<CommentsSheet> {
           }
 
           final comments = snapshot.data?.docs ?? [];
+          
+          // ✅ Filter to top-level comments only (parentCommentId is null or missing)
+          final topLevelComments = comments
+              .where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final parentId = data['parentCommentId'];
+                return parentId == null; // Include both missing field and explicit null
+              })
+              .toList();
+          
           final allComments = [
             ..._pendingComments,
-            ...comments
+            ...topLevelComments
                 .map((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   final commentId = doc.id;
