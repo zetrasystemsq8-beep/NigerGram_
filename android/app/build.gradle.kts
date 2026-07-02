@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.nigergram.app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -30,14 +30,12 @@ android {
 
     defaultConfig {
         applicationId = "com.nigergram.app"
-        // Fixed: Explicitly set to 21 for institutional video support
-        minSdk = 21 
+        minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        
-        // Added: Ensures the app handles large library sets without crashing
-        multiDexEnabled = true 
+
+        multiDexEnabled = true
     }
 
     buildTypes {
