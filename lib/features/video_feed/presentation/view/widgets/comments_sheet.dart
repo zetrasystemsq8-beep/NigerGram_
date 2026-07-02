@@ -242,6 +242,12 @@ class _CommentsSheetState extends State<CommentsSheet> {
               })
               .toList();
           
+          // ✅ FIX: When Firestore stream contains a pending comment's ID,
+          // remove it from _pendingComments (lines 248-251).
+          // This confirms the optimistic comment has been saved.
+          final firebaseCommentIds = topLevelComments.map((doc) => doc.id).toSet();
+          _pendingComments.removeWhere((pending) => firebaseCommentIds.contains(pending.id));
+          
           final allComments = [
             ..._pendingComments,
             ...topLevelComments
