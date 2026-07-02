@@ -41,7 +41,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       });
     });
     
-    Future.delayed(const Duration(seconds: 2), () {
+    // Show splash for 2.5 seconds, then fade to auth form
+    Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) {
         setState(() {
           _showSplash = false;
@@ -60,6 +61,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     super.dispose();
   }
 
+  // (existing helper methods remain unchanged)
   void _showForgotPasswordSheet() {
     final TextEditingController emailController = TextEditingController();
     bool isLoading = false;
@@ -216,7 +218,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   }
 
   void _handleSignUp() async {
-    // 🔥 Check if terms are accepted
     if (!_termsAccepted) {
       NigerGramError.showSnackBar(context, 'Please agree to Terms & Conditions');
       return;
@@ -272,79 +273,106 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     }
   }
 
+  // -------------------- UI BUILDERS --------------------
+  Widget _buildSplashScreen() {
+    return Scaffold(
+      backgroundColor: NGColors.background,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Animated logo with glow
+            TweenAnimationBuilder(
+              tween: Tween<double>(begin: 0.8, end: 1.1),
+              duration: const Duration(milliseconds: 1500),
+              curve: Curves.easeInOut,
+              builder: (context, scale, child) {
+                return Transform.scale(
+                  scale: scale,
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [NGColors.accent, Colors.white, NGColors.accent],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ).createShader(bounds),
+                    child: const Text(
+                      '🇳🇬',
+                      style: TextStyle(
+                        fontSize: 80,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [NGColors.accent, Colors.white, NGColors.accent],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ).createShader(bounds),
+              child: const Text(
+                'NIGERGRAM',
+                style: TextStyle(
+                  fontSize: 44,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 4,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: 60,
+              height: 3,
+              decoration: BoxDecoration(
+                color: NGColors.accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'The Heartbeat of Naija Content',
+              style: TextStyle(
+                color: NGColors.textSecondary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 30),
+            const SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(
+                color: NGColors.accent,
+                strokeWidth: 2,
+              ),
+            ),
+            const SizedBox(height: 40),
+            // Zetra Production on splash
+            const Text(
+              'Zetra Production',
+              style: TextStyle(
+                color: NGColors.textMuted,
+                fontSize: 12,
+                letterSpacing: 2,
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_showSplash) {
-      return Scaffold(
-        backgroundColor: NGColors.background,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [NGColors.accent, Colors.white, NGColors.accent],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ).createShader(bounds),
-                child: const Text(
-                  '🇳🇬',
-                  style: TextStyle(
-                    fontSize: 60,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [NGColors.accent, Colors.white, NGColors.accent],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ).createShader(bounds),
-                child: const Text(
-                  'NIGERGRAM',
-                  style: TextStyle(
-                    fontSize: 40,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 4,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                width: 60,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: NGColors.accent,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'The Heartbeat of Naija Content',
-                style: TextStyle(
-                  color: NGColors.textSecondary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 1,
-                ),
-              ),
-              const SizedBox(height: 30),
-              const SizedBox(
-                width: 30,
-                height: 30,
-                child: CircularProgressIndicator(
-                  color: NGColors.accent,
-                  strokeWidth: 2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return _buildSplashScreen();
     }
 
     return Scaffold(
@@ -358,307 +386,326 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             NigerGramError.showSnackBar(context, state.message);
           }
         },
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Column(
-              children: [
-                // Logo
-                ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: [NGColors.accent, Colors.white, NGColors.accent],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ).createShader(bounds),
-                  child: const Text(
-                    '🇳🇬 NIGERGRAM',
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF0A0A0F),
+                Color(0xFF1A1A2E),
+                Color(0xFF0D0D1A),
+              ],
+              stops: [0.0, 0.5, 1.0],
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                children: [
+                  // -------------------- Header (Logo + Tagline) --------------------
+                  ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [NGColors.accent, Colors.white, NGColors.accent],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ).createShader(bounds),
+                    child: const Text(
+                      '🇳🇬 NIGERGRAM',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'The Heartbeat of Naija Content',
                     style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                      color: Colors.white,
+                      color: NGColors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'The Heartbeat of Naija Content',
-                  style: TextStyle(
-                    color: NGColors.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                // Tabs
-                Container(
-                  decoration: BoxDecoration(
-                    color: NGColors.surface,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicator: BoxDecoration(
-                      color: NGColors.accent,
-                      borderRadius: BorderRadius.circular(12),
+                  // -------------------- Tab Bar (Full width, pill style) --------------------
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(30),
                     ),
-                    labelColor: Colors.white,
-                    unselectedLabelColor: NGColors.textMuted,
-                    labelStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                    tabs: const [
-                      Tab(text: 'Log In'),
-                      Tab(text: 'Sign Up'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Form
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        // Email
-                        Container(
-                          decoration: BoxDecoration(
-                            color: NGColors.surface,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: TextField(
-                            controller: _emailController,
-                            style: const TextStyle(color: NGColors.textPrimary, fontSize: 15),
-                            keyboardType: TextInputType.emailAddress,
-                            cursorColor: NGColors.accent,
-                            decoration: const InputDecoration(
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                              hintText: 'Email',
-                              hintStyle: TextStyle(color: NGColors.textMuted, fontSize: 14),
-                              border: InputBorder.none,
-                              prefixIcon: Icon(Icons.email_outlined, color: NGColors.textMuted, size: 20),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Password
-                        Container(
-                          decoration: BoxDecoration(
-                            color: NGColors.surface,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: TextField(
-                            controller: _passwordController,
-                            style: const TextStyle(color: NGColors.textPrimary, fontSize: 15),
-                            obscureText: !_isPasswordVisible,
-                            cursorColor: NGColors.accent,
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                              hintText: 'Password',
-                              hintStyle: const TextStyle(color: NGColors.textMuted, fontSize: 14),
-                              border: InputBorder.none,
-                              prefixIcon: const Icon(Icons.lock_outline, color: NGColors.textMuted, size: 20),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                                  color: NGColors.textMuted,
-                                  size: 20,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isPasswordVisible = !_isPasswordVisible;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Sign Up only fields
-                        if (_currentTab == 1) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: NGColors.surface,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: TextField(
-                              controller: _usernameController,
-                              style: const TextStyle(color: NGColors.textPrimary, fontSize: 15),
-                              cursorColor: NGColors.accent,
-                              decoration: const InputDecoration(
-                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                hintText: 'Username',
-                                hintStyle: TextStyle(color: NGColors.textMuted, fontSize: 14),
-                                border: InputBorder.none,
-                                prefixIcon: Icon(Icons.person_outline, color: NGColors.textMuted, size: 20),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: NGColors.surface,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: TextField(
-                              controller: _bioController,
-                              style: const TextStyle(color: NGColors.textPrimary, fontSize: 15),
-                              cursorColor: NGColors.accent,
-                              maxLines: 2,
-                              decoration: const InputDecoration(
-                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                hintText: 'Bio (optional)',
-                                hintStyle: TextStyle(color: NGColors.textMuted, fontSize: 14),
-                                border: InputBorder.none,
-                                prefixIcon: Icon(Icons.edit_note, color: NGColors.textMuted, size: 20),
-                              ),
-                            ),
-                          ),
-                          
-                          // 🔥 Terms Checkbox
-                          const SizedBox(height: 12),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: Checkbox(
-                                  value: _termsAccepted,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _termsAccepted = value ?? false;
-                                    });
-                                  },
-                                  activeColor: NGColors.accent,
-                                  checkColor: Colors.white,
-                                  side: const BorderSide(color: NGColors.divider),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: RichText(
-                                  text: TextSpan(
-                                    style: TextStyle(
-                                      color: NGColors.textSecondary,
-                                      fontSize: 13,
-                                      height: 1.4,
-                                    ),
-                                    children: [
-                                      const TextSpan(text: 'I agree to the '),
-                                      TextSpan(
-                                        text: 'Terms & Conditions',
-                                        style: const TextStyle(
-                                          color: NGColors.accent,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        recognizer: TapGestureRecognizer()
-                                          ..onTap = () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => const TermsView(type: 'terms'),
-                                              ),
-                                            );
-                                          },
-                                      ),
-                                      const TextSpan(text: ' and '),
-                                      TextSpan(
-                                        text: 'Privacy Policy',
-                                        style: const TextStyle(
-                                          color: NGColors.accent,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        recognizer: TapGestureRecognizer()
-                                          ..onTap = () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => const TermsView(type: 'privacy'),
-                                              ),
-                                            );
-                                          },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-
-                        const SizedBox(height: 20),
-
-                        // Login / Sign Up Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : () {
-                              if (_currentTab == 0) {
-                                _handleLogin();
-                              } else {
-                                _handleSignUp();
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: NGColors.accent,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2.5,
-                                    ),
-                                  )
-                                : Text(
-                                    _currentTab == 0 ? 'Log In' : 'Create Account',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // Forgot Password (only in Login tab)
-                        if (_currentTab == 0)
-                          GestureDetector(
-                            onTap: _showForgotPasswordSheet,
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text(
-                                'Forgot Password?',
-                                style: TextStyle(
-                                  color: NGColors.textMuted,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicator: BoxDecoration(
+                        color: NGColors.accent,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      labelColor: Colors.white,
+                      unselectedLabelColor: NGColors.textMuted,
+                      labelStyle: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicatorPadding: const EdgeInsets.all(4),
+                      tabs: const [
+                        Tab(text: 'Log In'),
+                        Tab(text: 'Sign Up'),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 24),
+
+                  // -------------------- Form (Scrollable) --------------------
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          // Email Field
+                          _buildTextField(
+                            controller: _emailController,
+                            hintText: 'Email',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Password Field
+                          _buildTextField(
+                            controller: _passwordController,
+                            hintText: 'Password',
+                            icon: Icons.lock_outline,
+                            obscureText: !_isPasswordVisible,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                                color: NGColors.textMuted,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isPasswordVisible = !_isPasswordVisible;
+                                });
+                              },
+                            ),
+                          ),
+
+                          // Sign Up only fields
+                          if (_currentTab == 1) ...[
+                            const SizedBox(height: 12),
+                            _buildTextField(
+                              controller: _usernameController,
+                              hintText: 'Username',
+                              icon: Icons.person_outline,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildTextField(
+                              controller: _bioController,
+                              hintText: 'Bio (optional)',
+                              icon: Icons.edit_note,
+                              maxLines: 2,
+                            ),
+                            const SizedBox(height: 12),
+                            // Terms Checkbox
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: Checkbox(
+                                    value: _termsAccepted,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _termsAccepted = value ?? false;
+                                      });
+                                    },
+                                    activeColor: NGColors.accent,
+                                    checkColor: Colors.white,
+                                    side: const BorderSide(color: NGColors.divider),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: RichText(
+                                    text: TextSpan(
+                                      style: TextStyle(
+                                        color: NGColors.textSecondary,
+                                        fontSize: 13,
+                                        height: 1.4,
+                                      ),
+                                      children: [
+                                        const TextSpan(text: 'I agree to the '),
+                                        TextSpan(
+                                          text: 'Terms & Conditions',
+                                          style: const TextStyle(
+                                            color: NGColors.accent,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          recognizer: TapGestureRecognizer()
+                                            ..onTap = () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) => const TermsView(type: 'terms'),
+                                                ),
+                                              );
+                                            },
+                                        ),
+                                        const TextSpan(text: ' and '),
+                                        TextSpan(
+                                          text: 'Privacy Policy',
+                                          style: const TextStyle(
+                                            color: NGColors.accent,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          recognizer: TapGestureRecognizer()
+                                            ..onTap = () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) => const TermsView(type: 'privacy'),
+                                                ),
+                                              );
+                                            },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+
+                          const SizedBox(height: 24),
+
+                          // Action Button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : () {
+                                if (_currentTab == 0) {
+                                  _handleLogin();
+                                } else {
+                                  _handleSignUp();
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: NGColors.accent,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 0,
+                                shadowColor: NGColors.accent.withOpacity(0.5),
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2.5,
+                                      ),
+                                    )
+                                  : Text(
+                                      _currentTab == 0 ? 'Log In' : 'Create Account',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Forgot Password (only Login tab)
+                          if (_currentTab == 0)
+                            GestureDetector(
+                              onTap: _showForgotPasswordSheet,
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Text(
+                                  'Forgot Password?',
+                                  style: TextStyle(
+                                    color: NGColors.textMuted,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          const SizedBox(height: 40),
+
+                          // -------------------- Brand Watermark (Zetra) --------------------
+                          const Text(
+                            'Zetra Production',
+                            style: TextStyle(
+                              color: NGColors.textMuted,
+                              fontSize: 13,
+                              letterSpacing: 2.5,
+                              fontWeight: FontWeight.w300,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // Helper to build consistent text fields
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    bool obscureText = false,
+    TextInputType? keyboardType,
+    Widget? suffixIcon,
+    int maxLines = 1,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.08),
+          width: 1,
+        ),
+      ),
+      child: TextField(
+        controller: controller,
+        style: const TextStyle(color: NGColors.textPrimary, fontSize: 15),
+        obscureText: obscureText,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        cursorColor: NGColors.accent,
+        decoration: InputDecoration(
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: maxLines > 1 ? 12 : 16,
+          ),
+          hintText: hintText,
+          hintStyle: TextStyle(color: NGColors.textMuted.withOpacity(0.7), fontSize: 14),
+          border: InputBorder.none,
+          prefixIcon: Icon(icon, color: NGColors.textMuted, size: 20),
+          suffixIcon: suffixIcon,
         ),
       ),
     );
