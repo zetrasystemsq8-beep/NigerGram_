@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 
@@ -30,6 +29,7 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
   String? _senderBalance;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final WalletCubit _cubit = getIt<WalletCubit>();
 
   @override
   void initState() {
@@ -75,85 +75,14 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
     setState(() => _isSending = true);
 
     try {
-      // ✅ PRODUCTION-GRADE: Execute atomic Firestore transaction
-      // This ensures:
-      // 1. Funds are deducted from sender's wallet
-      // 2. Funds are added to creator's wallet
-      // 3. Transaction record is created for both users
-      // 4. All operations succeed or all fail (no partial transactions)
-
-      await _firestore.runTransaction<void>((tx) async {
-        // 1. Get sender's wallet
-        final senderWalletRef = _firestore.collection('wallets').doc(currentUser.uid);
-        final senderWalletSnap = await tx.get(senderWalletRef);
-
-        if (!senderWalletSnap.exists) {
-          throw Exception('Sender wallet not found');
-        }
-
-        final senderBalance = (senderWalletSnap.data()?['balance'] as num?)?.toDouble() ?? 0.0;
-        if (senderBalance < amount) {
-          throw Exception('Insufficient balance. Current balance: ₦$senderBalance');
-        }
-
-        // 2. Get creator's wallet (create if doesn't exist)
-        final creatorWalletRef = _firestore.collection('wallets').doc(widget.creatorId);
-        final creatorWalletSnap = await tx.get(creatorWalletRef);
-        final creatorBalance = (creatorWalletSnap.data()?['balance'] as num?)?.toDouble() ?? 0.0;
-
-        // 3. Deduct from sender
-        tx.update(senderWalletRef, {
-          'balance': FieldValue.increment(-amount),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-
-        // 4. Add to creator (create if needed)
-        if (creatorWalletSnap.exists) {
-          tx.update(creatorWalletRef, {
-            'balance': FieldValue.increment(amount),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        } else {
-          tx.set(creatorWalletRef, {
-            'userId': widget.creatorId,
-            'balance': amount,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        // 5. Create transaction record for sender
-        final txnDocRef = _firestore
-            .collection('wallets')
-            .doc(currentUser.uid)
-            .collection('transactions')
-            .doc();
-        tx.set(txnDocRef, {
-          'type': 'tip_sent',
-          'amount': amount,
-          'recipient': widget.creatorUsername,
-          'recipientId': widget.creatorId,
-          'videoId': widget.videoId ?? '',
-          'message': _messageController.text.isEmpty ? null : _messageController.text,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-
-        // 6. Create transaction record for creator
-        final creatorTxnDocRef = _firestore
-            .collection('wallets')
-            .doc(widget.creatorId)
-            .collection('transactions')
-            .doc();
-        tx.set(creatorTxnDocRef, {
-          'type': 'tip_received',
-          'amount': amount,
-          'sender': currentUser.displayName ?? currentUser.email?.split('@').first ?? 'User',
-          'senderId': currentUser.uid,
-          'videoId': widget.videoId ?? '',
-          'message': _messageController.text.isEmpty ? null : _messageController.text,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-      });
+      // Delegate atomic transfer and transaction creation to the repository via the cubit
+      await _cubit.sendTip(
+        toUserId: widget.creatorId,
+        toUsername: widget.creatorUsername,
+        amount: amount,
+        videoId: widget.videoId,
+        message: _messageController.text.isEmpty ? null : _messageController.text,
+      );
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
