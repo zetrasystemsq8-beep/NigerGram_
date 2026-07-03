@@ -34,10 +34,15 @@ class MonnifyService {
           'Monnify auth failed: ${res.statusCode} ${res.body}');
     }
 
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    final responseJson = jsonDecode(res.body) as Map<String, dynamic>;
+
+    if (responseJson['requestSuccessful'] != true) {
+      throw Exception(
+          'Monnify auth failed: ${responseJson['responseMessage'] ?? 'Unknown error'}');
+    }
 
     final response =
-        body['responseBody'] as Map<String, dynamic>?;
+        responseJson['responseBody'] as Map<String, dynamic>?;
 
     if (response == null) {
       throw Exception('Invalid auth response: ${res.body}');
@@ -67,6 +72,10 @@ class MonnifyService {
     final uri =
         Uri.parse('$_base/api/v1/merchant/transactions/init-transaction');
 
+    // Generate unique payment reference (required by Monnify)
+    final paymentReference =
+        'NGR-${DateTime.now().millisecondsSinceEpoch}-${(DateTime.now().microsecond % 1000).toString().padLeft(3, '0')}';
+
     final body = {
       'amount': amount,
       'customerName': customerName,
@@ -74,9 +83,10 @@ class MonnifyService {
       'currencyCode': 'NGN',
       'contractCode': AppConfig.monnifyContractCode,
       'paymentDescription': 'NigerGram Wallet Funding',
-      'paymentReference':
-          'NGR-${DateTime.now().millisecondsSinceEpoch}',
-      'redirectUrl': 'https://example.com',
+      'paymentReference': paymentReference,
+      // Use a proper callback URL - update this to your actual domain
+      'redirectUrl': 'https://nigergram.app/payment-callback',
+      'incomeSplitConfig': [],
     };
 
     final res = await http.post(
@@ -95,7 +105,18 @@ class MonnifyService {
 
     final json = jsonDecode(res.body) as Map<String, dynamic>;
 
-    return json['responseBody'] as Map<String, dynamic>;
+    if (json['requestSuccessful'] != true) {
+      throw Exception(
+          'Transaction init failed: ${json['responseMessage'] ?? 'Unknown error'}');
+    }
+
+    final responseBody = json['responseBody'] as Map<String, dynamic>;
+
+    // Return the payment reference along with checkout URL for tracking
+    return {
+      ...responseBody,
+      'paymentReference': paymentReference, // Ensure this is in the response
+    };
   }
 
   Future<Map<String, dynamic>> queryTransaction(
@@ -120,6 +141,13 @@ class MonnifyService {
 
     final json = jsonDecode(res.body) as Map<String, dynamic>;
 
-    return json['responseBody'] as Map<String, dynamic>;
+    if (json['requestSuccessful'] != true) {
+      throw Exception(
+          'Query failed: ${json['responseMessage'] ?? 'Unknown error'}');
+    }
+
+    final responseBody = json['responseBody'] as Map<String, dynamic>;
+
+    return responseBody;
   }
 }
