@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:http/http.dart' as http;
 import 'package:nigergram/core/config/app_config.dart';
 
@@ -20,8 +19,10 @@ class MonnifyService {
         '${AppConfig.monnifyApiKey}:${AppConfig.monnifySecretKey}';
     final encoded = base64Encode(utf8.encode(creds));
 
+    final uri = Uri.parse('$_base/api/v1/auth/login');
+
     final res = await http.post(
-      Uri.parse('$_base/api/v1/auth/login'),
+      uri,
       headers: {
         'Authorization': 'Basic $encoded',
         'Content-Type': 'application/json',
@@ -30,22 +31,28 @@ class MonnifyService {
 
     if (res.statusCode != 200) {
       throw Exception(
-        'Monnify auth failed (${res.statusCode}): ${res.body}',
-      );
+          'Monnify auth failed: ${res.statusCode} ${res.body}');
     }
 
-    final body = jsonDecode(res.body);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
 
-    if (body['requestSuccessful'] != true) {
-      throw Exception(body['responseMessage'] ?? 'Authentication failed');
+    final response =
+        body['responseBody'] as Map<String, dynamic>?;
+
+    if (response == null) {
+      throw Exception('Invalid auth response: ${res.body}');
     }
 
-    final response = body['responseBody'];
+    final token = response['accessToken'] as String?;
+    final expiry = response['expiresIn'] as int? ?? 3600;
 
-    _token = response['accessToken'];
-    _tokenExpiry = DateTime.now().add(
-      Duration(seconds: response['expiresIn'] ?? 3600),
-    );
+    if (token == null) {
+      throw Exception('Monnify auth token missing: ${res.body}');
+    }
+
+    _token = token;
+    _tokenExpiry =
+        DateTime.now().add(Duration(seconds: expiry - 60));
 
     return _token!;
   }
@@ -57,74 +64,62 @@ class MonnifyService {
   }) async {
     final token = await _auth();
 
-    final paymentReference =
-        'NIGERGRAM-${DateTime.now().millisecondsSinceEpoch}';
+    final uri =
+        Uri.parse('$_base/api/v1/merchant/transactions/init-transaction');
 
-    final payload = {
-      "amount": amount,
-      "customerName": customerName,
-      "customerEmail": customerEmail,
-      "paymentReference": paymentReference,
-      "paymentDescription": "NigerGram Wallet Funding",
-      "currencyCode": "NGN",
-      "contractCode": AppConfig.monnifyContractCode,
-      "redirectUrl": "https://example.com"
+    final body = {
+      'amount': amount,
+      'customerName': customerName,
+      'customerEmail': customerEmail,
+      'currencyCode': 'NGN',
+      'contractCode': AppConfig.monnifyContractCode,
+      'paymentDescription': 'NigerGram Wallet Funding',
+      'paymentReference':
+          'NGR-${DateTime.now().millisecondsSinceEpoch}',
+      'redirectUrl': 'https://example.com',
     };
 
     final res = await http.post(
-      Uri.parse(
-        '$_base/api/v1/merchant/transactions/init-transaction',
-      ),
+      uri,
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode(payload),
+      body: jsonEncode(body),
     );
-
-    print("Monnify Init Status: ${res.statusCode}");
-    print("Monnify Init Body: ${res.body}");
 
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw Exception(
-        'Monnify init failed (${res.statusCode}): ${res.body}',
-      );
+          'Monnify init transaction failed: ${res.statusCode} ${res.body}');
     }
 
-    final body = jsonDecode(res.body);
+    final json = jsonDecode(res.body) as Map<String, dynamic>;
 
-    if (body['requestSuccessful'] != true) {
-      throw Exception(body['responseMessage'] ?? 'Transaction failed');
-    }
-
-    return body['responseBody'];
+    return json['responseBody'] as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> queryTransaction(
       String paymentReference) async {
     final token = await _auth();
 
+    final uri = Uri.parse(
+        '$_base/api/v1/merchant/transactions/query?paymentReference=$paymentReference');
+
     final res = await http.get(
-      Uri.parse(
-        '$_base/api/v1/merchant/transactions/query?paymentReference=$paymentReference',
-      ),
+      uri,
       headers: {
         'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
       },
     );
 
     if (res.statusCode != 200) {
       throw Exception(
-        'Query failed (${res.statusCode}): ${res.body}',
-      );
+          'Monnify query failed: ${res.statusCode} ${res.body}');
     }
 
-    final body = jsonDecode(res.body);
+    final json = jsonDecode(res.body) as Map<String, dynamic>;
 
-    if (body['requestSuccessful'] != true) {
-      throw Exception(body['responseMessage'] ?? 'Query failed');
-    }
-
-    return body['responseBody'];
+    return json['responseBody'] as Map<String, dynamic>;
   }
 }
