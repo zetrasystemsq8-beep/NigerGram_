@@ -33,6 +33,45 @@ class _FundWalletViewState extends State<FundWalletView> {
     }
   }
 
+  /// Launch payment URL with fallback strategies for Android 11+
+  Future<void> _launchPaymentUrl(String checkoutUrl) async {
+    final uri = Uri.parse(checkoutUrl);
+    
+    try {
+      // First try: externalApplication mode (opens in external browser)
+      debugPrint('Attempting to launch URL in external application: $checkoutUrl');
+      bool launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      
+      if (launched) {
+        _updateStatus('Payment page opened in browser...');
+        return;
+      }
+
+      // Second try: platformDefault mode (system default behavior)
+      debugPrint('External app launch failed, trying platformDefault mode');
+      launched = await launchUrl(
+        uri,
+        mode: LaunchMode.platformDefault,
+      );
+      
+      if (launched) {
+        _updateStatus('Payment page opened...');
+        return;
+      }
+
+      // If both fail, throw exception with helpful message
+      throw Exception(
+        'Could not launch payment URL. Please ensure your device has a web browser installed.',
+      );
+    } catch (e) {
+      debugPrint('URL launch error: $e');
+      throw Exception('Failed to open payment page: ${e.toString()}');
+    }
+  }
+
   Future<void> _startFunding() async {
     final amount = double.tryParse(_amountController.text) ?? 0.0;
     if (amount <= 0) {
@@ -71,13 +110,8 @@ class _FundWalletViewState extends State<FundWalletView> {
 
       _updateStatus('Opening payment page...');
 
-      // Launch the checkout URL
-      final uri = Uri.parse(checkoutUrl);
-      if (!await canLaunchUrl(uri)) {
-        throw Exception('Could not launch payment URL: $checkoutUrl');
-      }
-
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // Launch payment URL with fallback strategies
+      await _launchPaymentUrl(checkoutUrl);
 
       // Start polling with 35 second timeout (generous time for user to complete payment)
       _updateStatus('Waiting for payment confirmation...');

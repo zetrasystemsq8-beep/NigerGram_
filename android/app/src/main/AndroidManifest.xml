@@ -38,7 +38,18 @@
             android:value="2" />
     </application>
 
+    <!-- Required for Android 11+ to handle URL launching -->
     <queries>
+        <!-- Allow query of all urls for url_launcher -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <!-- Process text for text selection -->
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
