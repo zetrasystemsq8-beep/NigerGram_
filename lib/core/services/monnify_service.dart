@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:nigergram/core/config/app_config.dart';
 
@@ -12,6 +13,7 @@ class MonnifyService {
     if (_token != null &&
         _tokenExpiry != null &&
         DateTime.now().isBefore(_tokenExpiry!)) {
+      debugPrint('[Monnify] Using cached auth token');
       return _token!;
     }
 
@@ -21,6 +23,8 @@ class MonnifyService {
 
     final uri = Uri.parse('$_base/api/v1/auth/login');
 
+    debugPrint('[Monnify Auth] Authenticating with endpoint: $uri');
+
     final res = await http.post(
       uri,
       headers: {
@@ -28,6 +32,9 @@ class MonnifyService {
         'Content-Type': 'application/json',
       },
     );
+
+    debugPrint('[Monnify Auth] Status Code: ${res.statusCode}');
+    debugPrint('[Monnify Auth] Response: ${res.body}');
 
     if (res.statusCode != 200) {
       throw Exception(
@@ -59,6 +66,8 @@ class MonnifyService {
     _tokenExpiry =
         DateTime.now().add(Duration(seconds: expiry - 60));
 
+    debugPrint('[Monnify Auth] Token obtained, expires in: ${expiry}s');
+
     return _token!;
   }
 
@@ -89,6 +98,9 @@ class MonnifyService {
       'incomeSplitConfig': [],
     };
 
+    debugPrint('[Monnify Init] URL: $uri');
+    debugPrint('[Monnify Init] Request body: ${jsonEncode(body)}');
+
     final res = await http.post(
       uri,
       headers: {
@@ -97,6 +109,9 @@ class MonnifyService {
       },
       body: jsonEncode(body),
     );
+
+    debugPrint('[Monnify Init] Status Code: ${res.statusCode}');
+    debugPrint('[Monnify Init] Response: ${res.body}');
 
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw Exception(
@@ -112,6 +127,9 @@ class MonnifyService {
 
     final responseBody = json['responseBody'] as Map<String, dynamic>;
 
+    debugPrint('[Monnify Init] Checkout URL: ${responseBody['checkoutUrl']}');
+    debugPrint('[Monnify Init] Payment Reference: $paymentReference');
+
     // Return the payment reference along with checkout URL for tracking
     return {
       ...responseBody,
@@ -119,12 +137,18 @@ class MonnifyService {
     };
   }
 
+  /// Query transaction status - uses transactionReference from the response body
+  /// According to Monnify Sandbox API, the correct endpoint parameter is transactionReference
   Future<Map<String, dynamic>> queryTransaction(
-      String paymentReference) async {
+      String transactionReference) async {
     final token = await _auth();
 
+    // IMPORTANT: The correct parameter name is 'transactionReference' NOT 'paymentReference'
+    // The Monnify API returns transactionReference in the response, which should be used for queries
     final uri = Uri.parse(
-        '$_base/api/v1/merchant/transactions/query?paymentReference=$paymentReference');
+        '$_base/api/v1/merchant/transactions/query?transactionReference=$transactionReference');
+
+    debugPrint('[Monnify Query] URL: $uri');
 
     final res = await http.get(
       uri,
@@ -134,6 +158,9 @@ class MonnifyService {
       },
     );
 
+    debugPrint('[Monnify Query] Status Code: ${res.statusCode}');
+    debugPrint('[Monnify Query] Full Response: ${res.body}');
+
     if (res.statusCode != 200) {
       throw Exception(
           'Monnify query failed: ${res.statusCode} ${res.body}');
@@ -141,12 +168,19 @@ class MonnifyService {
 
     final json = jsonDecode(res.body) as Map<String, dynamic>;
 
+    debugPrint('[Monnify Query] requestSuccessful: ${json['requestSuccessful']}');
+
     if (json['requestSuccessful'] != true) {
       throw Exception(
           'Query failed: ${json['responseMessage'] ?? 'Unknown error'}');
     }
 
     final responseBody = json['responseBody'] as Map<String, dynamic>;
+
+    debugPrint('[Monnify Query] Response body keys: ${responseBody.keys}');
+    debugPrint('[Monnify Query] Transaction status field: ${responseBody['status']}');
+    debugPrint('[Monnify Query] Payment status field: ${responseBody['paymentStatus']}');
+    debugPrint('[Monnify Query] Full response body: ${jsonEncode(responseBody)}');
 
     return responseBody;
   }
