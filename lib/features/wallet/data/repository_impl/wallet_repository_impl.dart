@@ -84,7 +84,7 @@ class WalletRepositoryImpl implements WalletRepository {
 
       if (!toSnap.exists) {
         transaction.set(toRef, {
-          'uid': toUserId,
+          'userId': toUserId,
           'balance': newToBalance,
           'totalEarned': newToTotalEarned,
           'updatedAt': FieldValue.serverTimestamp(),
@@ -124,7 +124,7 @@ class WalletRepositoryImpl implements WalletRepository {
       final totalEarned = (snapData?['totalEarned'] as num?)?.toDouble() ?? 0.0;
 
       transaction.set(ref, {
-        'uid': userId,
+        'userId': userId,
         'balance': newBalance,
         'totalEarned': totalEarned,
         'updatedAt': FieldValue.serverTimestamp(),
