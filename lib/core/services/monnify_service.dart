@@ -1,10 +1,11 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+
 import 'package:http/http.dart' as http;
 import 'package:nigergram/core/config/app_config.dart';
 
 class MonnifyService {
   final String _base = AppConfig.monnifyBaseUrl;
+
   String? _token;
   DateTime? _tokenExpiry;
 
@@ -21,15 +22,6 @@ class MonnifyService {
 
     final uri = Uri.parse('$_base/api/v1/auth/login');
 
-    if (kDebugMode) {
-      debugPrint('================ MONNIFY AUTH ================');
-      debugPrint('POST $uri');
-      debugPrint(
-          'API Key: ${AppConfig.monnifyApiKey.substring(0, 6)}...');
-      debugPrint(
-          'Secret Key: ${AppConfig.monnifySecretKey.substring(0, 6)}...');
-    }
-
     final res = await http.post(
       uri,
       headers: {
@@ -38,32 +30,30 @@ class MonnifyService {
       },
     );
 
-    if (kDebugMode) {
-      debugPrint('Status Code: ${res.statusCode}');
-      debugPrint('Response Body: ${res.body}');
-      debugPrint('==============================================');
-    }
-
     if (res.statusCode != 200) {
       throw Exception(
-          'Monnify auth failed: ${res.statusCode}\n${res.body}');
+        'Monnify auth failed: ${res.statusCode}\n${res.body}',
+      );
     }
 
     final body = jsonDecode(res.body) as Map<String, dynamic>;
 
-    final response = body['response'];
+    final response =
+        (body['responseBody'] ?? body['response']) as Map<String, dynamic>?;
 
     if (response == null) {
       throw Exception(
-          'Monnify auth response is null.\nFull response:\n${res.body}');
+        'Monnify auth response is null.\nFull response:\n${res.body}',
+      );
     }
 
     final token = response['accessToken'] as String?;
-    final expiry = response['expiresIn'] as int? ?? 3600;
+    final expiry = (response['expiresIn'] as num?)?.toInt() ?? 3600;
 
     if (token == null || token.isEmpty) {
       throw Exception(
-          'Monnify auth token missing.\nFull response:\n${res.body}');
+        'Monnify access token missing.\nFull response:\n${res.body}',
+      );
     }
 
     _token = token;
@@ -81,11 +71,10 @@ class MonnifyService {
   }) async {
     final token = await _auth();
 
-    final uri = Uri.parse(
-      '$_base/api/v1/merchant/transactions/init-transaction',
-    );
+    final uri =
+        Uri.parse('$_base/api/v1/merchant/transactions/init-transaction');
 
-    final body = {
+    final request = {
       'amount': amount,
       'customerName': customerName,
       'customerEmail': customerEmail,
@@ -102,23 +91,27 @@ class MonnifyService {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode(body),
+      body: jsonEncode(request),
     );
-
-    if (kDebugMode) {
-      debugPrint('========== INIT TRANSACTION ==========');
-      debugPrint('Status Code: ${res.statusCode}');
-      debugPrint('Response: ${res.body}');
-      debugPrint('======================================');
-    }
 
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw Exception(
-          'Monnify init transaction failed: ${res.statusCode}\n${res.body}');
+        'Monnify init transaction failed: ${res.statusCode}\n${res.body}',
+      );
     }
 
-    final json = jsonDecode(res.body) as Map<String, dynamic>;
-    return json['response'] as Map<String, dynamic>;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+    final response =
+        (body['responseBody'] ?? body['response']) as Map<String, dynamic>?;
+
+    if (response == null) {
+      throw Exception(
+        'Invalid Monnify initTransaction response.\n${res.body}',
+      );
+    }
+
+    return response;
   }
 
   Future<Map<String, dynamic>> queryTransaction(
@@ -137,19 +130,23 @@ class MonnifyService {
       },
     );
 
-    if (kDebugMode) {
-      debugPrint('========== QUERY TRANSACTION ==========');
-      debugPrint('Status Code: ${res.statusCode}');
-      debugPrint('Response: ${res.body}');
-      debugPrint('=======================================');
-    }
-
     if (res.statusCode != 200) {
       throw Exception(
-          'Monnify query failed: ${res.statusCode}\n${res.body}');
+        'Monnify query failed: ${res.statusCode}\n${res.body}',
+      );
     }
 
-    final json = jsonDecode(res.body) as Map<String, dynamic>;
-    return json['response'] as Map<String, dynamic>;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+    final response =
+        (body['responseBody'] ?? body['response']) as Map<String, dynamic>?;
+
+    if (response == null) {
+      throw Exception(
+        'Invalid Monnify query response.\n${res.body}',
+      );
+    }
+
+    return response;
   }
 }
