@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:nigergram/core/services/monnify_service.dart';
@@ -245,7 +246,7 @@ class _FundWalletViewState extends State<FundWalletView> {
               ),
               const SizedBox(height: 24),
               // Status message display
-              if (_statusMessage.isNotEmpty) ...[(
+              if (_statusMessage.isNotEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -273,9 +274,8 @@ class _FundWalletViewState extends State<FundWalletView> {
                     ],
                   ),
                 ),
-              )],
-              if (_statusMessage.isNotEmpty)
                 const SizedBox(height: 24),
+              ],
               ElevatedButton(
                 onPressed: _isLoading ? null : _startFunding,
                 style: ElevatedButton.styleFrom(
