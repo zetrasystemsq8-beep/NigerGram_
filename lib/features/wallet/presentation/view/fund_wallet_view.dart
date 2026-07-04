@@ -36,7 +36,7 @@ class _FundWalletViewState extends State<FundWalletView> {
   /// Launch payment URL with fallback strategies for Android 11+
   Future<void> _launchPaymentUrl(String checkoutUrl) async {
     final uri = Uri.parse(checkoutUrl);
-    
+
     try {
       // First try: externalApplication mode (opens in external browser)
       debugPrint('Attempting to launch URL in external application: $checkoutUrl');
@@ -44,7 +44,7 @@ class _FundWalletViewState extends State<FundWalletView> {
         uri,
         mode: LaunchMode.externalApplication,
       );
-      
+
       if (launched) {
         _updateStatus('Payment page opened in browser...');
         return;
@@ -56,7 +56,7 @@ class _FundWalletViewState extends State<FundWalletView> {
         uri,
         mode: LaunchMode.platformDefault,
       );
-      
+
       if (launched) {
         _updateStatus('Payment page opened...');
         return;
@@ -101,8 +101,11 @@ class _FundWalletViewState extends State<FundWalletView> {
 
       final checkoutUrl = init['checkoutUrl'] as String?;
       final paymentReference = init['paymentReference'] as String?;
+      final transactionReference = init['transactionReference'] as String?;
 
-      if (checkoutUrl == null || paymentReference == null) {
+      if (checkoutUrl == null ||
+          paymentReference == null ||
+          transactionReference == null) {
         throw Exception(
           'Invalid response from payment gateway. Missing checkout URL or reference.',
         );
@@ -116,7 +119,7 @@ class _FundWalletViewState extends State<FundWalletView> {
       // Start polling with 35 second timeout (generous time for user to complete payment)
       _updateStatus('Waiting for payment confirmation...');
       final paid = await _pollUntilPaid(
-        paymentReference,
+        transactionReference,
         timeout: const Duration(seconds: 35),
       );
 
@@ -153,7 +156,7 @@ class _FundWalletViewState extends State<FundWalletView> {
   }
 
   Future<bool> _pollUntilPaid(
-    String reference, {
+    String transactionReference, {
     Duration timeout = const Duration(seconds: 35),
   }) async {
     final end = DateTime.now().add(timeout);
@@ -167,7 +170,7 @@ class _FundWalletViewState extends State<FundWalletView> {
           'Waiting for payment confirmation... (${pollCount * 2}s)',
         );
 
-        final res = await _monnify.queryTransaction(reference);
+        final res = await _monnify.queryTransaction(transactionReference);
 
         // Monnify returns paymentStatus in the response
         final status = (res['paymentStatus'] as String?) ?? '';
