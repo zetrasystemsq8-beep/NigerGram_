@@ -138,15 +138,15 @@ class MonnifyService {
   }
 
   /// Query transaction status - uses transactionReference from the response body
-  /// According to Monnify Sandbox API, the correct endpoint parameter is transactionReference
+  /// According to Monnify API v2 documentation, the correct endpoint is /api/v2/merchant/transactions/query
   Future<Map<String, dynamic>> queryTransaction(
       String transactionReference) async {
     final token = await _auth();
 
-    // IMPORTANT: The correct parameter name is 'transactionReference' NOT 'paymentReference'
-    // The Monnify API returns transactionReference in the response, which should be used for queries
+    // FIXED: Use v2 endpoint instead of v1
+    // The Monnify API v1 query endpoint does NOT exist; v2 is the correct endpoint
     final uri = Uri.parse(
-        '$_base/api/v1/merchant/transactions/query?transactionReference=$transactionReference');
+        '$_base/api/v2/merchant/transactions/query?transactionReference=$transactionReference');
 
     debugPrint('[Monnify Query] URL: $uri');
 
