@@ -51,21 +51,21 @@ class WalletCubit extends Cubit<WalletState> {
     }
   }
 
-  Future<void> sendTip({
+  Future<void> sendGift({
     required String toUserId,
     required String toUsername,
-    required double amount,
+    required int coinAmount,
     String? videoId,
     String? message,
   }) async {
     final user = FirebaseAuth.instance.currentUser!;
     try {
-      await repository.sendTip(
+      await repository.sendGift(
         fromUserId: user.uid,
         toUserId: toUserId,
         fromUsername: user.displayName ?? user.email?.split('@').first ?? 'user',
         toUsername: toUsername,
-        amount: amount,
+        coinAmount: coinAmount,
         videoId: videoId,
         message: message,
       );
@@ -74,13 +74,20 @@ class WalletCubit extends Cubit<WalletState> {
     }
   }
 
-  Future<void> fundWallet({required double amount}) async {
+  Future<void> fundWallet({
+    required int coinAmount,
+    required String monnifyTransactionReference,
+  }) async {
     final user = FirebaseAuth.instance.currentUser!;
-    await repository.fundWallet(userId: user.uid, amount: amount);
+    await repository.fundWallet(
+      userId: user.uid,
+      coinAmount: coinAmount,
+      monnifyTransactionReference: monnifyTransactionReference,
+    );
   }
 
   Future<void> requestWithdrawal({
-    required double amount,
+    required int coinAmount,
     required String bankName,
     required String bankAccountNumber,
     required String bankAccountName,
@@ -88,7 +95,7 @@ class WalletCubit extends Cubit<WalletState> {
     final user = FirebaseAuth.instance.currentUser!;
     await repository.requestWithdrawal(
       userId: user.uid,
-      amount: amount,
+      coinAmount: coinAmount,
       bankName: bankName,
       bankAccountNumber: bankAccountNumber,
       bankAccountName: bankAccountName,

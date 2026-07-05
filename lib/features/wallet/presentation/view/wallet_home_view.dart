@@ -32,10 +32,10 @@ class _WalletHomeViewState extends State<WalletHomeView> {
     setState(() => _isRefreshing = false);
   }
 
-  String _formatBalance(double amount) {
-    if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(1)}M';
-    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(1)}K';
-    return amount.toStringAsFixed(0);
+  String _formatBalance(int coinCount) {
+    if (coinCount >= 1000000) return '${(coinCount / 1000000).toStringAsFixed(1)}M';
+    if (coinCount >= 1000) return '${(coinCount / 1000).toStringAsFixed(1)}K';
+    return coinCount.toStringAsFixed(0);
   }
 
   String _formatDate(Timestamp? timestamp) {
@@ -136,7 +136,7 @@ class _WalletHomeViewState extends State<WalletHomeView> {
 
           final wallet = state.wallet;
           final transactions = state.transactions;
-          final balance = wallet?.balance ?? 0.0;
+          final coinBalance = wallet?.coinBalance ?? 0;
 
           return RefreshIndicator(
             color: const Color(0xFFFF0050),
@@ -178,7 +178,7 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '₦${_formatBalance(balance)}',
+                          '${_formatBalance(coinBalance)} coins',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 38,
@@ -219,7 +219,7 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                             Expanded(
                               child: OutlinedButton(
                                 onPressed: () {
-                                  if (balance <= 0) {
+                                  if (coinBalance <= 0) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text('Insufficient balance to withdraw'),
@@ -324,12 +324,10 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                       itemCount: transactions.length > 30 ? 30 : transactions.length,
                       itemBuilder: (context, index) {
                         final tx = transactions[index];
-                        final isCredit = tx.type == 'credit';
-                        final amount = tx.amount;
+                        final isCredit = tx.type == 'gift_received' || tx.type == 'purchase';
+                        final coinAmount = tx.coinAmount;
 
-                        // 👈 FIXED: No more 'description' field
-                        // Using 'type' to show transaction name
-                        final transactionName = isCredit ? 'Wallet Funding' : 'Withdrawal';
+                        final transactionName = _getTransactionName(tx.type);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
@@ -363,7 +361,7 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      transactionName, // 👈 FIXED: No more description
+                                      transactionName,
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w500,
@@ -382,7 +380,7 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                                 ),
                               ),
                               Text(
-                                '${isCredit ? '+' : '-'}₦${amount.toStringAsFixed(0)}',
+                                '${isCredit ? '+' : '-'}$coinAmount coins',
                                 style: TextStyle(
                                   color: isCredit ? Colors.green : Colors.red,
                                   fontWeight: FontWeight.bold,
@@ -401,5 +399,20 @@ class _WalletHomeViewState extends State<WalletHomeView> {
         },
       ),
     );
+  }
+
+  String _getTransactionName(String type) {
+    switch (type) {
+      case 'gift_sent':
+        return 'Gift Sent';
+      case 'gift_received':
+        return 'Gift Received';
+      case 'purchase':
+        return 'Wallet Funding';
+      case 'withdrawal':
+        return 'Withdrawal';
+      default:
+        return 'Transaction';
+    }
   }
 }

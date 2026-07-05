@@ -26,7 +26,7 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
   final _amountController = TextEditingController();
   final _messageController = TextEditingController();
   bool _isSending = false;
-  String? _senderBalance;
+  int? _senderCoinBalance;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final WalletCubit _cubit = getIt<WalletCubit>();
@@ -43,9 +43,9 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
 
     try {
       final doc = await _firestore.collection('wallets').doc(user.uid).get();
-      final balance = (doc.data()?['balance'] as num?)?.toDouble() ?? 0.0;
+      final balance = (doc.data()?['coinBalance'] as num?)?.toInt() ?? 0;
       if (mounted) {
-        setState(() => _senderBalance = balance.toStringAsFixed(2));
+        setState(() => _senderCoinBalance = balance);
       }
     } catch (e) {
       debugPrint('❌ Failed to load sender balance: $e');
@@ -59,10 +59,10 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
     super.dispose();
   }
 
-  Future<void> _sendTip() async {
+  Future<void> _sendGift() async {
     if (!_formKey.currentState!.validate()) return;
-    final amount = double.tryParse(_amountController.text) ?? 0.0;
-    if (amount <= 0) return;
+    final coinAmount = int.tryParse(_amountController.text) ?? 0;
+    if (coinAmount <= 0) return;
 
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
@@ -76,27 +76,27 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
 
     try {
       // Delegate atomic transfer and transaction creation to the repository via the cubit
-      await _cubit.sendTip(
+      await _cubit.sendGift(
         toUserId: widget.creatorId,
         toUsername: widget.creatorUsername,
-        amount: amount,
+        coinAmount: coinAmount,
         videoId: widget.videoId,
         message: _messageController.text.isEmpty ? null : _messageController.text,
       );
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Tip sent successfully!')),
+          const SnackBar(content: Text('✅ Gift sent successfully!')),
         );
         Navigator.of(context).pop();
       }
-      debugPrint('✅ Tip of ₦$amount sent to ${widget.creatorUsername}');
+      debugPrint('✅ Gift of $coinAmount coins sent to ${widget.creatorUsername}');
     } catch (e) {
-      debugPrint('❌ Tip transaction failed: $e');
+      debugPrint('❌ Gift transaction failed: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send tip: $e'),
+            content: Text('Failed to send gift: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -124,12 +124,12 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
             const SizedBox(height: 8),
             Center(child: Container(height: 4, width: 48, color: Colors.grey[300])),
             const SizedBox(height: 16),
-            Text('Tip @${widget.creatorUsername}',
+            Text('Send Gift to @${widget.creatorUsername}',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            if (_senderBalance != null)
+            if (_senderCoinBalance != null)
               Text(
-                'Your balance: ₦$_senderBalance',
+                'Your balance: $_senderCoinBalance coins',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             const SizedBox(height: 12),
@@ -140,21 +140,20 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
                 children: [
                   TextFormField(
                     controller: _amountController,
-                    keyboardType: TextInputType.numberWithOptions(decimal: true, signed: false),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9\.]'))],
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     enabled: !_isSending,
                     decoration: const InputDecoration(
-                      labelText: 'Amount (₦)',
-                      hintText: 'Enter amount',
+                      labelText: 'Coin Amount',
+                      hintText: 'Enter coin amount',
                       border: OutlineInputBorder(),
-                      prefixText: '₦ ',
+                      suffixText: 'coins',
                     ),
                     validator: (v) {
-                      final val = double.tryParse(v ?? '0') ?? 0;
-                      if (val <= 0) return 'Enter a valid amount';
-                      if (_senderBalance != null) {
-                        final balance = double.tryParse(_senderBalance!) ?? 0;
-                        if (val > balance) return 'Insufficient balance';
+                      final val = int.tryParse(v ?? '0') ?? 0;
+                      if (val <= 0) return 'Enter a valid coin amount';
+                      if (_senderCoinBalance != null) {
+                        if (val > _senderCoinBalance!) return 'Insufficient coin balance';
                       }
                       return null;
                     },
@@ -171,7 +170,7 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: _isSending ? null : _sendTip,
+                    onPressed: _isSending ? null : _sendGift,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFE2C55),
                       disabledBackgroundColor: Colors.grey[400],
@@ -186,7 +185,7 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
                             ),
                           )
                         : const Text(
-                            'Send Tip',
+                            'Send Gift',
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                   ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
+import 'package:nigergram/core/services/coin_service.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_state.dart';
 
@@ -21,10 +22,10 @@ class _CreatorEarningsViewState extends State<CreatorEarningsView> {
     _walletCubit.refresh();
   }
 
-  String _formatBalance(double amount) {
-    if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(1)}M';
-    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(1)}K';
-    return amount.toStringAsFixed(0);
+  String _formatCoinCount(int coinCount) {
+    if (coinCount >= 1000000) return '${(coinCount / 1000000).toStringAsFixed(1)}M';
+    if (coinCount >= 1000) return '${(coinCount / 1000).toStringAsFixed(1)}K';
+    return coinCount.toStringAsFixed(0);
   }
 
   @override
@@ -55,8 +56,8 @@ class _CreatorEarningsViewState extends State<CreatorEarningsView> {
             );
           }
 
-          // 👈 FIX: Use wallet balance instead
-          final totalEarned = state.wallet?.balance ?? 0.0;
+          final coinBalance = state.wallet?.coinBalance ?? 0;
+          final nairaValue = coinBalance * CoinService.COIN_VALUE_IN_NAIRA;
 
           return RefreshIndicator(
             color: const Color(0xFFFF0050),
@@ -97,11 +98,19 @@ class _CreatorEarningsViewState extends State<CreatorEarningsView> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '₦${_formatBalance(totalEarned)}',
+                          '${_formatCoinCount(coinBalance)} coins',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 38,
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '≈ ₦${nairaValue.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
                           ),
                         ),
                       ],
