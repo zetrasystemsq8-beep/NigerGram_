@@ -39,7 +39,8 @@ class _FundWalletViewState extends State<FundWalletView> {
 
   void _updateCoinsPreview() {
     final amount = double.tryParse(_amountController.text) ?? 0.0;
-    final coins = (amount / CoinService.coinValueInNaira).floor();
+    // Use the CoinService helper that encapsulates the conversion and flooring
+    final coins = CoinService.coinFromNaira(amount);
     if (coins != _coinsPreview) {
       setState(() => _coinsPreview = coins);
     }
@@ -93,14 +94,16 @@ class _FundWalletViewState extends State<FundWalletView> {
   Future<void> _startFunding() async {
     final amount = double.tryParse(_amountController.text) ?? 0.0;
 
-    if (amount < CoinService.coinValueInNaira) {
+    // Use the constant name that exists in CoinService
+    if (amount < CoinService.COIN_VALUE_IN_NAIRA) {
       _showErrorSnackBar(
-        'Minimum amount is ₦${CoinService.coinValueInNaira.toStringAsFixed(0)} (1 coin)',
+        'Minimum amount is ₦${CoinService.COIN_VALUE_IN_NAIRA.toStringAsFixed(0)} (1 coin)',
       );
       return;
     }
 
-    final coinAmount = (amount / CoinService.coinValueInNaira).floor();
+    // Use the helper to convert Naira to coin count
+    final coinAmount = CoinService.coinFromNaira(amount);
     if (coinAmount <= 0) {
       _showErrorSnackBar('Please enter a valid amount greater than 0');
       return;
@@ -325,7 +328,7 @@ class _FundWalletViewState extends State<FundWalletView> {
               Text(
                 _coinsPreview > 0
                     ? 'You will receive $_coinsPreview coin${_coinsPreview == 1 ? '' : 's'}'
-                    : 'Minimum ₦${CoinService.coinValueInNaira.toStringAsFixed(0)} = 1 coin',
+                    : 'Minimum ₦${CoinService.COIN_VALUE_IN_NAIRA.toStringAsFixed(0)} = 1 coin',
                 style: TextStyle(
                   color: _coinsPreview > 0 ? Colors.greenAccent : Colors.grey[400],
                   fontSize: 13,
