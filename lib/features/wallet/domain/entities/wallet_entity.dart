@@ -2,27 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class WalletEntity {
   final String userId;
-  final double balance;
-  final String currency;
-  final double totalEarned;
+  final int coinBalance;
   final DateTime? updatedAt;
 
   WalletEntity({
     required this.userId,
-    required this.balance,
-    required this.currency,
-    this.totalEarned = 0.0,
+    required this.coinBalance,
     this.updatedAt,
   });
 
-  // 👈 THIS METHOD MUST EXIST
   factory WalletEntity.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return WalletEntity(
       userId: data['userId'] ?? '',
-      balance: (data['balance'] ?? 0.0).toDouble(),
-      currency: data['currency'] ?? 'NGN',
-      totalEarned: (data['totalEarned'] ?? 0.0).toDouble(),
+      coinBalance: (data['coinBalance'] as num?)?.toInt() ?? 0,
       updatedAt: data['updatedAt'] != null
           ? (data['updatedAt'] as Timestamp).toDate()
           : null,
@@ -32,9 +25,7 @@ class WalletEntity {
   factory WalletEntity.fromMap(Map<String, dynamic> map) {
     return WalletEntity(
       userId: map['userId'] ?? '',
-      balance: (map['balance'] ?? 0.0).toDouble(),
-      currency: map['currency'] ?? 'NGN',
-      totalEarned: (map['totalEarned'] ?? 0.0).toDouble(),
+      coinBalance: (map['coinBalance'] as num?)?.toInt() ?? 0,
       updatedAt: map['updatedAt'] != null
           ? (map['updatedAt'] as Timestamp).toDate()
           : null,
@@ -44,9 +35,7 @@ class WalletEntity {
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
-      'balance': balance,
-      'currency': currency,
-      'totalEarned': totalEarned,
+      'coinBalance': coinBalance,
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
     };
   }
