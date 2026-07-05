@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:nigergram/core/services/coin_service.dart';
 import 'package:nigergram/core/services/monnify_service.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 
 class FundWalletView extends StatefulWidget {
   const FundWalletView({super.key});
@@ -80,14 +82,14 @@ class _FundWalletViewState extends State<FundWalletView> {
   Future<void> _startFunding() async {
     debugPrint('[Monnify Debug] ============ UI EVENT: USER PRESSED PAY VIA MONNIFY ============');
     
-    final amount = double.tryParse(_amountController.text) ?? 0.0;
-    if (amount <= 0) {
-      debugPrint('[Monnify Debug] UI EVENT: Invalid amount: $amount');
+    final nairaPaid = double.tryParse(_amountController.text) ?? 0.0;
+    if (nairaPaid <= 0) {
+      debugPrint('[Monnify Debug] UI EVENT: Invalid amount: $nairaPaid');
       _showErrorSnackBar('Please enter a valid amount greater than 0');
       return;
     }
 
-    debugPrint('[Monnify Debug] UI EVENT: Amount entered: $amount');
+    debugPrint('[Monnify Debug] UI EVENT: Amount entered: $nairaPaid');
 
     setState(() => _isLoading = true);
     _updateStatus('Initializing payment...');
@@ -108,7 +110,7 @@ class _FundWalletViewState extends State<FundWalletView> {
 
       debugPrint('[Monnify Debug] UI EVENT: Calling initTransaction()');
       final init = await _monnify.initTransaction(
-        amount: amount,
+        amount: nairaPaid,
         customerEmail: customerEmail,
         customerName: customerName,
       );
@@ -149,11 +151,18 @@ class _FundWalletViewState extends State<FundWalletView> {
       if (paid) {
         debugPrint('[Monnify Debug] UI EVENT: Payment confirmed');
         _updateStatus('Payment confirmed! Crediting wallet...');
-        await _walletCubit.fundWallet(amount: amount);
+        
+        // Convert naira to coins: round down (integer division)
+        final coinAmount = (nairaPaid / CoinService.COIN_VALUE_IN_NAIRA).floor();
+        
+        await _walletCubit.fundWallet(
+          coinAmount: coinAmount,
+          monnifyTransactionReference: transactionReference,
+        );
 
         if (mounted) {
           debugPrint('[Monnify Debug] UI EVENT: Wallet funded successfully');
-          _showSuccessSnackBar('Wallet funded successfully with ₦${amount.toStringAsFixed(2)}');
+          _showSuccessSnackBar('Wallet funded successfully with $coinAmount coins (₦${nairaPaid.toStringAsFixed(2)})');
           _amountController.clear();
           _updateStatus('');
           // Close the view after short delay
@@ -321,6 +330,7 @@ class _FundWalletViewState extends State<FundWalletView> {
                 controller: _amountController,
                 enabled: !_isLoading,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9\.])'))],
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Amount (₦)',
@@ -340,7 +350,7 @@ class _FundWalletViewState extends State<FundWalletView> {
               ),
               const SizedBox(height: 24),
               // Status message display
-              if (_statusMessage.isNotEmpty) ...[
+              if (_statusMessage.isNotEmpty) ...[{
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -369,7 +379,7 @@ class _FundWalletViewState extends State<FundWalletView> {
                   ),
                 ),
                 const SizedBox(height: 24),
-              ],
+              }],
               ElevatedButton(
                 onPressed: _isLoading ? null : _startFunding,
                 style: ElevatedButton.styleFrom(
