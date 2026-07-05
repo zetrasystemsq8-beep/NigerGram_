@@ -2,23 +2,31 @@ abstract class WalletRepository {
   Stream walletStream(String uid);
   Future fetchWallet(String uid);
   Stream transactionsStreamForUser(String uid);
-  Future sendTip({
+  
+  Future sendGift({
     required String fromUserId,
     required String toUserId,
     required String fromUsername,
     required String toUsername,
-    required double amount,
+    required int coinAmount,
     String? videoId,
     String? message,
   });
-  Future fundWallet({required String userId, required double amount});
+  
+  Future fundWallet({
+    required String userId,
+    required int coinAmount,
+    required String monnifyTransactionReference,
+  });
+  
   Future requestWithdrawal({
     required String userId,
-    required double amount,
+    required int coinAmount,
     required String bankName,
     required String bankAccountNumber,
     required String bankAccountName,
   });
+  
   Future saveBankInfo({
     required String userId,
     required String bankName,
