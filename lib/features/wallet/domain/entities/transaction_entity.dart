@@ -6,12 +6,14 @@ class WalletTransactionEntity {
   final String toUserId;
   final String fromUsername;
   final String toUsername;
-  final double amount;
+  final int coinAmount;
   final String type;
   final String? videoId;
   final String? message;
   final String status;
   final Timestamp timestamp;
+  final String? giftId;
+  final String? monnifyTransactionReference;
 
   WalletTransactionEntity({
     required this.id,
@@ -19,12 +21,14 @@ class WalletTransactionEntity {
     required this.toUserId,
     required this.fromUsername,
     required this.toUsername,
-    required this.amount,
+    required this.coinAmount,
     required this.type,
     this.videoId,
     this.message,
     required this.status,
     required this.timestamp,
+    this.giftId,
+    this.monnifyTransactionReference,
   });
 
   factory WalletTransactionEntity.fromFirestore(DocumentSnapshot doc) {
@@ -35,12 +39,14 @@ class WalletTransactionEntity {
       toUserId: data['toUserId'] as String? ?? '',
       fromUsername: data['fromUsername'] as String? ?? '',
       toUsername: data['toUsername'] as String? ?? '',
-      amount: (data['amount'] as num?)?.toDouble() ?? 0.0,
+      coinAmount: (data['coinAmount'] as num?)?.toInt() ?? 0,
       type: data['type'] as String? ?? '',
       videoId: data['videoId'] as String?,
       message: data['message'] as String?,
       status: data['status'] as String? ?? 'pending',
       timestamp: data['timestamp'] as Timestamp? ?? Timestamp.now(),
+      giftId: data['giftId'] as String?,
+      monnifyTransactionReference: data['monnifyTransactionReference'] as String?,
     );
   }
 
@@ -50,12 +56,14 @@ class WalletTransactionEntity {
       'toUserId': toUserId,
       'fromUsername': fromUsername,
       'toUsername': toUsername,
-      'amount': amount,
+      'coinAmount': coinAmount,
       'type': type,
       'videoId': videoId,
       'message': message,
       'status': status,
       'timestamp': FieldValue.serverTimestamp(),
+      if (giftId != null) 'giftId': giftId,
+      if (monnifyTransactionReference != null) 'monnifyTransactionReference': monnifyTransactionReference,
     };
   }
 }
