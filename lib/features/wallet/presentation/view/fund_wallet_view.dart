@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:nigergram/core/services/coin_service.dart';
 import 'package:nigergram/core/services/monnify_service.dart';
+import 'package:nigergram/core/services/coin_service.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
 
 class FundWalletView extends StatefulWidget {
   const FundWalletView({super.key});
@@ -20,13 +20,29 @@ class _FundWalletViewState extends State<FundWalletView> {
   final _amountController = TextEditingController();
   bool _isLoading = false;
   String _statusMessage = '';
+  int _coinsPreview = 0;
   final MonnifyService _monnify = getIt<MonnifyService>();
   final _walletCubit = getIt<WalletCubit>();
 
   @override
+  void initState() {
+    super.initState();
+    _amountController.addListener(_updateCoinsPreview);
+  }
+
+  @override
   void dispose() {
+    _amountController.removeListener(_updateCoinsPreview);
     _amountController.dispose();
     super.dispose();
+  }
+
+  void _updateCoinsPreview() {
+    final amount = double.tryParse(_amountController.text) ?? 0.0;
+    final coins = (amount / CoinService.coinValueInNaira).floor();
+    if (coins != _coinsPreview) {
+      setState(() => _coinsPreview = coins);
+    }
   }
 
   void _updateStatus(String message) {
@@ -40,56 +56,55 @@ class _FundWalletViewState extends State<FundWalletView> {
     final uri = Uri.parse(checkoutUrl);
 
     try {
-      debugPrint('[Monnify Debug] UI EVENT: Launching payment URL: $checkoutUrl');
-      
       // First try: externalApplication mode (opens in external browser)
-      debugPrint('[Monnify Debug] UI EVENT: Attempting to launch URL in external application');
+      debugPrint('Attempting to launch URL in external application: $checkoutUrl');
       bool launched = await launchUrl(
         uri,
         mode: LaunchMode.externalApplication,
       );
 
       if (launched) {
-        debugPrint('[Monnify Debug] UI EVENT: Browser launched successfully (externalApplication)');
         _updateStatus('Payment page opened in browser...');
         return;
       }
 
       // Second try: platformDefault mode (system default behavior)
-      debugPrint('[Monnify Debug] UI EVENT: External app launch failed, trying platformDefault mode');
+      debugPrint('External app launch failed, trying platformDefault mode');
       launched = await launchUrl(
         uri,
         mode: LaunchMode.platformDefault,
       );
 
       if (launched) {
-        debugPrint('[Monnify Debug] UI EVENT: Browser launched successfully (platformDefault)');
         _updateStatus('Payment page opened...');
         return;
       }
 
       // If both fail, throw exception with helpful message
-      debugPrint('[Monnify Debug] UI EVENT: Both launch modes failed');
       throw Exception(
         'Could not launch payment URL. Please ensure your device has a web browser installed.',
       );
     } catch (e) {
-      debugPrint('[Monnify Debug] UI EVENT: URL launch error: $e');
+      debugPrint('URL launch error: $e');
       throw Exception('Failed to open payment page: ${e.toString()}');
     }
   }
 
   Future<void> _startFunding() async {
-    debugPrint('[Monnify Debug] ============ UI EVENT: USER PRESSED PAY VIA MONNIFY ============');
-    
-    final nairaPaid = double.tryParse(_amountController.text) ?? 0.0;
-    if (nairaPaid <= 0) {
-      debugPrint('[Monnify Debug] UI EVENT: Invalid amount: $nairaPaid');
-      _showErrorSnackBar('Please enter a valid amount greater than 0');
+    final amount = double.tryParse(_amountController.text) ?? 0.0;
+
+    if (amount < CoinService.coinValueInNaira) {
+      _showErrorSnackBar(
+        'Minimum amount is ₦${CoinService.coinValueInNaira.toStringAsFixed(0)} (1 coin)',
+      );
       return;
     }
 
-    debugPrint('[Monnify Debug] UI EVENT: Amount entered: $nairaPaid');
+    final coinAmount = (amount / CoinService.coinValueInNaira).floor();
+    if (coinAmount <= 0) {
+      _showErrorSnackBar('Please enter a valid amount greater than 0');
+      return;
+    }
 
     setState(() => _isLoading = true);
     _updateStatus('Initializing payment...');
@@ -97,20 +112,16 @@ class _FundWalletViewState extends State<FundWalletView> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        debugPrint('[Monnify Debug] UI EVENT: User not authenticated');
         throw Exception('User not authenticated');
       }
 
       final customerEmail = user.email ?? 'user@nigergram.app';
       final customerName = user.displayName ?? 'NigerGram User';
 
-      debugPrint('[Monnify Debug] UI EVENT: User authenticated: $customerEmail');
-
       _updateStatus('Contacting payment gateway...');
 
-      debugPrint('[Monnify Debug] UI EVENT: Calling initTransaction()');
       final init = await _monnify.initTransaction(
-        amount: nairaPaid,
+        amount: amount,
         customerEmail: customerEmail,
         customerName: customerName,
       );
@@ -119,15 +130,9 @@ class _FundWalletViewState extends State<FundWalletView> {
       final paymentReference = init['paymentReference'] as String?;
       final transactionReference = init['transactionReference'] as String?;
 
-      debugPrint('[Monnify Debug] UI EVENT: Init transaction returned');
-      debugPrint('[Monnify Debug] UI EVENT: checkoutUrl: $checkoutUrl');
-      debugPrint('[Monnify Debug] UI EVENT: paymentReference: $paymentReference');
-      debugPrint('[Monnify Debug] UI EVENT: transactionReference: $transactionReference');
-
       if (checkoutUrl == null ||
           paymentReference == null ||
           transactionReference == null) {
-        debugPrint('[Monnify Debug] UI EVENT: Missing required fields from init response');
         throw Exception(
           'Invalid response from payment gateway. Missing checkout URL or reference.',
         );
@@ -138,31 +143,25 @@ class _FundWalletViewState extends State<FundWalletView> {
       // Launch payment URL with fallback strategies
       await _launchPaymentUrl(checkoutUrl);
 
-      // Start polling with 35 second timeout (generous time for user to complete payment)
+      // Start polling with generous timeout (bank transfers can take a few minutes to confirm)
       _updateStatus('Waiting for payment confirmation...');
-      debugPrint('[Monnify Debug] UI EVENT: Starting polling');
       final paid = await _pollUntilPaid(
         transactionReference,
-        timeout: const Duration(seconds: 35),
+        timeout: const Duration(minutes: 5),
       );
 
-      debugPrint('[Monnify Debug] UI EVENT: Polling finished, paid: $paid');
-
       if (paid) {
-        debugPrint('[Monnify Debug] UI EVENT: Payment confirmed');
-        _updateStatus('Payment confirmed! Crediting wallet...');
-        
-        // Convert naira to coins: round down (integer division)
-        final coinAmount = (nairaPaid / CoinService.COIN_VALUE_IN_NAIRA).floor();
-        
+        _updateStatus('Payment confirmed! Crediting coins...');
+
         await _walletCubit.fundWallet(
           coinAmount: coinAmount,
           monnifyTransactionReference: transactionReference,
         );
 
         if (mounted) {
-          debugPrint('[Monnify Debug] UI EVENT: Wallet funded successfully');
-          _showSuccessSnackBar('Wallet funded successfully with $coinAmount coins (₦${nairaPaid.toStringAsFixed(2)})');
+          _showSuccessSnackBar(
+            'Wallet funded successfully with $coinAmount coin${coinAmount == 1 ? '' : 's'}!',
+          );
           _amountController.clear();
           _updateStatus('');
           // Close the view after short delay
@@ -170,23 +169,18 @@ class _FundWalletViewState extends State<FundWalletView> {
           if (mounted) Navigator.of(context).pop();
         }
       } else {
-        debugPrint('[Monnify Debug] UI EVENT: Payment verification timeout');
         _showErrorSnackBar(
           'Payment verification timeout. Please check your payment status and try again.',
         );
         _updateStatus('');
       }
     } on SocketException catch (e) {
-      debugPrint('[Monnify Debug] UI EVENT: SocketException: ${e.message}');
       _showErrorSnackBar('Network error: ${e.message}. Please check your connection.');
       _updateStatus('');
     } on TimeoutException catch (_) {
-      debugPrint('[Monnify Debug] UI EVENT: TimeoutException');
       _showErrorSnackBar('Request timeout. Please try again.');
       _updateStatus('');
     } catch (e) {
-      debugPrint('[Monnify Debug] UI EVENT: Exception: $e');
-      debugPrint('[Monnify Debug] UI EVENT: Stack trace: ${StackTrace.current}');
       _showErrorSnackBar('Payment failed: $e');
       _updateStatus('');
     } finally {
@@ -196,32 +190,20 @@ class _FundWalletViewState extends State<FundWalletView> {
 
   Future<bool> _pollUntilPaid(
     String transactionReference, {
-    Duration timeout = const Duration(seconds: 35),
+    Duration timeout = const Duration(minutes: 5),
   }) async {
     final end = DateTime.now().add(timeout);
     int pollCount = 0;
     const pollInterval = Duration(milliseconds: 2000); // Poll every 2 seconds
 
-    debugPrint('[Monnify Debug] ============ POLLING START ============');
-    debugPrint('[Monnify Debug] Polling timeout: ${timeout.inSeconds}s');
-    debugPrint('[Monnify Debug] Polling interval: ${pollInterval.inMilliseconds}ms');
-    debugPrint('[Monnify Debug] Polling transactionReference: $transactionReference');
-
     while (DateTime.now().isBefore(end)) {
       try {
         pollCount++;
-        final elapsedSeconds = pollCount * 2;
-        debugPrint('[Monnify Debug] ---- POLL #$pollCount (${elapsedSeconds}s) ----');
-        
         _updateStatus(
           'Waiting for payment confirmation... (${pollCount * 2}s)',
         );
 
-        debugPrint('[Monnify Debug] Poll #$pollCount: Calling queryTransaction()');
         final res = await _monnify.queryTransaction(transactionReference);
-
-        debugPrint('[Monnify Debug] Poll #$pollCount: Query returned');
-        debugPrint('[Monnify Debug] Poll #$pollCount: Response keys: ${res.keys.toList()}');
 
         // Monnify returns paymentStatus in the response
         final status = (res['paymentStatus'] as String?) ?? '';
@@ -229,18 +211,16 @@ class _FundWalletViewState extends State<FundWalletView> {
         final statusUpper = status.toUpperCase();
         final transStatusUpper = transactionStatus.toUpperCase();
 
-        debugPrint('[Monnify Debug] Poll #$pollCount: paymentStatus: $status');
-        debugPrint('[Monnify Debug] Poll #$pollCount: status: $transactionStatus');
-        debugPrint('[Monnify Debug] Poll #$pollCount: Full response: ${res.toString()}');
+        debugPrint(
+          '[FundWallet] paymentStatus=$statusUpper status=$transStatusUpper',
+        );
 
         // Check for successful payment statuses
         if (statusUpper == 'PAID' ||
             statusUpper == 'SUCCESS' ||
             transStatusUpper == 'COMPLETED' ||
             transStatusUpper == 'SUCCESSFUL') {
-          debugPrint('[Monnify Debug] Poll #$pollCount: PAYMENT CONFIRMED - Status: $statusUpper / $transStatusUpper');
           _updateStatus('Payment confirmed!');
-          debugPrint('[Monnify Debug] ============ POLLING END (SUCCESS) ============');
           return true;
         }
 
@@ -249,33 +229,24 @@ class _FundWalletViewState extends State<FundWalletView> {
             statusUpper.contains('DECLINED') ||
             statusUpper.contains('CANCELLED') ||
             transStatusUpper.contains('FAILED')) {
-          debugPrint('[Monnify Debug] Poll #$pollCount: PAYMENT FAILED - Status: $statusUpper / $transStatusUpper');
           throw Exception(
             'Payment was declined or cancelled. Status: $status',
           );
         }
 
-        debugPrint('[Monnify Debug] Poll #$pollCount: Payment pending, continuing polling');
-        
         // Continue polling if pending
         await Future.delayed(pollInterval);
-      } on SocketException catch (e) {
-        debugPrint('[Monnify Debug] Poll #$pollCount: SocketException: ${e.message}');
-        debugPrint('[Monnify Debug] Poll #$pollCount: Network error - continuing polling');
+      } on SocketException {
         // Network error - continue polling, we'll timeout if persistent
         await Future.delayed(pollInterval);
       } catch (e) {
         // Log the error but continue trying to verify
-        debugPrint('[Monnify Debug] Poll #$pollCount: Exception: $e');
-        debugPrint('[Monnify Debug] Poll #$pollCount: Stack trace: ${StackTrace.current}');
-        debugPrint('[Monnify Debug] Poll #$pollCount: Continuing despite error');
+        debugPrint('Payment verification error: $e');
         await Future.delayed(pollInterval);
       }
     }
 
     // Timeout reached without confirmation
-    debugPrint('[Monnify Debug] Polling TIMEOUT REACHED after ${pollCount * 2}s with $pollCount polls');
-    debugPrint('[Monnify Debug] ============ POLLING END (TIMEOUT) ============');
     return false;
   }
 
@@ -330,7 +301,9 @@ class _FundWalletViewState extends State<FundWalletView> {
                 controller: _amountController,
                 enabled: !_isLoading,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9\.])'))],
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Amount (₦)',
@@ -348,9 +321,20 @@ class _FundWalletViewState extends State<FundWalletView> {
                   prefixStyle: const TextStyle(color: Colors.white),
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                _coinsPreview > 0
+                    ? 'You will receive $_coinsPreview coin${_coinsPreview == 1 ? '' : 's'}'
+                    : 'Minimum ₦${CoinService.coinValueInNaira.toStringAsFixed(0)} = 1 coin',
+                style: TextStyle(
+                  color: _coinsPreview > 0 ? Colors.greenAccent : Colors.grey[400],
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               const SizedBox(height: 24),
               // Status message display
-              if (_statusMessage.isNotEmpty) ...[{
+              if (_statusMessage.isNotEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -379,7 +363,7 @@ class _FundWalletViewState extends State<FundWalletView> {
                   ),
                 ),
                 const SizedBox(height: 24),
-              }],
+              ],
               ElevatedButton(
                 onPressed: _isLoading ? null : _startFunding,
                 style: ElevatedButton.styleFrom(
