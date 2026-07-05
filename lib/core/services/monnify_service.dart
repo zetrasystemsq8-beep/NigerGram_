@@ -166,26 +166,32 @@ class MonnifyService {
     return result;
   }
 
-  /// Query transaction status - uses transactionReference from the response body
-  /// According to Monnify API v2 documentation, the correct endpoint is /api/v2/merchant/transactions/query
+  /// Query transaction status
+  /// CRITICAL FIX: Use POST with query parameter in request body, NOT GET with query string
+  /// Monnify's /api/v2/merchant/transactions/query endpoint requires POST method
+  /// and expects transactionReference in the JSON body, NOT as a URL query parameter.
   Future<Map<String, dynamic>> queryTransaction(
       String transactionReference) async {
     final token = await _auth();
 
-    // Use v2 endpoint - this is the correct endpoint for querying transactions
-    final uri = Uri.parse(
-        '$_base/api/v2/merchant/transactions/query?transactionReference=$transactionReference');
+    // Use v2 endpoint with POST method (NOT GET)
+    final uri = Uri.parse('$_base/api/v2/merchant/transactions/query');
 
     debugPrint('[Monnify Debug] ============ QUERY TRANSACTION START ============');
     debugPrint('[Monnify Debug] Query Request URL: $uri');
+    debugPrint('[Monnify Debug] Query Request Method: POST');
+    debugPrint('[Monnify Debug] Query transactionReference: $transactionReference');
     debugPrint('[Monnify Debug] Query Request Headers: Authorization: Bearer [REDACTED], Content-Type: application/json');
 
-    final res = await http.get(
+    final res = await http.post(
       uri,
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
+      body: jsonEncode({
+        'transactionReference': transactionReference,
+      }),
     );
 
     debugPrint('[Monnify Debug] Query Status Code: ${res.statusCode}');
