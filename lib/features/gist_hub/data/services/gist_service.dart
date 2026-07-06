@@ -194,6 +194,7 @@ class GistService {
   }
 
   // 🔥 FIXED: Correct vote logic with pollVoters
+  // 🔥 UPDATED: wallet docs auto-create on first use (set + merge instead of update)
   Future<void> castVote({
     required String postId,
     required int choiceIndex,
@@ -249,32 +250,40 @@ class GistService {
         final int platformShare = creatorShare == 0 ? voteCost : voteCost - creatorShare;
 
         final voterWalletRef = _firestore.collection('wallets').doc(user.uid);
-        transaction.update(voterWalletRef, {
-          'coinBalance': FieldValue.increment(-voteCost),
-        });
+        transaction.set(
+          voterWalletRef,
+          {'coinBalance': FieldValue.increment(-voteCost)},
+          SetOptions(merge: true),
+        );
 
         final String creatorId = data['userId']?.toString() ?? '';
         if (creatorShare > 0 && creatorId.isNotEmpty) {
           final creatorWalletRef = _firestore.collection('wallets').doc(creatorId);
-          transaction.update(creatorWalletRef, {
-            'coinBalance': FieldValue.increment(creatorShare),
-          });
+          transaction.set(
+            creatorWalletRef,
+            {'coinBalance': FieldValue.increment(creatorShare)},
+            SetOptions(merge: true),
+          );
         }
 
         // Platform earnings stored as a doc within the existing wallets collection.
         final platformWalletRef = _firestore.collection('wallets').doc('platform');
-        transaction.update(platformWalletRef, {
-          'coinBalance': FieldValue.increment(platformShare),
-        });
+        transaction.set(
+          platformWalletRef,
+          {'coinBalance': FieldValue.increment(platformShare)},
+          SetOptions(merge: true),
+        );
 
         // Poll creation fee: 5 coins deducted from the creator once the poll
         // crosses 30 total votes (charged exactly once, at the crossing point).
         final int totalVotes = pollVotes.values.fold(0, (sum, v) => sum + v);
         if (totalVotes == 30 && creatorId.isNotEmpty) {
           final creatorWalletRef = _firestore.collection('wallets').doc(creatorId);
-          transaction.update(creatorWalletRef, {
-            'coinBalance': FieldValue.increment(-5),
-          });
+          transaction.set(
+            creatorWalletRef,
+            {'coinBalance': FieldValue.increment(-5)},
+            SetOptions(merge: true),
+          );
         }
       });
     } catch (e) {
