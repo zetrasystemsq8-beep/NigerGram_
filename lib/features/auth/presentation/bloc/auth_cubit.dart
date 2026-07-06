@@ -70,6 +70,7 @@ class AuthCubit extends Cubit<AuthState> {
             'bankAccountNumber': null,
             'bankName': null,
             'bankAccountName': null,
+            'bankCode': null, // ADDED: bankCode field required for creator payouts
             'updatedAt': FieldValue.serverTimestamp(),
           }).timeout(
             const Duration(seconds: 8),
