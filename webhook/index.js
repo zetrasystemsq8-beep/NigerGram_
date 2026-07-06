@@ -20,6 +20,7 @@ const rawBodyMiddleware = (req, res, next) => {
 
 admin.initializeApp({
   credential: admin.credential.applicationDefault(),
+  projectId: 'nigergram',
 });
 
 const db = admin.firestore();
