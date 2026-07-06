@@ -31,6 +31,8 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+const { gistHubCronHandler } = require('./scheduled/decay_and_poll_finalizer');
+
 const app = express();
 app.use(rawBodyMiddleware);
 
@@ -177,6 +179,8 @@ app.post('/monnify-webhook', async (req, res) => {
     return res.status(500).send('server error');
   }
 });
+
+app.get('/cron/gist-hub', gistHubCronHandler);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
