@@ -18,15 +18,8 @@ const rawBodyMiddleware = (req, res, next) => {
   });
 };
 
-if (!process.env.SERVICE_ACCOUNT_JSON) {
-  console.error('SERVICE_ACCOUNT_JSON env var is required');
-  process.exit(1);
-}
-
-const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_JSON);
-
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.applicationDefault(),
 });
 
 const db = admin.firestore();
