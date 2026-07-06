@@ -40,8 +40,7 @@ class MonnifyService {
 
     if (res.statusCode != 200) {
       debugPrint('[Monnify Debug] Auth FAILED - Status Code ${res.statusCode}');
-      throw Exception(
-          'Monnify auth failed: ${res.statusCode} ${res.body}');
+      throw Exception('Monnify auth failed: ${res.statusCode} ${res.body}');
     }
 
     final responseJson = jsonDecode(res.body) as Map<String, dynamic>;
@@ -51,12 +50,10 @@ class MonnifyService {
 
     if (responseJson['requestSuccessful'] != true) {
       debugPrint('[Monnify Debug] Auth FAILED - requestSuccessful is false');
-      throw Exception(
-          'Monnify auth failed: ${responseJson['responseMessage'] ?? 'Unknown error'}');
+      throw Exception('Monnify auth failed: ${responseJson['responseMessage'] ?? 'Unknown error'}');
     }
 
-    final response =
-        responseJson['responseBody'] as Map<String, dynamic>?;
+    final response = responseJson['responseBody'] as Map<String, dynamic>?;
 
     if (response == null) {
       debugPrint('[Monnify Debug] Auth FAILED - responseBody is null');
@@ -132,8 +129,7 @@ class MonnifyService {
 
     if (res.statusCode != 200 && res.statusCode != 201) {
       debugPrint('[Monnify Debug] Init FAILED - Status Code ${res.statusCode}');
-      throw Exception(
-          'Monnify init transaction failed: ${res.statusCode} ${res.body}');
+      throw Exception('Monnify init transaction failed: ${res.statusCode} ${res.body}');
     }
 
     final json = jsonDecode(res.body) as Map<String, dynamic>;
@@ -143,8 +139,7 @@ class MonnifyService {
 
     if (json['requestSuccessful'] != true) {
       debugPrint('[Monnify Debug] Init FAILED - requestSuccessful is false');
-      throw Exception(
-          'Transaction init failed: ${json['responseMessage'] ?? 'Unknown error'}');
+      throw Exception('Transaction init failed: ${json['responseMessage'] ?? 'Unknown error'}');
     }
 
     final responseBody = json['responseBody'] as Map<String, dynamic>;
@@ -199,8 +194,7 @@ class MonnifyService {
 
     if (res.statusCode != 200) {
       debugPrint('[Monnify Debug] Query FAILED - Status Code ${res.statusCode}');
-      throw Exception(
-          'Monnify query failed: ${res.statusCode} ${res.body}');
+      throw Exception('Monnify query failed: ${res.statusCode} ${res.body}');
     }
 
     final json = jsonDecode(res.body) as Map<String, dynamic>;
@@ -210,8 +204,7 @@ class MonnifyService {
 
     if (json['requestSuccessful'] != true) {
       debugPrint('[Monnify Debug] Query FAILED - requestSuccessful is false');
-      throw Exception(
-          'Query failed: ${json['responseMessage'] ?? 'Unknown error'}');
+      throw Exception('Query failed: ${json['responseMessage'] ?? 'Unknown error'}');
     }
 
     final responseBody = json['responseBody'] as Map<String, dynamic>;
@@ -224,6 +217,114 @@ class MonnifyService {
     debugPrint('[Monnify Debug] Query Full Response Body: ${jsonEncode(responseBody)}');
     debugPrint('[Monnify Debug] ============ QUERY TRANSACTION END ============');
 
+    return responseBody;
+  }
+
+  /// Resolve account name using Monnify bank resolution endpoint (v2)
+  Future<String> resolveAccountName({
+    required String accountNumber,
+    required String bankCode,
+  }) async {
+    final token = await _auth();
+    final uri = Uri.parse('$_base/api/v2/bank/resolve');
+
+    debugPrint('[Monnify Debug] ============ ACCOUNT RESOLVE START ============');
+    debugPrint('[Monnify Debug] Account Number: $accountNumber Bank Code: $bankCode');
+
+    final res = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'accountNumber': accountNumber,
+        'bankCode': bankCode,
+      }),
+    );
+
+    debugPrint('[Monnify Debug] Resolve Status Code: ${res.statusCode}');
+    debugPrint('[Monnify Debug] Resolve Raw Response: ${res.body}');
+
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      debugPrint('[Monnify Debug] Resolve FAILED - Status Code ${res.statusCode}');
+      throw Exception('Account resolution failed: ${res.statusCode} ${res.body}');
+    }
+
+    final json = jsonDecode(res.body) as Map<String, dynamic>;
+    if (json['requestSuccessful'] != true) {
+      debugPrint('[Monnify Debug] Resolve FAILED - requestSuccessful is false');
+      throw Exception('Account resolution failed: ${json['responseMessage']}');
+    }
+
+    final responseBody = json['responseBody'] as Map<String, dynamic>?;
+    final accountName = responseBody?['accountName'] as String?;
+    if (accountName == null || accountName.isEmpty) {
+      debugPrint('[Monnify Debug] Resolve FAILED - accountName missing');
+      throw Exception('Monnify did not return an account name');
+    }
+
+    debugPrint('[Monnify Debug] ============ ACCOUNT RESOLVE END ============');
+    return accountName;
+  }
+
+  /// Initiate single disbursement to a bank account (v2)
+  /// Returns responseBody map when Monnify accepts the request.
+  Future<Map<String, dynamic>> initiateDisbursement({
+    required double amount,
+    required String accountNumber,
+    required String bankCode,
+    required String accountName,
+    required String narration,
+    required String reference,
+  }) async {
+    final token = await _auth();
+    final uri = Uri.parse('$_base/api/v2/disbursement/single-transfer');
+
+    final body = {
+      'amount': amount,
+      'currencyCode': 'NGN',
+      'beneficiaryName': accountName,
+      'beneficiaryAccountNumber': accountNumber,
+      'beneficiaryBankCode': bankCode,
+      'narration': narration,
+      'reference': reference,
+    };
+
+    debugPrint('[Monnify Debug] ============ DISBURSEMENT START ============');
+    debugPrint('[Monnify Debug] Disbursement Request URL: $uri');
+    debugPrint('[Monnify Debug] Disbursement Request Body: ${jsonEncode(body)}');
+
+    final res = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    debugPrint('[Monnify Debug] Disbursement Status Code: ${res.statusCode}');
+    debugPrint('[Monnify Debug] Disbursement Raw Response: ${res.body}');
+
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      debugPrint('[Monnify Debug] Disbursement FAILED - Status Code ${res.statusCode}');
+      throw Exception('Disbursement API call failed: ${res.statusCode} ${res.body}');
+    }
+
+    final json = jsonDecode(res.body) as Map<String, dynamic>;
+    if (json['requestSuccessful'] != true) {
+      debugPrint('[Monnify Debug] Disbursement FAILED - requestSuccessful is false');
+      throw Exception('Disbursement failed: ${json['responseMessage']}');
+    }
+
+    final responseBody = json['responseBody'] as Map<String, dynamic>?;
+    if (responseBody == null) {
+      debugPrint('[Monnify Debug] Disbursement FAILED - missing responseBody');
+      throw Exception('Disbursement failed: missing responseBody');
+    }
+
+    debugPrint('[Monnify Debug] ============ DISBURSEMENT END ============');
     return responseBody;
   }
 }
