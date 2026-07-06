@@ -9,11 +9,6 @@ class GistService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  // NOTE: WalletRepositoryImpl/getIt import path was not provided, so coin
-  // operations below use the direct Firestore fallback you specified
-  // (wallets/{userId}.coinBalance). Swap in getIt<WalletRepositoryImpl>()
-  // if/when you confirm the import path.
-
   Future<bool> isUserCreator(String userId) async {
     final doc = await _firestore.collection('users').doc(userId).get();
     return (doc.data()?['isCreator'] as bool?) ?? false;
@@ -172,6 +167,25 @@ class GistService {
         tx.update(postRef, {
           'reactions': reactions,
           'totalReactions': total,
+        });
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> addShare({required String postId}) async {
+    final postRef = _firestore.collection('gist_posts').doc(postId);
+    try {
+      await _firestore.runTransaction((tx) async {
+        final snapshot = await tx.get(postRef);
+        if (!snapshot.exists) throw Exception('Post not found');
+        final data = snapshot.data() as Map<String, dynamic>;
+        final double currentScore = (data['trendingScore'] is num)
+            ? (data['trendingScore'] as num).toDouble()
+            : 0.0;
+        tx.update(postRef, {
+          'trendingScore': currentScore + 5,
         });
       });
     } catch (e) {
