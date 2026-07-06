@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // users: only the authenticated owner may read/write
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // wallets: owner may read/write their bank fields
+    match /wallets/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // withdrawal_requests: creators can create their own requests; server updates status
+    match /withdrawal_requests/{reqId} {
+      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      allow read: if request.auth != null && resource.data.creatorId == request.auth.uid;
+      allow update: if false; // server (admin SDK) updates status
+      allow delete: if false;
+    }
+
+    // wallet_transactions: owners can read their transactions
+    match /wallet_transactions/{txId} {
+      allow read: if request.auth != null && (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId);
+      allow create: if request.auth != null;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // monnify_webhook_audit: server-only
+    match /monnify_webhook_audit/{docId} {
+      allow write: if false;
+      allow read: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
