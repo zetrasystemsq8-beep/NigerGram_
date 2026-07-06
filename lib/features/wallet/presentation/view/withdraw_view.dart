@@ -11,8 +11,9 @@ class WithdrawView extends StatefulWidget {
 }
 
 class _WithdrawViewState extends State<WithdrawView> {
-  final _coinAmountController = TextEditingController();
+  final _nairaAmountController = TextEditingController();
   final _bankNameController = TextEditingController();
+  final _bankCodeController = TextEditingController();
   final _accountNumberController = TextEditingController();
   final _accountNameController = TextEditingController();
   bool _isSubmitting = false;
@@ -20,24 +21,25 @@ class _WithdrawViewState extends State<WithdrawView> {
 
   @override
   void dispose() {
-    _coinAmountController.dispose();
+    _nairaAmountController.dispose();
     _bankNameController.dispose();
+    _bankCodeController.dispose();
     _accountNumberController.dispose();
     _accountNameController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    final coinAmount = int.tryParse(_coinAmountController.text) ?? 0;
-    if (coinAmount <= 0) {
+    final nairaAmount = double.tryParse(_nairaAmountController.text) ?? 0.0;
+    if (nairaAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid coin amount')),
+        const SnackBar(content: Text('Enter a valid amount in Naira')),
       );
       return;
     }
     if (_bankNameController.text.isEmpty ||
-        _accountNumberController.text.isEmpty ||
-        _accountNameController.text.isEmpty) {
+        _bankCodeController.text.isEmpty ||
+        _accountNumberController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter bank details')),
       );
@@ -46,10 +48,11 @@ class _WithdrawViewState extends State<WithdrawView> {
     setState(() => _isSubmitting = true);
     try {
       await _cubit.requestWithdrawal(
-        coinAmount: coinAmount,
+        amount: nairaAmount,
         bankName: _bankNameController.text,
         bankAccountNumber: _accountNumberController.text,
         bankAccountName: _accountNameController.text,
+        bankCode: _bankCodeController.text,
       );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -77,14 +80,13 @@ class _WithdrawViewState extends State<WithdrawView> {
         child: Column(
           children: [
             TextField(
-              controller: _coinAmountController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              controller: _nairaAmountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
               decoration: const InputDecoration(
-                labelText: 'Coin Amount',
-                hintText: 'Enter coin amount',
+                labelText: 'Amount (₦)',
+                hintText: 'Enter amount in Naira',
                 border: OutlineInputBorder(),
-                suffixText: 'coins',
               ),
             ),
             const SizedBox(height: 8),
@@ -92,6 +94,15 @@ class _WithdrawViewState extends State<WithdrawView> {
               controller: _bankNameController,
               decoration: const InputDecoration(
                 labelText: 'Bank Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _bankCodeController,
+              decoration: const InputDecoration(
+                labelText: 'Bank Code',
+                hintText: 'e.g. 011',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -108,7 +119,7 @@ class _WithdrawViewState extends State<WithdrawView> {
             TextField(
               controller: _accountNameController,
               decoration: const InputDecoration(
-                labelText: 'Account Name',
+                labelText: 'Account Name (optional)',
                 border: OutlineInputBorder(),
               ),
             ),
