@@ -19,6 +19,12 @@ class GistPostEntity {
   final bool isAnonymous;
   final int totalReactions;
 
+  // NEW: trendingScore used by Trending tab / viral system
+  final double trendingScore;
+
+  // NEW: indicates whether a poll is still active (true) or finalized (false)
+  final bool isPollActive;
+
   GistPostEntity({
     required this.id,
     required this.userId,
@@ -37,6 +43,8 @@ class GistPostEntity {
     this.expiresAt,
     this.isAnonymous = false,
     this.totalReactions = 0,
+    this.trendingScore = 0.0,
+    this.isPollActive = false,
   });
 
   factory GistPostEntity.fromMap(Map<String, dynamic> map, String id) {
@@ -58,6 +66,10 @@ class GistPostEntity {
       expiresAt: map['expiresAt'] as Timestamp?,
       isAnonymous: map['isAnonymous'] ?? false,
       totalReactions: map['totalReactions'] ?? 0,
+      trendingScore: (map['trendingScore'] is num)
+          ? (map['trendingScore'] as num).toDouble()
+          : (map['trendingScore'] ?? 0.0),
+      isPollActive: map['isPollActive'] ?? false,
     );
   }
 
@@ -79,6 +91,8 @@ class GistPostEntity {
       'expiresAt': expiresAt,
       'isAnonymous': isAnonymous,
       'totalReactions': totalReactions,
+      'trendingScore': trendingScore,
+      'isPollActive': isPollActive,
     };
   }
 }
