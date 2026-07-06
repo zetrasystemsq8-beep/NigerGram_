@@ -150,27 +150,15 @@ class _FundWalletViewState extends State<FundWalletView> {
       _updateStatus('Waiting for payment confirmation...');
       final paid = await _pollUntilPaid(
         transactionReference,
+        coinAmount: coinAmount,
         timeout: const Duration(minutes: 5),
       );
 
       if (paid) {
-        _updateStatus('Payment confirmed! Crediting coins...');
-
-        await _walletCubit.fundWallet(
-          coinAmount: coinAmount,
-          monnifyTransactionReference: transactionReference,
-        );
-
-        if (mounted) {
-          _showSuccessSnackBar(
-            'Wallet funded successfully with $coinAmount coin${coinAmount == 1 ? '' : 's'}!',
-          );
-          _amountController.clear();
-          _updateStatus('');
-          // Close the view after short delay
-          await Future.delayed(const Duration(milliseconds: 500));
-          if (mounted) Navigator.of(context).pop();
-        }
+        // Polling already credited coins and showed success; close view
+        _updateStatus('Completed');
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) Navigator.of(context).pop();
       } else {
         _showErrorSnackBar(
           'Payment verification timeout. Please check your payment status and try again.',
@@ -193,6 +181,7 @@ class _FundWalletViewState extends State<FundWalletView> {
 
   Future<bool> _pollUntilPaid(
     String transactionReference, {
+    required int coinAmount,
     Duration timeout = const Duration(minutes: 5),
   }) async {
     final end = DateTime.now().add(timeout);
@@ -215,7 +204,7 @@ class _FundWalletViewState extends State<FundWalletView> {
         final transStatusUpper = transactionStatus.toUpperCase();
 
         debugPrint(
-          '[FundWallet] paymentStatus=$statusUpper status=$transStatusUpper',
+          '[FundWallet] paymentStatus=$statusUpper status=$transStatusUpper transactionRef=$transactionReference',
         );
 
         // Check for successful payment statuses
@@ -223,7 +212,30 @@ class _FundWalletViewState extends State<FundWalletView> {
             statusUpper == 'SUCCESS' ||
             transStatusUpper == 'COMPLETED' ||
             transStatusUpper == 'SUCCESSFUL') {
-          _updateStatus('Payment confirmed!');
+          _updateStatus('Payment confirmed! Crediting coins...');
+
+          // Credit coins immediately (idempotent on backend)
+          try {
+            debugPrint('[FundWallet] Crediting $coinAmount coins for tx=$transactionReference');
+            await _walletCubit.fundWallet(
+              coinAmount: coinAmount,
+              monnifyTransactionReference: transactionReference,
+            );
+            debugPrint('[FundWallet] Credit succeeded for tx=$transactionReference');
+
+            if (mounted) {
+              _showSuccessSnackBar(
+                'Wallet funded successfully with $coinAmount coin${coinAmount == 1 ? '' : 's'}!',
+              );
+            }
+          } catch (e) {
+            // Log and notify, but still return true because payment is confirmed
+            debugPrint('[FundWallet] Error crediting coins for tx=$transactionReference: $e');
+            if (mounted) {
+              _showErrorSnackBar('Payment confirmed but credit failed: $e');
+            }
+          }
+
           return true;
         }
 
@@ -244,7 +256,7 @@ class _FundWalletViewState extends State<FundWalletView> {
         await Future.delayed(pollInterval);
       } catch (e) {
         // Log the error but continue trying to verify
-        debugPrint('Payment verification error: $e');
+        debugPrint('[FundWallet] Payment verification error for tx=$transactionReference: $e');
         await Future.delayed(pollInterval);
       }
     }
