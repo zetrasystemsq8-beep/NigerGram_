@@ -87,7 +87,7 @@ class GistService {
 
       final postRef = _firestore.collection('gist_posts').doc();
       final now = FieldValue.serverTimestamp();
-      
+
       final expiryDate = DateTime.now().add(const Duration(days: 7));
       final int optionCount = pollOptions?.length ?? 0;
       final Map<String, int> initialPollVotes = {};
@@ -95,7 +95,7 @@ class GistService {
         initialPollVotes[i.toString()] = 0;
       }
       final Map<String, int> initialPollVoters = {};
-      
+
       final initialReactions = {
         "😂": 0,
         "😱": 0,
@@ -117,6 +117,7 @@ class GistService {
         'pollVoters': initialPollVoters,
         'reactions': initialReactions,
         'commentCount': 0,
+        'shareCount': 0,
         'createdAt': now,
         'expiresAt': type == 'poll' ? Timestamp.fromDate(expiryDate) : null,
         'isAnonymous': isAnonymous,
@@ -139,16 +140,29 @@ class GistService {
         final data = snapshot.data() as Map<String, dynamic>;
         final reactions = Map<String, int>.from(data['reactions'] ?? {});
         reactions[emoji] = (reactions[emoji] ?? 0) + 1;
-        
+
         int total = 0;
         reactions.forEach((key, value) {
           total += value;
         });
-        
+
         tx.update(postRef, {
           'reactions': reactions,
           'totalReactions': total,
         });
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Increments the share counter for a post.
+  /// Called when a user shares a gist post to another surface (chat, other app, etc).
+  Future<void> addShare({required String postId}) async {
+    final postRef = _firestore.collection('gist_posts').doc(postId);
+    try {
+      await postRef.update({
+        'shareCount': FieldValue.increment(1),
       });
     } catch (e) {
       rethrow;
@@ -163,28 +177,28 @@ class GistService {
     final postRef = _firestore.collection('gist_posts').doc(postId);
     final user = _auth.currentUser;
     if (user == null) throw Exception('Not logged in');
-    
+
     try {
       await _firestore.runTransaction((transaction) async {
         final snapshot = await transaction.get(postRef);
         if (!snapshot.exists) throw Exception('Post not found');
-        
+
         final data = snapshot.data() as Map<String, dynamic>;
-        
+
         // Check if user already voted
         final voters = Map<String, int>.from(data['pollVoters'] ?? {});
         if (voters.containsKey(user.uid)) {
           throw Exception('You already voted');
         }
-        
+
         // Update vote counts
         final pollVotes = Map<String, int>.from(data['pollVotes'] ?? {});
         final key = choiceIndex.toString();
         pollVotes[key] = (pollVotes[key] ?? 0) + 1;
-        
+
         // Store who voted
         voters[user.uid] = choiceIndex;
-        
+
         transaction.update(postRef, {
           'pollVotes': pollVotes,
           'pollVoters': voters,
