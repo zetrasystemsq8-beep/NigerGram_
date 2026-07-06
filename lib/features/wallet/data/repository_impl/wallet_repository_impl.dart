@@ -46,12 +46,12 @@ class WalletRepositoryImpl implements WalletRepository {
   }
 
   @override
-  Future<void> sendTip({
+  Future<void> sendGift({
     required String fromUserId,
     required String toUserId,
     required String fromUsername,
     required String toUsername,
-    required double amount,
+    required int coinAmount,
     String? videoId,
     String? message,
   }) async {
@@ -64,35 +64,31 @@ class WalletRepositoryImpl implements WalletRepository {
       final toSnap = await transaction.get(toRef);
 
       final fromData = fromSnap.data() as Map<String, dynamic>?;
-      final fromBalance = (fromData?['balance'] as num?)?.toDouble() ?? 0.0;
-      if (fromBalance < amount) {
-        throw Exception('Insufficient balance');
+      final fromBalance = (fromData?['coinBalance'] as num?)?.toInt() ?? 0;
+      if (fromBalance < coinAmount) {
+        throw Exception('Insufficient coin balance');
       }
 
-      final newFromBalance = fromBalance - amount;
+      final newFromBalance = fromBalance - coinAmount;
 
       final toData = toSnap.data() as Map<String, dynamic>?;
-      final toBalance = (toData?['balance'] as num?)?.toDouble() ?? 0.0;
-      final toTotalEarned = (toData?['totalEarned'] as num?)?.toDouble() ?? 0.0;
-      final newToBalance = toBalance + amount;
-      final newToTotalEarned = toTotalEarned + amount;
+      final toBalance = (toData?['coinBalance'] as num?)?.toInt() ?? 0;
+      final newToBalance = toBalance + coinAmount;
 
       transaction.update(fromRef, {
-        'balance': newFromBalance,
+        'coinBalance': newFromBalance,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
       if (!toSnap.exists) {
         transaction.set(toRef, {
           'userId': toUserId,
-          'balance': newToBalance,
-          'totalEarned': newToTotalEarned,
+          'coinBalance': newToBalance,
           'updatedAt': FieldValue.serverTimestamp(),
         });
       } else {
         transaction.update(toRef, {
-          'balance': newToBalance,
-          'totalEarned': newToTotalEarned,
+          'coinBalance': newToBalance,
           'updatedAt': FieldValue.serverTimestamp(),
         });
       }
@@ -102,8 +98,8 @@ class WalletRepositoryImpl implements WalletRepository {
         'toUserId': toUserId,
         'fromUsername': fromUsername,
         'toUsername': toUsername,
-        'amount': amount,
-        'type': 'tip',
+        'coinAmount': coinAmount,
+        'type': 'gift',
         'videoId': videoId,
         'message': message,
         'status': 'completed',
@@ -170,6 +166,7 @@ class WalletRepositoryImpl implements WalletRepository {
     required String bankName,
     required String bankAccountNumber,
     required String bankAccountName,
+    required String bankCode,
   }) async {
     final ref = _wallets.doc(userId);
     final txRef = _transactions.doc();
@@ -189,6 +186,7 @@ class WalletRepositoryImpl implements WalletRepository {
         'bankAccountNumber': bankAccountNumber,
         'bankName': bankName,
         'bankAccountName': bankAccountName,
+        'bankCode': bankCode,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -202,6 +200,7 @@ class WalletRepositoryImpl implements WalletRepository {
         'videoId': null,
         'message': null,
         'status': 'pending',
+        'bankCode': bankCode,
         'timestamp': FieldValue.serverTimestamp(),
       });
     });
@@ -213,12 +212,14 @@ class WalletRepositoryImpl implements WalletRepository {
     required String bankName,
     required String bankAccountNumber,
     required String bankAccountName,
+    required String bankCode,
   }) async {
     final ref = _wallets.doc(userId);
     await ref.set({
       'bankAccountNumber': bankAccountNumber,
       'bankName': bankName,
       'bankAccountName': bankAccountName,
+      'bankCode': bankCode,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
