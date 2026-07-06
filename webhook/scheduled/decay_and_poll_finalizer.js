@@ -1,7 +1,11 @@
 const admin = require('firebase-admin');
 
+// ✅ FIXED: Load Firebase from environment variable
 if (!admin.apps.length) {
-  admin.initializeApp();
+  const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_JSON);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
 }
 
 const db = admin.firestore();
@@ -31,8 +35,6 @@ async function decayTrendingScores() {
 
 // Poll expiry: mark expired active polls inactive, then promote ONLY the
 // single highest-voted poll among those just expired to a poll_result post
-// (which starts with a trendingScore above the Trending threshold so it
-// surfaces immediately, then decays naturally like any other post).
 async function finalizeExpiredPolls() {
   const now = admin.firestore.Timestamp.now();
 
@@ -122,7 +124,7 @@ async function finalizeExpiredPolls() {
   return { expired: snapshot.size, winnerCreated };
 }
 
-// Combined cron handler — mount this at your existing cron endpoint
+// Combined cron handler
 async function gistHubCronHandler(req, res) {
   try {
     const decayResult = await decayTrendingScores();
