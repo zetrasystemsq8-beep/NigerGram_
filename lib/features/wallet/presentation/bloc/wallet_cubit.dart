@@ -87,18 +87,20 @@ class WalletCubit extends Cubit<WalletState> {
   }
 
   Future<void> requestWithdrawal({
-    required int coinAmount,
+    required double amount,
     required String bankName,
     required String bankAccountNumber,
     required String bankAccountName,
+    required String bankCode,
   }) async {
     final user = FirebaseAuth.instance.currentUser!;
     await repository.requestWithdrawal(
       userId: user.uid,
-      coinAmount: coinAmount,
+      amount: amount,
       bankName: bankName,
       bankAccountNumber: bankAccountNumber,
       bankAccountName: bankAccountName,
+      bankCode: bankCode,
     );
   }
 
@@ -106,6 +108,7 @@ class WalletCubit extends Cubit<WalletState> {
     required String bankName,
     required String bankAccountNumber,
     required String bankAccountName,
+    required String bankCode,
   }) async {
     final user = FirebaseAuth.instance.currentUser!;
     await repository.saveBankInfo(
@@ -113,6 +116,7 @@ class WalletCubit extends Cubit<WalletState> {
       bankName: bankName,
       bankAccountNumber: bankAccountNumber,
       bankAccountName: bankAccountName,
+      bankCode: bankCode,
     );
   }
 
