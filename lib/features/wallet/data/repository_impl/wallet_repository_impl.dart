@@ -4,6 +4,8 @@ import 'package:nigergram/core/services/coin_service.dart';
 import 'package:nigergram/features/wallet/domain/entities/transaction_entity.dart';
 import 'package:nigergram/features/wallet/domain/entities/wallet_entity.dart';
 import 'package:nigergram/features/wallet/domain/repositories/wallet_repository.dart';
+import 'package:nigergram/core/services/monnify_service.dart';
+import 'package:nigergram/core/di/dependency_injector.dart';
 
 class WalletRepositoryImpl implements WalletRepository {
   final FirebaseFirestore firestore;
@@ -172,14 +174,19 @@ class WalletRepositoryImpl implements WalletRepository {
     });
   }
 
+  /// Request withdrawal:
+  /// - amount is in Naira (double)
+  /// - bankCode must be provided
   @override
   Future<void> requestWithdrawal({
     required String userId,
-    required int coinAmount,
+    required double amount,
     required String bankName,
     required String bankAccountNumber,
     required String bankAccountName,
+    required String bankCode,
   }) async {
+    // Validate creator flag and limits
     final userDoc = await _users.doc(userId).get();
     final userData = userDoc.data() as Map<String, dynamic>?;
     final isCreator = (userData?['isCreator'] as bool?) ?? false;
@@ -187,6 +194,9 @@ class WalletRepositoryImpl implements WalletRepository {
     if (!isCreator) {
       throw Exception('Only creators can request withdrawals');
     }
+
+    // Determine coinAmount from Naira using CoinService (floored)
+    final coinAmount = CoinService.coinFromNaira(amount);
 
     if (coinAmount < CoinService.MIN_WITHDRAWAL_COINS) {
       throw Exception('Minimum withdrawal is ${CoinService.MIN_WITHDRAWAL_COINS} coins');
@@ -232,7 +242,9 @@ class WalletRepositoryImpl implements WalletRepository {
     final payout = CoinService.calculateCreatorPayout(coinAmount);
 
     final walletRef = _wallets.doc(userId);
+    final requestRef = _withdrawalRequests.doc(); // pre-generate id
 
+    // 1) Atomically deduct coins and create withdrawal request
     await firestore.runTransaction((transaction) async {
       final snap = await transaction.get(walletRef);
       final snapData = snap.data() as Map<String, dynamic>?;
@@ -248,10 +260,10 @@ class WalletRepositoryImpl implements WalletRepository {
         'bankAccountNumber': bankAccountNumber,
         'bankName': bankName,
         'bankAccountName': bankAccountName,
+        'bankCode': bankCode,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      final requestRef = _withdrawalRequests.doc();
       transaction.set(requestRef, {
         'creatorId': userId,
         'coinAmount': coinAmount,
@@ -260,6 +272,7 @@ class WalletRepositoryImpl implements WalletRepository {
         'bankName': bankName,
         'bankAccountNumber': bankAccountNumber,
         'bankAccountName': bankAccountName,
+        'bankCode': bankCode,
         'status': 'pending',
         'requestedAt': FieldValue.serverTimestamp(),
       });
@@ -273,9 +286,87 @@ class WalletRepositoryImpl implements WalletRepository {
         'coinAmount': coinAmount,
         'type': 'withdrawal',
         'status': 'pending',
+        'withdrawalRequestId': requestRef.id,
         'timestamp': FieldValue.serverTimestamp(),
       });
     });
+
+    // 2) Initiate disbursement with Monnify (outside Firestore transaction)
+    final monnify = getIt<MonnifyService>();
+    try {
+      final payoutReference = 'WD-${requestRef.id}-${DateTime.now().millisecondsSinceEpoch}';
+
+      final monnifyResponse = await monnify.initiateDisbursement(
+        amount: payout,
+        accountNumber: bankAccountNumber,
+        bankCode: bankCode,
+        accountName: bankAccountName,
+        narration: 'NigerGram payout',
+        reference: payoutReference,
+      );
+
+      final disbursementRef = monnifyResponse['disbursementReference'] ??
+          monnifyResponse['reference'] ??
+          payoutReference;
+
+      await requestRef.update({
+        'status': 'processing',
+        'monnifyDisbursementReference': disbursementRef,
+        'monnifyResponse': monnifyResponse,
+        'processingAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      // On immediate disbursement initiation failure: refund coins atomically, mark failed
+      final failureReason = e.toString();
+      await firestore.runTransaction((transaction) async {
+        // refund
+        final walletSnap = await transaction.get(walletRef);
+        final walletData = walletSnap.data() as Map<String, dynamic>?;
+        final currentBalance = (walletData?['coinBalance'] as num?)?.toInt() ?? 0;
+        final newBalance = currentBalance + coinAmount;
+
+        transaction.update(walletRef, {
+          'coinBalance': newBalance,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        // mark withdrawal request failed
+        transaction.update(requestRef, {
+          'status': 'failed',
+          'failureReason': failureReason,
+          'failedAt': FieldValue.serverTimestamp(),
+        });
+
+        // mark corresponding tx as failed (if found)
+        final txQuery = await _transactions
+            .where('withdrawalRequestId', isEqualTo: requestRef.id)
+            .where('type', isEqualTo: 'withdrawal')
+            .limit(1)
+            .get();
+
+        if (txQuery.docs.isNotEmpty) {
+          transaction.update(txQuery.docs.first.reference, {
+            'status': 'failed',
+          });
+        }
+
+        // write a refund tx entry
+        final refundTxRef = _transactions.doc();
+        transaction.set(refundTxRef, {
+          'fromUserId': 'system',
+          'toUserId': userId,
+          'fromUsername': 'system',
+          'toUsername': '',
+          'coinAmount': coinAmount,
+          'type': 'withdrawal_refund',
+          'status': 'completed',
+          'relatedWithdrawalRequestId': requestRef.id,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      });
+
+      throw Exception('Disbursement initiation failed: $failureReason');
+    }
   }
 
   @override
@@ -284,13 +375,23 @@ class WalletRepositoryImpl implements WalletRepository {
     required String bankName,
     required String bankAccountNumber,
     required String bankAccountName,
+    required String bankCode,
   }) async {
+    // Verify account name with Monnify before saving
+    final monnify = getIt<MonnifyService>();
+    final verifiedName = await monnify.resolveAccountName(
+      accountNumber: bankAccountNumber,
+      bankCode: bankCode,
+    );
+
+    // Save the verified name (do not accept free-typed name)
     final ref = _wallets.doc(userId);
     await ref.set(
       {
         'bankAccountNumber': bankAccountNumber,
         'bankName': bankName,
-        'bankAccountName': bankAccountName,
+        'bankAccountName': verifiedName,
+        'bankCode': bankCode,
         'updatedAt': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
