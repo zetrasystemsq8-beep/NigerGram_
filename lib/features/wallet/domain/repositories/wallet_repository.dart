@@ -21,10 +21,11 @@ abstract class WalletRepository {
   
   Future requestWithdrawal({
     required String userId,
-    required int coinAmount,
+    required double amount, // Naira amount
     required String bankName,
     required String bankAccountNumber,
     required String bankAccountName,
+    required String bankCode,
   });
   
   Future saveBankInfo({
@@ -32,5 +33,6 @@ abstract class WalletRepository {
     required String bankName,
     required String bankAccountNumber,
     required String bankAccountName,
+    required String bankCode,
   });
 }
