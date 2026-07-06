@@ -13,12 +13,14 @@ import 'package:nigergram/features/gist_hub/presentation/widgets/gist_hub_featur
 class GistPostCard extends StatefulWidget {
   final GistPostEntity post;
   final GistService service;
+  final bool readOnly; // NEW: when true, disable interactions
   final VoidCallback? onPostDeleted;
 
   const GistPostCard({
     super.key,
     required this.post,
     required this.service,
+    this.readOnly = false,
     this.onPostDeleted,
   });
 
@@ -50,6 +52,11 @@ class _GistPostCardState extends State<GistPostCard> {
 
   // 🔥 FIX: Prevent multiple reactions
   void _addReaction(String emoji) {
+    if (widget.readOnly || _post.type == 'poll' || _post.type == 'poll_result') {
+      // interactions disabled
+      return;
+    }
+
     // Check if user already reacted with this emoji
     if (_reactedEmojis.contains(emoji)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -65,7 +72,7 @@ class _GistPostCardState extends State<GistPostCard> {
       _post.reactions[emoji] = (_post.reactions[emoji] ?? 0) + 1;
       _reactedEmojis.add(emoji);
     });
-    
+
     widget.service.addReaction(
       postId: _post.id,
       emoji: emoji,
@@ -77,7 +84,18 @@ class _GistPostCardState extends State<GistPostCard> {
     });
   }
 
-  void _sharePost() {
+  void _sharePost() async {
+    if (widget.readOnly || _post.type == 'poll' || _post.type == 'poll_result') {
+      return;
+    }
+
+    try {
+      // Call server-side increment before sharing
+      await widget.service.addShare(postId: _post.id);
+    } catch (_) {
+      // ignore share increment failure — still allow share client-side
+    }
+
     final shareText = '${_post.content}\n\n🇳🇬 View on NigerGram: https://nigergram.app/gist/${_post.id}';
     Share.share(shareText, subject: 'Check this Gist');
   }
@@ -87,7 +105,7 @@ class _GistPostCardState extends State<GistPostCard> {
     final date = timestamp.toDate();
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays > 0) {
       return '${difference.inDays}d ago';
     } else if (difference.inHours > 0) {
@@ -313,46 +331,48 @@ class _GistPostCardState extends State<GistPostCard> {
               _buildReactionButton('🇳🇬'),
               const Spacer(),
               // Comment Button
-              GestureDetector(
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => GistCommentSheet(
-                      postId: _post.id,
-                      service: widget.service,
-                    ),
-                  );
-                },
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.chat_bubble_outline,
-                      color: NGColors.textMuted,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${_post.commentCount}',
-                      style: TextStyle(
-                        color: NGColors.textMuted,
-                        fontSize: 13,
+              if (!widget.readOnly && _post.type != 'poll' && _post.type != 'poll_result')
+                GestureDetector(
+                  onTap: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => GistCommentSheet(
+                        postId: _post.id,
+                        service: widget.service,
                       ),
-                    ),
-                  ],
+                    );
+                  },
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.chat_bubble_outline,
+                        color: NGColors.textMuted,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_post.commentCount}',
+                        style: TextStyle(
+                          color: NGColors.textMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(width: 16),
               // Share Button
-              GestureDetector(
-                onTap: _sharePost,
-                child: const Icon(
-                  Icons.share_outlined,
-                  color: NGColors.textMuted,
-                  size: 18,
+              if (!widget.readOnly && _post.type != 'poll' && _post.type != 'poll_result')
+                GestureDetector(
+                  onTap: _sharePost,
+                  child: const Icon(
+                    Icons.share_outlined,
+                    color: NGColors.textMuted,
+                    size: 18,
+                  ),
                 ),
-              ),
             ],
           ),
         ],
@@ -363,7 +383,37 @@ class _GistPostCardState extends State<GistPostCard> {
   Widget _buildReactionButton(String emoji) {
     final count = _post.reactions[emoji] ?? 0;
     final hasReacted = _reactedEmojis.contains(emoji);
-    
+
+    if (widget.readOnly || _post.type == 'poll' || _post.type == 'poll_result') {
+      // Show counts but disable tapping
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: count > 0 ? NGColors.accent.withOpacity(0.1) : NGColors.surfaceLight,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Text(
+              emoji,
+              style: const TextStyle(fontSize: 14),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 4),
+              Text(
+                count > 99 ? '99+' : count.toString(),
+                style: TextStyle(
+                  color: NGColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: () => _addReaction(emoji),
       child: Container(
@@ -406,10 +456,10 @@ class _GistPostCardState extends State<GistPostCard> {
   Widget _buildPremiumPoll() {
     final pollOptions = _post.pollOptions ?? [];
     final totalVotes = _post.pollVotes.values.fold(0, (sum, val) => sum + val);
-    
+
     final bool hasVoted = _post.pollVoters.containsKey(_currentUserId);
     final int? votedIndex = hasVoted ? _post.pollVoters[_currentUserId] : null;
-    
+
     String getTimeRemaining() {
       if (_post.expiresAt == null) return '7 days left';
       final expiry = _post.expiresAt!.toDate();
@@ -420,7 +470,7 @@ class _GistPostCardState extends State<GistPostCard> {
       if (diff.inMinutes > 0) return '${diff.inMinutes}m left';
       return 'Expired';
     }
-    
+
     if (pollOptions.isEmpty) return const SizedBox.shrink();
 
     return Container(
@@ -501,7 +551,7 @@ class _GistPostCardState extends State<GistPostCard> {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Poll options
           ...pollOptions.asMap().entries.map((entry) {
             final index = entry.key;
@@ -510,7 +560,7 @@ class _GistPostCardState extends State<GistPostCard> {
             final percentage = totalVotes > 0 ? (votes / totalVotes * 100) : 0;
             final bool isSelected = hasVoted && votedIndex == index;
             final bool isUnselected = hasVoted && votedIndex != index;
-            
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Material(
@@ -528,9 +578,9 @@ class _GistPostCardState extends State<GistPostCard> {
                       );
                       return;
                     }
-                    
+
                     HapticFeedback.mediumImpact();
-                    
+
                     widget.service.castVote(
                       postId: _post.id,
                       choiceIndex: index,
@@ -690,9 +740,9 @@ class _GistPostCardState extends State<GistPostCard> {
               ),
             );
           }).toList(),
-          
+
           const SizedBox(height: 12),
-          
+
           // Poll footer
           Row(
             children: [
