@@ -104,8 +104,8 @@ class MonnifyService {
       'contractCode': AppConfig.monnifyContractCode,
       'paymentDescription': 'NigerGram Wallet Funding',
       'paymentReference': paymentReference,
-      // Use a proper callback URL - update this to your actual domain
-      'redirectUrl': 'https://nigergram.app/payment-callback',
+      // ✅ FIXED: Changed to working Render URL
+      'redirectUrl': 'https://nigergram-webhook.onrender.com/payment-callback',
       'incomeSplitConfig': [],
     };
 
