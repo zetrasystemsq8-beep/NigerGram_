@@ -15,25 +15,39 @@ class GistService {
   }
 
   Stream<List<Map<String, dynamic>>> getGistFeedStream({required String filter}) {
-    Query<Map<String, dynamic>> query = _firestore.collection('gist_posts');
-
     if (filter == 'trending') {
-      query = query.orderBy('trendingScore', descending: true);
+      return _getTrendingStream();
     } else if (filter == 'polls') {
-      query = query.where('type', isEqualTo: 'poll');
+      return _firestore
+          .collection('gist_posts')
+          .where('type', isEqualTo: 'poll')
+          .limit(50)
+          .snapshots()
+          .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
     } else {
-      query = query.orderBy('createdAt', descending: true);
+      return _firestore
+          .collection('gist_posts')
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .snapshots()
+          .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
     }
+  }
 
-    return query.limit(50).snapshots().map((snap) {
-      return snap.docs.map((d) {
-        final data = d.data();
-        return {
-          'id': d.id,
-          ...data,
-        };
-      }).toList();
-    });
+  // Reads the dynamically-calculated cutoff from config/trending (written
+  // hourly by the cron job) before building the Trending query. Falls back
+  // to 10 if the config doc doesn't exist yet (e.g. before the first cron run).
+  Stream<List<Map<String, dynamic>>> _getTrendingStream() async* {
+    final configDoc = await _firestore.collection('config').doc('trending').get();
+    final double minScore = (configDoc.data()?['minScore'] as num?)?.toDouble() ?? 10.0;
+
+    yield* _firestore
+        .collection('gist_posts')
+        .where('trendingScore', isGreaterThan: minScore)
+        .orderBy('trendingScore', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
   Future<void> createPost({
@@ -193,8 +207,6 @@ class GistService {
     }
   }
 
-  // 🔥 FIXED: Correct vote logic with pollVoters
-  // 🔥 UPDATED: wallet docs auto-create on first use (set + merge instead of update)
   Future<void> castVote({
     required String postId,
     required int choiceIndex,
@@ -224,18 +236,15 @@ class GistService {
           throw Exception('This poll has expired');
         }
         
-        // Check if user already voted
         final voters = Map<String, int>.from(data['pollVoters'] ?? {});
         if (voters.containsKey(user.uid)) {
           throw Exception('You already voted');
         }
         
-        // Update vote counts
         final pollVotes = Map<String, int>.from(data['pollVotes'] ?? {});
         final key = choiceIndex.toString();
         pollVotes[key] = (pollVotes[key] ?? 0) + 1;
         
-        // Store who voted
         voters[user.uid] = choiceIndex;
         
         transaction.update(postRef, {
@@ -243,8 +252,6 @@ class GistService {
           'pollVoters': voters,
         });
 
-        // Vote cost split: 1 coin from voter -> 60% creator / 40% platform,
-        // integer rounding, platform gets the full coin if creatorShare rounds to 0.
         const int voteCost = 1;
         final int creatorShare = (voteCost * 60) ~/ 100;
         final int platformShare = creatorShare == 0 ? voteCost : voteCost - creatorShare;
@@ -266,7 +273,6 @@ class GistService {
           );
         }
 
-        // Platform earnings stored as a doc within the existing wallets collection.
         final platformWalletRef = _firestore.collection('wallets').doc('platform');
         transaction.set(
           platformWalletRef,
@@ -274,8 +280,6 @@ class GistService {
           SetOptions(merge: true),
         );
 
-        // Poll creation fee: 5 coins deducted from the creator once the poll
-        // crosses 30 total votes (charged exactly once, at the crossing point).
         final int totalVotes = pollVotes.values.fold(0, (sum, v) => sum + v);
         if (totalVotes == 30 && creatorId.isNotEmpty) {
           final creatorWalletRef = _firestore.collection('wallets').doc(creatorId);
