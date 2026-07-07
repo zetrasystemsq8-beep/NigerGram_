@@ -174,6 +174,123 @@ app.post('/monnify-webhook', async (req, res) => {
   }
 });
 
+app.get('/payment-callback', (req, res) => {
+  const amount = req.query.amount;
+  const reference = req.query.paymentReference || req.query.transactionReference || '';
+
+  const amountBlock = amount
+    ? `<p class="amount">₦${Number(amount).toLocaleString()}</p><p class="sub">added to your wallet</p>`
+    : `<p class="sub">Your coins will appear in your wallet shortly.</p>`;
+
+  res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Payment Complete — NigerGram</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: radial-gradient(circle at top, #1a1a1a 0%, #0a0a0a 70%);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+          }
+          .card {
+            width: 100%;
+            max-width: 380px;
+            text-align: center;
+            animation: fadeUp 0.5s ease-out;
+          }
+          @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .check-circle {
+            width: 84px;
+            height: 84px;
+            margin: 0 auto 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FFD700, #FF6B00);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 40px rgba(255, 165, 0, 0.35);
+            animation: pop 0.4s ease-out 0.15s both;
+          }
+          @keyframes pop {
+            0% { transform: scale(0.6); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+          }
+          .check-circle svg { width: 40px; height: 40px; }
+          h1 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.2px;
+          }
+          .amount {
+            font-size: 32px;
+            font-weight: 800;
+            margin: 16px 0 4px;
+            background: linear-gradient(135deg, #FFD700, #FF6B00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+          }
+          .sub {
+            font-size: 14px;
+            color: #999999;
+            margin-bottom: 28px;
+          }
+          .ref {
+            font-size: 11px;
+            color: #555555;
+            margin-bottom: 32px;
+            word-break: break-all;
+          }
+          .instruction {
+            font-size: 14px;
+            color: #cccccc;
+            line-height: 1.6;
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+          }
+          .brand {
+            margin-top: 40px;
+            font-size: 12px;
+            color: #444444;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="check-circle">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 6L9 17L4 12" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h1>Payment Successful</h1>
+          ${amountBlock}
+          ${reference ? `<p class="ref">Ref: ${reference}</p>` : ''}
+          <div class="instruction">
+            You can close this window now and return to the NigerGram app to see your updated coin balance.
+          </div>
+          <div class="brand">🇳🇬 NigerGram</div>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
 app.get('/cron/gist-hub', gistHubCronHandler);
 
 const PORT = process.env.PORT || 3000;
