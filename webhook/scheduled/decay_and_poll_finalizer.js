@@ -1,11 +1,7 @@
 const admin = require('firebase-admin');
 
-// ✅ FIXED: Load Firebase from environment variable
 if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_JSON);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+  admin.initializeApp();
 }
 
 const db = admin.firestore();
@@ -33,8 +29,55 @@ async function decayTrendingScores() {
   return { decayed: count };
 }
 
+// Dynamic trending cutoff: top 5% of all posts by trendingScore, with a
+// floor of 10 so low-activity periods can't let near-zero posts qualify.
+// Stored in config/trending so the app can read it without recalculating.
+async function calculateTrendingCutoff() {
+  const snapshot = await db.collection('gist_posts').get();
+
+  if (snapshot.empty) {
+    await db.collection('config').doc('trending').set({
+      minScore: 10,
+      totalPosts: 0,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { minScore: 10, totalPosts: 0 };
+  }
+
+  const scores = snapshot.docs
+    .map((doc) => doc.data().trendingScore)
+    .filter((s) => typeof s === 'number')
+    .sort((a, b) => b - a);
+
+  if (scores.length === 0) {
+    await db.collection('config').doc('trending').set({
+      minScore: 10,
+      totalPosts: snapshot.size,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { minScore: 10, totalPosts: snapshot.size };
+  }
+
+  const cutoffIndex = Math.max(0, Math.ceil(scores.length * 0.05) - 1);
+  let minScore = scores[cutoffIndex];
+
+  if (minScore < 10) {
+    minScore = 10;
+  }
+
+  await db.collection('config').doc('trending').set({
+    minScore,
+    totalPosts: scores.length,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { minScore, totalPosts: scores.length };
+}
+
 // Poll expiry: mark expired active polls inactive, then promote ONLY the
 // single highest-voted poll among those just expired to a poll_result post
+// (which starts with a trendingScore above the Trending threshold so it
+// surfaces immediately, then decays naturally like any other post).
 async function finalizeExpiredPolls() {
   const now = admin.firestore.Timestamp.now();
 
@@ -124,15 +167,17 @@ async function finalizeExpiredPolls() {
   return { expired: snapshot.size, winnerCreated };
 }
 
-// Combined cron handler
+// Combined cron handler — mount this at your existing cron endpoint
 async function gistHubCronHandler(req, res) {
   try {
     const decayResult = await decayTrendingScores();
+    const cutoffResult = await calculateTrendingCutoff();
     const pollResult = await finalizeExpiredPolls();
 
     res.status(200).json({
       success: true,
       decay: decayResult,
+      trendingCutoff: cutoffResult,
       polls: pollResult,
     });
   } catch (error) {
@@ -146,6 +191,7 @@ async function gistHubCronHandler(req, res) {
 
 module.exports = {
   decayTrendingScores,
+  calculateTrendingCutoff,
   finalizeExpiredPolls,
   gistHubCronHandler,
 };
