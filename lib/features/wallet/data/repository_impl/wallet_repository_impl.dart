@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:nigergram/features/wallet/domain/entities/transaction_entity.dart';
 import 'package:nigergram/features/wallet/domain/entities/wallet_entity.dart';
