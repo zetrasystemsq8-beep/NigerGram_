@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
@@ -38,11 +38,10 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
   }
 
   Future<void> _loadSenderBalance() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (!AppAuth.isLoggedIn) return;
 
     try {
-      final doc = await _firestore.collection('wallets').doc(user.uid).get();
+      final doc = await _firestore.collection('wallets').doc(AppAuth.uid).get();
       final balance = (doc.data()?['coinBalance'] as num?)?.toInt() ?? 0;
       if (mounted) {
         setState(() => _senderCoinBalance = balance);
@@ -64,8 +63,7 @@ class _TipBottomSheetState extends State<TipBottomSheet> {
     final coinAmount = int.tryParse(_amountController.text) ?? 0;
     if (coinAmount <= 0) return;
 
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
+    if (!AppAuth.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Not authenticated')),
       );
