@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 
@@ -39,8 +39,7 @@ class _GistCreatePostState extends State<GistCreatePost> {
   }
 
   Future<void> _submitPost() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+    if (!AppAuth.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please login first')),
       );
