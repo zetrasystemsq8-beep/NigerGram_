@@ -1,8 +1,7 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/wallet/data/repository_impl/wallet_repository_impl.dart';
 import 'package:nigergram/features/wallet/domain/entities/transaction_entity.dart';
 import 'package:nigergram/features/wallet/domain/entities/wallet_entity.dart';
@@ -14,10 +13,9 @@ class WalletCubit extends Cubit<WalletState> {
   StreamSubscription<List<WalletTransactionEntity>>? _txSub;
 
   WalletCubit({required this.repository}) : super(WalletState.initial()) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      watchWallet(user.uid);
-      watchTransactions(user.uid);
+    if (AppAuth.isLoggedIn) {
+      watchWallet(AppAuth.uid);
+      watchTransactions(AppAuth.uid);
     }
   }
 
@@ -37,14 +35,13 @@ class WalletCubit extends Cubit<WalletState> {
 
   Future<void> refresh() async {
     emit(state.copyWith(isLoading: true, error: ''));
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+    if (!AppAuth.isLoggedIn) {
       emit(state.copyWith(isLoading: false, error: 'Not authenticated'));
       return;
     }
     try {
-      final wallet = await repository.fetchWallet(user.uid);
-      final txs = await repository.transactionsStreamForUser(user.uid).first;
+      final wallet = await repository.fetchWallet(AppAuth.uid);
+      final txs = await repository.transactionsStreamForUser(AppAuth.uid).first;
       emit(state.copyWith(wallet: wallet, transactions: txs, isLoading: false));
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));
@@ -58,12 +55,11 @@ class WalletCubit extends Cubit<WalletState> {
     String? videoId,
     String? message,
   }) async {
-    final user = FirebaseAuth.instance.currentUser!;
     try {
       await repository.sendGift(
-        fromUserId: user.uid,
+        fromUserId: AppAuth.uid,
         toUserId: toUserId,
-        fromUsername: user.displayName ?? user.email?.split('@').first ?? 'user',
+        fromUsername: AppAuth.displayHandle,
         toUsername: toUsername,
         coinAmount: coinAmount,
         videoId: videoId,
@@ -78,9 +74,8 @@ class WalletCubit extends Cubit<WalletState> {
     required int coinAmount,
     required String monnifyTransactionReference,
   }) async {
-    final user = FirebaseAuth.instance.currentUser!;
     await repository.fundWallet(
-      userId: user.uid,
+      userId: AppAuth.uid,
       coinAmount: coinAmount,
       monnifyTransactionReference: monnifyTransactionReference,
     );
@@ -93,9 +88,8 @@ class WalletCubit extends Cubit<WalletState> {
     required String bankAccountName,
     required String bankCode,
   }) async {
-    final user = FirebaseAuth.instance.currentUser!;
     await repository.requestWithdrawal(
-      userId: user.uid,
+      userId: AppAuth.uid,
       amount: amount,
       bankName: bankName,
       bankAccountNumber: bankAccountNumber,
@@ -110,9 +104,8 @@ class WalletCubit extends Cubit<WalletState> {
     required String bankAccountName,
     required String bankCode,
   }) async {
-    final user = FirebaseAuth.instance.currentUser!;
     await repository.saveBankInfo(
-      userId: user.uid,
+      userId: AppAuth.uid,
       bankName: bankName,
       bankAccountNumber: bankAccountNumber,
       bankAccountName: bankAccountName,
