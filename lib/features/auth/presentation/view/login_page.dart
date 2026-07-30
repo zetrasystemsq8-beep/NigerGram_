@@ -203,10 +203,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      Supabase.instance.client.auth.signInWithPassword(
+  email: email,
+  password: password,
+);
       if (mounted) {
         context.go(RouterEnum.dashboardView.routeName);
       }
