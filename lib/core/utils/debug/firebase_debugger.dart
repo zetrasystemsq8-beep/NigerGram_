@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+/// Firestore-only diagnostics. Firebase Auth has been fully removed from
+/// NigerGram (authentication is 100% Supabase now), so this debugger only
+/// validates Firebase Core initialization and Firestore connectivity,
+/// which remain in use for Gist Hub, comments, reactions, and legacy data.
 class FirebaseDebugger {
-  /// Validates Firebase setup and connectivity
-  /// Returns true if all systems are healthy
+  /// Validates Firebase setup and connectivity.
+  /// Returns true if all systems are healthy.
   static Future<bool> validateFirebaseSetup() async {
     debugPrint('╔════════════════════════════════════════════╗');
     debugPrint('║  Firebase Configuration Debug Start       ║');
@@ -28,7 +31,7 @@ class FirebaseDebugger {
     try {
       debugPrint('🟡 Testing Firestore connectivity...');
       final firestore = FirebaseFirestore.instance;
-      
+
       // Create a test document
       await firestore
           .collection('_health_check')
@@ -69,20 +72,6 @@ class FirebaseDebugger {
       allHealthy = false;
     }
 
-    // Check Firebase Auth
-    try {
-      final auth = FirebaseAuth.instance;
-      final user = auth.currentUser;
-      if (user != null) {
-        debugPrint('✅ Firebase Auth: Logged in as ${user.email}');
-      } else {
-        debugPrint('✅ Firebase Auth: Not logged in (normal on startup)');
-      }
-    } catch (e) {
-      debugPrint('🔴 Firebase Auth: Error - $e');
-      allHealthy = false;
-    }
-
     // Summary
     debugPrint('╔════════════════════════════════════════════╗');
     if (allHealthy) {
@@ -95,7 +84,7 @@ class FirebaseDebugger {
     return allHealthy;
   }
 
-  /// Logs detailed Firebase configuration info
+  /// Logs detailed Firebase configuration info.
   static Future<void> logFirebaseInfo() async {
     debugPrint('╔════════════════════════════════════════════╗');
     debugPrint('║  Firebase Configuration Info              ║');
@@ -109,15 +98,6 @@ class FirebaseDebugger {
     }
 
     try {
-      final auth = FirebaseAuth.instance;
-      debugPrint('Auth Instance: ${auth.runtimeType}');
-      debugPrint('Current User: ${auth.currentUser?.email ?? "None"}');
-      debugPrint('Is Signed In: ${auth.currentUser != null}');
-    } catch (e) {
-      debugPrint('Auth Error: $e');
-    }
-
-    try {
       final firestore = FirebaseFirestore.instance;
       debugPrint('Firestore Instance: ${firestore.runtimeType}');
     } catch (e) {
@@ -125,72 +105,5 @@ class FirebaseDebugger {
     }
 
     debugPrint('────────────────────────────────────────────');
-  }
-
-  /// Simulates login process to debug issues
-  static Future<void> debugLogin({
-    required String email,
-    required String password,
-  }) async {
-    debugPrint('╔════════════════════════════════════════════╗');
-    debugPrint('║  Debug Login Process                      ║');
-    debugPrint('╚════════════════════════════════════════════╝');
-
-    try {
-      debugPrint('🟡 Attempting login with: $email');
-      
-      final auth = FirebaseAuth.instance;
-      
-      final userCredential = await auth
-          .signInWithEmailAndPassword(
-            email: email,
-            password: password,
-          )
-          .timeout(
-            const Duration(seconds: 15),
-            onTimeout: () {
-              throw TimeoutException(
-                'Login timed out after 15s - check internet connection',
-              );
-            },
-          );
-
-      debugPrint('✅ Login successful!');
-      debugPrint('   User: ${userCredential.user?.email}');
-      debugPrint('   UID: ${userCredential.user?.uid}');
-
-      // Sign out for testing
-      await auth.signOut();
-      debugPrint('✅ Signed out for testing');
-    } on FirebaseAuthException catch (e) {
-      debugPrint('🔴 Firebase Auth Error: ${e.code}');
-      debugPrint('   Message: ${e.message}');
-      _handleAuthError(e.code);
-    } on TimeoutException catch (e) {
-      debugPrint('🔴 Timeout: $e');
-      debugPrint('   → Check internet connection');
-      debugPrint('   → Check if Firebase credentials are valid');
-    } catch (e) {
-      debugPrint('🔴 Error: $e');
-    }
-
-    debugPrint('────────────────────────────────────────────');
-  }
-
-  /// Handle specific Firebase auth errors
-  static void _handleAuthError(String code) {
-    final errorMessages = {
-      'invalid-email': 'Email format is invalid',
-      'user-disabled': 'User account has been disabled',
-      'user-not-found': 'No account exists with this email',
-      'wrong-password': 'Incorrect password',
-      'invalid-credential': 'Invalid credentials',
-      'too-many-requests': 'Too many failed login attempts. Try again later.',
-      'operation-not-allowed': 'Email/password login is disabled',
-      'network-request-failed': 'Network error - check internet connection',
-    };
-
-    final message = errorMessages[code] ?? 'Unknown error: $code';
-    debugPrint('   Details: $message');
   }
 }
