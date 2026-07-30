@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
@@ -21,12 +21,10 @@ class GistCommentSheet extends StatefulWidget {
 
 class _GistCommentSheetState extends State<GistCommentSheet> {
   final TextEditingController _commentController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoading = false;
 
   void _submitComment() async {
-    final user = _auth.currentUser;
-    if (user == null) {
+    if (!AppAuth.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please login first')),
       );
