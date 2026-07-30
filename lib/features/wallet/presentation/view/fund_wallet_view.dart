@@ -7,7 +7,7 @@ import 'package:nigergram/core/services/monnify_service.dart';
 import 'package:nigergram/core/services/coin_service.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 
 class FundWalletView extends StatefulWidget {
   const FundWalletView({super.key});
@@ -113,13 +113,13 @@ class _FundWalletViewState extends State<FundWalletView> {
     _updateStatus('Initializing payment...');
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = AppAuth.currentUser;
       if (user == null) {
         throw Exception('User not authenticated');
       }
 
       final customerEmail = user.email ?? 'user@nigergram.app';
-      final customerName = user.displayName ?? 'NigerGram User';
+      final customerName = AppAuth.displayHandle;
 
       _updateStatus('Contacting payment gateway...');
 
