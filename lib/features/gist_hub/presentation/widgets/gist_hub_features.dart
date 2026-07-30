@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
@@ -54,8 +54,7 @@ class DeleteGistFeature {
     required String userId,
     required VoidCallback onDeleted,
   }) async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null || currentUser.uid != userId) {
+    if (!AppAuth.isLoggedIn || AppAuth.uid != userId) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You can only delete your own posts')),
       );
