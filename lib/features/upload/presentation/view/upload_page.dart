@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/media/repository/media_repository.dart';
 
 class UploadPage extends StatefulWidget {
@@ -49,28 +49,6 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  Future<void> _ensureSupabaseSession() async {
-    final supabaseUser = Supabase.instance.client.auth.currentUser;
-    if (supabaseUser == null) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null && user.email != null) {
-        try {
-          await Supabase.instance.client.auth.signInWithPassword(
-            email: user.email!,
-            password: 'nigergram_${user.uid.substring(0, 8)}',
-          );
-        } catch (_) {
-          try {
-            await Supabase.instance.client.auth.signUp(
-              email: user.email!,
-              password: 'nigergram_${user.uid.substring(0, 8)}',
-            );
-          } catch (_) {}
-        }
-      }
-    }
-  }
-
   Future<void> _uploadVideo() async {
     if (_videoFile == null) return;
     if (_descriptionController.text.trim().isEmpty) {
@@ -89,14 +67,13 @@ class _UploadPageState extends State<UploadPage> {
     });
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = AppAuth.currentUser;
       if (user == null) return;
 
-      await _ensureSupabaseSession();
       setState(() => _uploadProgress = 0.05);
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final videoFileName = '${user.uid}_$timestamp.mp4';
+      final videoFileName = '${user.id}_$timestamp.mp4';
       final supabase = Supabase.instance.client;
 
       // Show an immediate snackbar so testers can see compression started
@@ -129,7 +106,7 @@ class _UploadPageState extends State<UploadPage> {
 
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(user.uid)
+          .doc(user.id)
           .get();
       final username = userDoc.data()?['username'] ?? 'naija_creator';
       final profilePic = userDoc.data()?['profilePicUrl'] ?? '';
@@ -143,7 +120,7 @@ class _UploadPageState extends State<UploadPage> {
       await FirebaseFirestore.instance.collection('videos').add({
         'videoUrl': videoUrl,
         'description': _descriptionController.text.trim(),
-        'userId': user.uid,
+        'userId': user.id,
         'username': username,
         'profileImageUrl': profilePic,
         'likeCount': 0,
