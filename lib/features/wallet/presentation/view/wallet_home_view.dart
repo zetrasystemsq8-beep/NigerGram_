@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
