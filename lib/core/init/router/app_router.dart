@@ -1,9 +1,11 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:nigergram/core/init/router/custom_page_builder_widget.dart';
 import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
 import 'package:nigergram/features/auth/presentation/view/login_page.dart';
-import 'package:nigergram/features/auth/presentation/view/register_page.dart';
+import 'package:nigergram/features/auth/presentation/view/verification_page.dart';
 import 'package:nigergram/features/dashboard/presentation/view/dashboard_view.dart';
 import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 import 'package:nigergram/features/upload/presentation/view/upload_page.dart';
@@ -14,7 +16,6 @@ import 'package:nigergram/features/wallet/presentation/view/fund_wallet_view.dar
 import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/creator_earnings_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
-import 'package:go_router/go_router.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -22,9 +23,7 @@ final GlobalKey<NavigatorState> _rootNavigatorKey =
 class AppRouter {
   final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: FirebaseAuth.instance.currentUser != null
-        ? RouterEnum.dashboardView.routeName
-        : '/login',
+    initialLocation: _resolveInitialLocation(),
     routes: [
       GoRoute(
         path: '/login',
@@ -32,9 +31,9 @@ class AppRouter {
             customPageBuilderWidget(context, state, const LoginPage()),
       ),
       GoRoute(
-        path: '/register',
+        path: '/verify',
         pageBuilder: (context, state) =>
-            customPageBuilderWidget(context, state, const RegisterPage()),
+            customPageBuilderWidget(context, state, const VerificationPage()),
       ),
       GoRoute(
         path: RouterEnum.uploadView.routeName,
@@ -125,4 +124,13 @@ class AppRouter {
       ),
     ],
   );
+
+  /// Determines the initial route purely from Supabase's session state,
+  /// since Firebase Auth no longer exists in this app.
+  static String _resolveInitialLocation() {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return '/login';
+    if (user.emailConfirmedAt == null) return '/verify';
+    return RouterEnum.dashboardView.routeName;
+  }
 }
