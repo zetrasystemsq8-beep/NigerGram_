@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 import 'dart:developer';
 import 'package:nigergram/core/design_system/colors.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NigerGramError {
   // ============ GET MESSAGE (WITH EXCEPTION TYPES) ============
@@ -13,38 +13,34 @@ class NigerGramError {
     log('Error occurred: $error');
     debugPrint('Error: $error');
 
-    // ============ FIREBASE AUTH EXCEPTIONS ============
-    if (error is FirebaseAuthException) {
-      switch (error.code) {
-        case 'user-not-found':
-          return '👤 No account found with this email.';
-        case 'wrong-password':
-          return '🔒 Incorrect password. Please try again.';
-        case 'email-already-in-use':
-          return '📧 This email is already registered.';
-        case 'invalid-email':
-          return '📧 Please enter a valid email address.';
-        case 'too-many-requests':
-          return '⏳ Too many attempts. Please try again later.';
-        case 'weak-password':
-          return '🔐 Password must be at least 6 characters.';
-        case 'requires-recent-login':
-          return '⏰ Please login again to continue.';
-        case 'user-disabled':
-          return '🚫 This account has been disabled.';
-        case 'invalid-credential':
-          return '❌ Invalid email or password.';
-        case 'operation-not-allowed':
-          return '⚠️ This sign in method is not available.';
-        case 'credential-already-in-use':
-          return '⚠️ This account is already linked to another user.';
-        case 'network-request-failed':
-          return '📡 Network issue. Please check your connection.';
-        case 'timeout':
-          return '⏰ Request timed out. Please try again.';
-        default:
-          return '⚠️ ${error.message ?? 'Authentication error occurred.'}';
+    // ============ SUPABASE AUTH EXCEPTIONS ============
+    if (error is AuthException) {
+      final message = error.message.toLowerCase();
+      final code = error.statusCode;
+
+      if (message.contains('invalid login credentials') ||
+          message.contains('invalid_credentials')) {
+        return '❌ Invalid ZetraMail or password.';
       }
+      if (message.contains('email not confirmed')) {
+        return '📧 Please verify your ZetraMail to continue.';
+      }
+      if (message.contains('user not found')) {
+        return '👤 No account found with this ZetraMail.';
+      }
+      if (message.contains('too many requests') || code == '429') {
+        return '⏳ Too many attempts. Please try again later.';
+      }
+      if (message.contains('weak password')) {
+        return '🔐 Password must be at least 6 characters.';
+      }
+      if (message.contains('network')) {
+        return '📡 Network issue. Please check your connection.';
+      }
+      if (message.contains('timeout')) {
+        return '⏰ Request timed out. Please try again.';
+      }
+      return '⚠️ ${error.message}';
     }
 
     // ============ FIRESTORE EXCEPTIONS ============
