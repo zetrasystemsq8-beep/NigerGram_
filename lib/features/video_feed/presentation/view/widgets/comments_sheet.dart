@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'dart:async';
 import 'comment_item.dart';
 import 'comment_composer.dart';
@@ -359,7 +359,7 @@ class CommentData {
   /// ✅ Creates CommentData from Firestore document
   /// Handles all field name variations
   factory CommentData.fromFirestore(Map<String, dynamic> data, String commentId) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final currentUserId = AppAuth.uid;
     return CommentData(
       id: commentId,
       userId: data['userId'] ?? '',
