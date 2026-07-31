@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:nigergram/core/design_system/colors.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/inbox/presentation/view/chat_view.dart';
 
 class InboxView extends StatefulWidget {
@@ -17,7 +17,7 @@ class _InboxViewState extends State<InboxView> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
+  String get _currentUserId => AppAuth.uid;
   bool get _isUserLoggedIn => _currentUserId.isNotEmpty;
 
   String _getChatId(String userId1, String userId2) {
@@ -111,9 +111,8 @@ class _InboxViewState extends State<InboxView> {
 
       final currentUserData = await _firestore.collection('users').doc(_currentUserId).get();
       final currentDisplayName = currentUserData.data()?['displayName'] ??
-          FirebaseAuth.instance.currentUser?.displayName ?? 'You';
-      final currentProfilePic = currentUserData.data()?['profilePicUrl'] ??
-          FirebaseAuth.instance.currentUser?.photoURL ?? '';
+          AppAuth.displayHandle;
+      final currentProfilePic = currentUserData.data()?['profilePicUrl'] ?? '';
 
       await _firestore.collection('chats').doc(chatId).set({
         'participants': [_currentUserId, otherUserId],
@@ -533,7 +532,7 @@ class _NewChatSheetState extends State<_NewChatSheet> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _searchQuery = '';
 
-  String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
+  String get _currentUserId => AppAuth.uid;
 
   @override
   void dispose() {
