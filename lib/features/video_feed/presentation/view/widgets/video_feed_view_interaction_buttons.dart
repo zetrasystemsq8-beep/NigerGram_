@@ -1,83 +1,63 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:nigergram/features/video_feed/repository/interaction_repository.dart';
-import 'package:go_router/go_router.dart';
-import 'package:nigergram/features/wallet/presentation/widgets/tip_bottom_sheet.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
+import 'dart:async';
+import 'comment_item.dart';
+import 'comment_composer.dart';
 
-/// ✅ PRODUCTION-READY: Interaction buttons with full backend wiring
-/// Handles: Likes, Comments, Saves, Tags, Wallet, Tips, Native Share, Double-Tap Like
-class VideoFeedViewInteractionButtons extends StatefulWidget {
-  const VideoFeedViewInteractionButtons({
+/// 🎬 TikTok-quality comments sheet with modular architecture
+/// Features:
+/// - Smooth animations for list transitions
+/// - Real-time Firestore sync
+/// - Optimistic comment posting
+/// - Reply thread expand/collapse
+/// - Performance optimizations (const constructors, RepaintBoundary)
+class CommentsSheet extends StatefulWidget {
+  final String videoId;
+  final int initialCommentCount;
+
+  const CommentsSheet({
     required this.videoId,
-    required this.isLiked,
-    required this.likeCount,
-    required this.commentCount,
-    required this.shareCount,
-    this.isBookmarked = false,
-    this.onCommentTapped, // Added explicit functional hook parameter
-    this.onShareTapped,
-    this.onBookmarkTapped,
-    this.creatorId,
-    this.creatorUsername,
+    required this.initialCommentCount,
     super.key,
   });
 
-  final String videoId;
-  final bool isLiked;
-  final int likeCount;
-  final int commentCount;
-  final int shareCount;
-  final bool isBookmarked;
-  final VoidCallback? onCommentTapped; // Captured into class state
-  final VoidCallback? onShareTapped;
-  final VoidCallback? onBookmarkTapped;
-  final String? creatorId;
-  final String? creatorUsername;
-
   @override
-  State<VideoFeedViewInteractionButtons> createState() => _VideoFeedViewInteractionButtonsState();
+  State<CommentsSheet> createState() => _CommentsSheetState();
 }
 
-class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteractionButtons> {
-  late bool _isLiked;
-  late bool _isSaved;
-  late int _likeCount;
-  late int _commentCount;
-  bool _likePending = false;
-  bool _savePending = false;
-
-  final InteractionRepository _repo = InteractionRepository();
+class _CommentsSheetState extends State<CommentsSheet> {
+  late ScrollController _scrollController;
+  late List<CommentData> _pendingComments;
+  late Map<String, CommentData> _commentCache;
+  late Set<String> _expandedReplies;
+  late Map<String, bool> _likeOptimisticStates;
+  int _commentCount = 0;
+  
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _videoSub;
 
   @override
   void initState() {
     super.initState();
-    _isLiked = widget.isLiked;
-    _isSaved = widget.isBookmarked;
-    _likeCount = widget.likeCount;
-    _commentCount = widget.commentCount;
+    _scrollController = ScrollController();
+    _pendingComments = [];
+    _commentCache = {};
+    _expandedReplies = {};
+    _likeOptimisticStates = {};
+    _commentCount = widget.initialCommentCount;
     _startVideoListener(widget.videoId);
   }
 
   @override
-  void didUpdateWidget(VideoFeedViewInteractionButtons oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.videoId != widget.videoId) {
-      _stopVideoListener();
-      _isLiked = widget.isLiked;
-      _isSaved = widget.isBookmarked;
-      _likeCount = widget.likeCount;
-      _commentCount = widget.commentCount;
-      _startVideoListener(widget.videoId);
-    }
+  void dispose() {
+    _scrollController.dispose();
+    _stopVideoListener();
+    super.dispose();
   }
 
+  /// ✅ Listen to video document for real-time commentCount updates
+  /// Mirrors the pattern from video_feed_view_interaction_buttons.dart
   void _startVideoListener(String videoId) {
     _stopVideoListener();
     try {
@@ -87,26 +67,13 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
         if (data == null) return;
 
         setState(() {
-          _likeCount = (data['likeCount'] as num?)?.toInt() ?? _likeCount;
           _commentCount = (data['commentCount'] as num?)?.toInt() ?? _commentCount;
-
-          final currentUser = FirebaseAuth.instance.currentUser;
-          if (currentUser != null) {
-            final likedBy = (data['likedBy'] as List<dynamic>?)?.cast<String>();
-            if (likedBy != null) {
-              _isLiked = likedBy.contains(currentUser.uid);
-            }
-            final savedBy = (data['savedBy'] as List<dynamic>?)?.cast<String>();
-            if (savedBy != null) {
-              _isSaved = savedBy.contains(currentUser.uid);
-            }
-          }
         });
       }, onError: (e) {
-        debugPrint('❌ Video listener error: $e');
+        debugPrint('❌ Video listener error in CommentsSheet: $e');
       });
     } catch (e) {
-      debugPrint('❌ Failed to start video listener: $e');
+      debugPrint('❌ Failed to start video listener in CommentsSheet: $e');
     }
   }
 
@@ -115,408 +82,317 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
     _videoSub = null;
   }
 
-  Future<void> _handleLike() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to like videos')),
-      );
-      return;
-    }
-
-    if (_likePending) return;
-    _likePending = true;
-
+  /// ✅ Optimistic comment posting
+  /// Adds comment to UI immediately, then syncs to Firestore
+  void _onCommentAdded(CommentData comment) {
     setState(() {
-      _isLiked = !_isLiked;
-      _likeCount += _isLiked ? 1 : -1;
-      if (_likeCount < 0) _likeCount = 0;
+      _pendingComments.insert(0, comment);
+      _commentCount++;
     });
 
-    try {
-      final newStatus = await _repo.toggleLike(widget.videoId, user.uid);
-      final doc = await _firestore.collection('videos').doc(widget.videoId).get();
-      final authoritativeCount = (doc.data()?['likeCount'] as num?)?.toInt();
-
-      if (mounted) {
-        setState(() {
-          _isLiked = newStatus;
-          if (authoritativeCount != null) {
-            _likeCount = authoritativeCount < 0 ? 0 : authoritativeCount;
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLiked = !_isLiked;
-          _likeCount += _isLiked ? 1 : -1;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Like failed: $e')),
+    // Smooth scroll to top to show new comment
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
         );
       }
-    } finally {
-      _likePending = false;
-    }
+    });
   }
 
-  Future<void> _handleSave() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to save videos')),
-      );
-      return;
-    }
-
-    if (_savePending) return;
-    _savePending = true;
-
-    try {
-      await _repo.toggleSave(widget.videoId, user.uid);
-      setState(() => _isSaved = !_isSaved);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
-      );
-    } finally {
-      _savePending = false;
-    }
+  void _onLikeToggled(String commentId, bool isLiked) {
+    setState(() {
+      _likeOptimisticStates[commentId] = isLiked;
+    });
   }
 
-  Future<void> _openComments() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to comment')),
-      );
-      return;
-    }
-
-    // Direct performance redirect pipeline back up to layout controller level
-    if (widget.onCommentTapped != null) {
-      widget.onCommentTapped!();
-      return;
-    }
-  }
-
-  Future<void> _handleTagTap() async {
-    try {
-      final doc = await _firestore.collection('videos').doc(widget.videoId).get();
-      final data = doc.data();
-      if (data == null) return;
-
-      final tags = (data['tags'] as List<dynamic>?)?.cast<String>() ?? [];
-      final tag = tags.isNotEmpty ? tags.first : 'NigerGram';
-
-      if (context.mounted) {
-        context.push('/discover?tag=$tag');
+  void _onReplyCountUpdated(String commentId, int newCount) {
+    setState(() {
+      if (_commentCache.containsKey(commentId)) {
+        _commentCache[commentId]!.replyCount = newCount;
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load tag destination: $e')),
-      );
-    }
+    });
   }
 
-  Future<void> _handleShare() async {
-    HapticFeedback.mediumImpact();
-    
-    try {
-      final doc = await _firestore.collection('videos').doc(widget.videoId).get();
-      final data = doc.data();
-      if (data == null) return;
-
-      final username = data['username'] ?? 'NigerGram Creator';
-      final description = data['description'] ?? 'Check out this video';
-      final deepLink = 'nigergram://video/${widget.videoId}';
-      
-      if (mounted) {
-        await showModalBottomSheet(
-          context: context,
-          builder: (ctx) => ShareBottomSheet(
-            videoId: widget.videoId,
-            username: username,
-            description: description,
-            deepLink: deepLink,
-          ),
-        );
-        
-        await _firestore
-            .collection('videos')
-            .doc(widget.videoId)
-            .update({'shareCount': FieldValue.increment(1)}).catchError((_) {});
+  void _toggleRepliesExpanded(String commentId) {
+    setState(() {
+      if (_expandedReplies.contains(commentId)) {
+        _expandedReplies.remove(commentId);
+      } else {
+        _expandedReplies.add(commentId);
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Share failed: $e')),
-      );
-    }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final double screenHeight = MediaQuery.of(context).size.height;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Like Button
-        VideoFeedViewInteractionButton(
-          icon: _isLiked ? Icons.favorite : Icons.favorite_border,
-          label: _formatCount(_likeCount),
-          iconColor: _isLiked ? const Color(0xFFFE2C55) : Colors.white,
-          onTap: _handleLike,
-        ),
-        SizedBox(height: screenHeight * 0.02),
-
-        // Comment Button
-        VideoFeedViewInteractionButton(
-          icon: Icons.chat_bubble_rounded,
-          label: _formatCount(_commentCount),
-          onTap: _openComments,
-        ),
-        SizedBox(height: screenHeight * 0.02),
-
-        // Tag Button
-        VideoFeedViewInteractionButton(
-          icon: Icons.label_rounded,
-          label: 'Tags',
-          onTap: _handleTagTap,
-        ),
-        SizedBox(height: screenHeight * 0.02),
-
-        // Share Button
-        VideoFeedViewInteractionButton(
-          icon: Icons.reply_rounded,
-          label: _formatCount(widget.shareCount),
-          onTap: _handleShare,
-        ),
-        SizedBox(height: screenHeight * 0.02),
-
-        // Save/Bookmark Button
-        VideoFeedViewInteractionButton(
-          icon: _isSaved ? Icons.bookmark : Icons.bookmark_border,
-          label: 'Save',
-          iconColor: _isSaved ? Colors.amber : Colors.white,
-          onTap: _handleSave,
-        ),
-        SizedBox(height: screenHeight * 0.02),
-
-        // Wallet Button
-        VideoFeedViewInteractionButton(
-          icon: Icons.account_balance_wallet_rounded,
-          label: 'Wallet',
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            context.push('/wallet');
-          },
-        ),
-        SizedBox(height: screenHeight * 0.02),
-
-        // Tip Button
-        VideoFeedViewInteractionButton(
-          icon: Icons.card_giftcard_rounded,
-          label: 'Tip',
-          onTap: () {
-            if (widget.creatorId == null || widget.creatorId!.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Creator information unavailable')),
-              );
-              return;
-            }
-
-            showModalBottomSheet<void>(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (ctx) => TipBottomSheet(
-                creatorId: widget.creatorId!,
-                creatorUsername: widget.creatorUsername ?? '',
-                videoId: widget.videoId,
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Material(
+        color: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF111111)
+                : Colors.white,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            children: [
+              _buildHandle(),
+              _buildHeader(),
+              Expanded(
+                child: _buildCommentsList(scrollController),
               ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  String _formatCount(int count) {
-    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
-    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
-    return count.toString();
-  }
-
-  @override
-  void dispose() {
-    _stopVideoListener();
-    super.dispose();
-  }
-}
-
-class VideoFeedViewInteractionButton extends StatelessWidget {
-  const VideoFeedViewInteractionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.iconColor = Colors.white,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: iconColor, size: 32),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+              CommentComposer(
+                videoId: widget.videoId,
+                onCommentAdded: _onCommentAdded,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
-}
 
-class ShareBottomSheet extends StatelessWidget {
-  final String videoId;
-  final String username;
-  final String description;
-  final String deepLink;
+  Widget _buildHandle() => Padding(
+        padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+        child: Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey[700]
+                : Colors.grey[300],
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      );
 
-  const ShareBottomSheet({
-    required this.videoId,
-    required this.username,
-    required this.description,
-    required this.deepLink,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF16161A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildHeader() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Share Video',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+            Semantics(
+              label: 'Comments section',
+              child: Text(
+                'Comments',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
             ),
-            const SizedBox(height: 20),
-            GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
-              children: [
-                _ShareOption(
-                  icon: Icons.send,
-                  label: 'WhatsApp',
-                  color: const Color(0xFF25D366),
-                  onTap: () {
-                    final message = '📱 Check out this NigerGram video by @$username: $description\n$deepLink';
-                    _share('whatsapp', message);
-                    Navigator.pop(context);
-                  },
+            Semantics(
+              label: 'Total comments: $_commentCount',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey[800]
+                      : Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                _ShareOption(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  label: 'Twitter',
-                  color: const Color(0xFF1DA1F2),
-                  onTap: () {
-                    final message = '🎬 Check out @$username on NigerGram: $description #NigerGram';
-                    _share('twitter', message);
-                    Navigator.pop(context);
-                  },
+                child: Text(
+                  _commentCount.toString(),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
-                _ShareOption(
-                  icon: Icons.copy,
-                  label: 'Copy Link',
-                  color: Colors.blue,
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: deepLink));
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Link copied to clipboard')),
-                    );
-                  },
-                ),
-                _ShareOption(
-                  icon: Icons.more_horiz_rounded,
-                  label: 'More',
-                  color: Colors.grey,
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
+              ),
             ),
           ],
         ),
-      ),
-    );
-  }
+      );
 
-  void _share(String platform, String message) {
-    debugPrint('Sharing to $platform: $message');
-  }
+  Widget _buildCommentsList(ScrollController scrollController) =>
+      StreamBuilder<QuerySnapshot>(
+        // ✅ Matches InteractionRepository.getCommentsStream():
+        // No parentCommentId filter - returns ALL comments ordered by createdAt
+        stream: FirebaseFirestore.instance
+            .collection('videos')
+            .doc(widget.videoId)
+            .collection('comments')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              _pendingComments.isEmpty) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          final comments = snapshot.data?.docs ?? [];
+          
+          // ✅ Filter to top-level comments only (parentCommentId is null or missing)
+          final topLevelComments = comments
+              .where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final parentId = data['parentCommentId'];
+                return parentId == null; // Include both missing field and explicit null
+              })
+              .toList();
+          
+          // ✅ FIX: When Firestore stream contains a pending comment's ID,
+          // remove it from _pendingComments (lines 248-251).
+          // This confirms the optimistic comment has been saved.
+          final firebaseCommentIds = topLevelComments.map((doc) => doc.id).toSet();
+          _pendingComments.removeWhere((pending) => firebaseCommentIds.contains(pending.id));
+          
+          final allComments = [
+            ..._pendingComments,
+            ...topLevelComments
+                .map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final commentId = doc.id;
+                  if (!_commentCache.containsKey(commentId)) {
+                    _commentCache[commentId] = CommentData.fromFirestore(data, commentId);
+                  }
+                  return _commentCache[commentId]!;
+                })
+                .toList()
+                .where((c) => !_pendingComments.any((p) => p.id == c.id))
+                .toList(),
+          ];
+
+          if (allComments.isEmpty) {
+            return Center(
+              child: Semantics(
+                label: 'No comments yet',
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.comment_outlined,
+                      size: 48,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey[600]
+                          : Colors.grey[300],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No comments yet',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return ListView.separated(
+            controller: scrollController,
+            itemCount: allComments.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final comment = allComments[index];
+              final isExpanded = _expandedReplies.contains(comment.id);
+
+              // ✅ Performance optimization: Prevent unnecessary rebuilds
+              return RepaintBoundary(
+                key: ValueKey(comment.id),
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                  child: CommentItem(
+                    comment: comment,
+                    videoId: widget.videoId,
+                    isExpanded: isExpanded,
+                    onToggleExpanded: () => _toggleRepliesExpanded(comment.id),
+                    onLikeToggled: (isLiked) =>
+                        _onLikeToggled(comment.id, isLiked),
+                    onReplyCountUpdated: (newCount) =>
+                        _onReplyCountUpdated(comment.id, newCount),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
 }
 
-class _ShareOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
+/// 📊 Reusable comment data model
+/// Converts between Firestore docs and UI representation
+class CommentData {
+  final String id;
+  final String userId;
+  final String username;
+  final String avatarUrl;
+  final String text;
+  final DateTime timestamp;
+  int likes;
+  int replyCount;
+  bool isLikedByCurrentUser;
+  final bool isVerified;
+  final bool isCreator;
+  final bool isPinned;
+  final String? parentCommentId;
 
-  const _ShareOption({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
+  CommentData({
+    required this.id,
+    required this.userId,
+    required this.username,
+    required this.avatarUrl,
+    required this.text,
+    required this.timestamp,
+    this.likes = 0,
+    this.replyCount = 0,
+    this.isLikedByCurrentUser = false,
+    this.isVerified = false,
+    this.isCreator = false,
+    this.isPinned = false,
+    this.parentCommentId,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+  /// ✅ Creates CommentData from Firestore document
+  /// Handles all field name variations
+  factory CommentData.fromFirestore(Map<String, dynamic> data, String commentId) {
+    final currentUserId = AppAuth.uid;
+    return CommentData(
+      id: commentId,
+      userId: data['userId'] ?? '',
+      username: data['username'] ?? 'Anonymous',
+      avatarUrl: data['userAvatar'] ?? '',
+      text: data['text'] ?? '',
+      // ✅ Handles both 'createdAt' and 'timestamp' field names
+      timestamp: ((data['createdAt'] ?? data['timestamp']) as Timestamp?)?.toDate() ?? DateTime.now(),
+      likes: (data['likeCount'] as num?)?.toInt() ?? 0,
+      replyCount: (data['replyCount'] as num?)?.toInt() ?? 0,
+      isLikedByCurrentUser:
+          ((data['likedBy'] as List?)?.contains(currentUserId)) ?? false,
+      isVerified: data['isVerified'] ?? false,
+      isCreator: data['isCreator'] ?? false,
+      isPinned: data['isPinned'] ?? false,
+      parentCommentId: data['parentCommentId'],
     );
   }
+
+  /// ✅ Converts to Firestore document format
+  Map<String, dynamic> toFirestore() => {
+        'id': id,
+        'userId': userId,
+        'username': username,
+        'userAvatar': avatarUrl,
+        'text': text,
+        'createdAt': Timestamp.fromDate(timestamp),
+        'timestamp': Timestamp.fromDate(timestamp), // Backward compatibility
+        'likeCount': likes,
+        'replyCount': replyCount,
+        'isVerified': isVerified,
+        'isCreator': isCreator,
+        'isPinned': isPinned,
+        if (parentCommentId != null) 'parentCommentId': parentCommentId,
+      };
 }
