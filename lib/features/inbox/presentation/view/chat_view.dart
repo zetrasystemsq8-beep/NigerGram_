@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:nigergram/core/design_system/colors.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 
 class ChatView extends StatefulWidget {
   final String chatId;
@@ -24,7 +24,7 @@ class ChatView extends StatefulWidget {
 
 class _ChatViewState extends State<ChatView> {
   final TextEditingController _messageController = TextEditingController();
-  final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+  final String _currentUserId = AppAuth.uid;
   final ScrollController _scrollController = ScrollController();
 
   @override
