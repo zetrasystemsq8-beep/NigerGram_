@@ -1,12 +1,11 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 
 class GistService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final SupabaseClient _supabase = Supabase.instance.client;
 
   Future<bool> isUserCreator(String userId) async {
@@ -58,10 +57,9 @@ class GistService {
     bool isAnonymous = false,
   }) async {
     try {
-      final user = _auth.currentUser;
-      String userId = user?.uid ?? '';
-      String displayName = user?.displayName ?? 'Anonymous';
-      String username = user?.email?.split('@').first ?? 'anonymous';
+      String userId = AppAuth.uid;
+      String displayName = AppAuth.isLoggedIn ? AppAuth.displayHandle : 'Anonymous';
+      String username = AppAuth.isLoggedIn ? AppAuth.displayHandle : 'anonymous';
       String profilePic = '';
 
       if (userId.isNotEmpty) {
@@ -212,8 +210,8 @@ class GistService {
     required int choiceIndex,
   }) async {
     final postRef = _firestore.collection('gist_posts').doc(postId);
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('Not logged in');
+    if (!AppAuth.isLoggedIn) throw Exception('Not logged in');
+    final String userUid = AppAuth.uid;
     
     try {
       await _firestore.runTransaction((transaction) async {
@@ -237,7 +235,7 @@ class GistService {
         }
         
         final voters = Map<String, int>.from(data['pollVoters'] ?? {});
-        if (voters.containsKey(user.uid)) {
+        if (voters.containsKey(userUid)) {
           throw Exception('You already voted');
         }
         
@@ -245,7 +243,7 @@ class GistService {
         final key = choiceIndex.toString();
         pollVotes[key] = (pollVotes[key] ?? 0) + 1;
         
-        voters[user.uid] = choiceIndex;
+        voters[userUid] = choiceIndex;
         
         transaction.update(postRef, {
           'pollVotes': pollVotes,
@@ -256,7 +254,7 @@ class GistService {
         final int creatorShare = (voteCost * 60) ~/ 100;
         final int platformShare = creatorShare == 0 ? voteCost : voteCost - creatorShare;
 
-        final voterWalletRef = _firestore.collection('wallets').doc(user.uid);
+        final voterWalletRef = _firestore.collection('wallets').doc(userUid);
         transaction.set(
           voterWalletRef,
           {'coinBalance': FieldValue.increment(-voteCost)},
@@ -317,8 +315,7 @@ class GistService {
 
       final commentRef = _firestore.collection('gist_comments').doc();
       final now = FieldValue.serverTimestamp();
-      final user = _auth.currentUser;
-      final userId = user?.uid ?? '';
+      final userId = AppAuth.uid;
       String displayName = 'Unknown';
       String username = 'unknown';
       String profilePic = '';
