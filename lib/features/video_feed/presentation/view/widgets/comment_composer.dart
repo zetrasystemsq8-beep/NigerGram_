@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'comments_sheet.dart';
 
 /// 📝 Reusable comment/reply composer
@@ -58,9 +58,8 @@ class _CommentComposerState extends State<CommentComposer> {
     if (!_isComposing || _isPosting) return;
 
     final text = _textController.text.trim();
-    final currentUser = FirebaseAuth.instance.currentUser;
 
-    if (currentUser == null) {
+    if (!AppAuth.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You must be logged in to comment')),
       );
@@ -73,9 +72,9 @@ class _CommentComposerState extends State<CommentComposer> {
     // ✅ Create optimistic comment for instant UI feedback
     final optimisticComment = CommentData(
       id: commentId,
-      userId: currentUser.uid,
-      username: currentUser.displayName ?? 'Anonymous',
-      avatarUrl: currentUser.photoURL ?? '',
+      userId: AppAuth.uid,
+      username: AppAuth.displayHandle,
+      avatarUrl: '',
       text: text,
       timestamp: now,
       likes: 0,
@@ -129,9 +128,7 @@ class _CommentComposerState extends State<CommentComposer> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = FirebaseAuth.instance.currentUser;
-
-    if (currentUser == null) {
+    if (!AppAuth.isLoggedIn) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -179,12 +176,7 @@ class _CommentComposerState extends State<CommentComposer> {
           CircleAvatar(
             radius: 16,
             backgroundColor: Colors.grey[300],
-            backgroundImage: currentUser.photoURL != null
-                ? NetworkImage(currentUser.photoURL!)
-                : null,
-            child: currentUser.photoURL == null
-                ? Icon(Icons.person, size: 16, color: Colors.grey[600])
-                : null,
+            child: Icon(Icons.person, size: 16, color: Colors.grey[600]),
           ),
           const SizedBox(width: 8),
           Expanded(
