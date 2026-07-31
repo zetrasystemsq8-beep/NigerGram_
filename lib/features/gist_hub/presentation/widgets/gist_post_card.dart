@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
@@ -31,7 +31,7 @@ class GistPostCard extends StatefulWidget {
 class _GistPostCardState extends State<GistPostCard> {
   late GistPostEntity _post;
   bool _isSaved = false;
-  final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+  final String _currentUserId = AppAuth.uid;
   final Set<String> _reactedEmojis = {};
 
   @override
