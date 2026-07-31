@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'comments_sheet.dart';
 
 /// ⚙️ Comment actions menu (long-press)
@@ -75,7 +75,7 @@ class _CommentActionsSheetState extends State<CommentActionsSheet> {
         'type': 'comment',
         'commentId': widget.comment.id,
         'videoId': widget.videoId,
-        'reportedBy': FirebaseAuth.instance.currentUser?.uid,
+        'reportedBy': AppAuth.uid,
         'reason': 'inappropriate',
         'timestamp': Timestamp.now(),
       });
@@ -113,8 +113,8 @@ class _CommentActionsSheetState extends State<CommentActionsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    final isOwner = currentUserId == widget.comment.userId;
+    final currentUserId = AppAuth.uid;
+    final isOwner = currentUserId.isNotEmpty && currentUserId == widget.comment.userId;
 
     return Container(
       decoration: BoxDecoration(
