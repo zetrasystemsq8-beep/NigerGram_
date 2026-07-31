@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:intl/intl.dart';
 import 'comment_actions_sheet.dart';
 import 'replies_section.dart';
@@ -89,7 +89,7 @@ class _CommentItemState extends State<CommentItem>
     widget.onLikeToggled(_isLiked);
 
     try {
-      final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      final currentUserId = AppAuth.uid;
       final commentRef = FirebaseFirestore.instance
           .collection('videos')
           .doc(widget.videoId)
