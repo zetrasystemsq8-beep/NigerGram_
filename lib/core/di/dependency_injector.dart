@@ -6,7 +6,6 @@ import 'package:nigergram/features/video_feed/domain/usecases/fetch_more_videos_
 import 'package:nigergram/features/video_feed/domain/usecases/fetch_videos_usecase.dart';
 import 'package:nigergram/features/video_feed/presentation/bloc/video_feed_cubit.dart';
 import 'package:get_it/get_it.dart';
-import 'package:nigergram/core/services/monnify_service.dart';
 import 'package:nigergram/features/wallet/data/repository_impl/wallet_repository_impl.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 
@@ -18,8 +17,6 @@ void injectionSetup() {
     ..registerSingleton<AppRouter>(AppRouter())
     // Firebase
     ..registerLazySingleton<FirebaseFirestore>(() => FirebaseFirestore.instance)
-    // Services
-    ..registerLazySingleton<MonnifyService>(() => MonnifyService())
     // Repositories
     ..registerLazySingleton<VideoFeedRepository>(
       () => VideoFeedRepositoryImpl(firestore: getIt<FirebaseFirestore>()),
