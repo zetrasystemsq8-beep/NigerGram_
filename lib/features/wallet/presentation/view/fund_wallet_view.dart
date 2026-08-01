@@ -1,288 +1,34 @@
-import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:nigergram/core/services/monnify_service.dart';
-import 'package:nigergram/core/services/coin_service.dart';
-import 'package:nigergram/core/di/dependency_injector.dart';
-import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 import 'package:nigergram/core/utils/app_auth.dart';
 
-class FundWalletView extends StatefulWidget {
+/// NigerGram no longer processes payments directly. To fund their
+/// wallet, a user sends cents (CP) from ZTC to their NigerGram
+/// account — identified by their ZetraID.
+///
+/// Two ways to do that:
+/// 1. Open ZTC, tap the NigerGram card on the ZTC dashboard — ZTC
+///    already knows to send straight to their NigerGram wallet.
+/// 2. Copy the account number below, leave the app, open ZTC
+///    manually, and send to that number using ZTC's normal
+///    "Send Money" flow.
+///
+/// Either way, crediting happens on ZTC's side. This screen never
+/// polls or waits — the balance updates the moment ZTC credits it,
+/// because the wallet screen is already listening to Firestore in
+/// real time.
+class FundWalletView extends StatelessWidget {
   const FundWalletView({super.key});
 
-  @override
-  State<FundWalletView> createState() => _FundWalletViewState();
-}
+  String get _accountNumber => AppAuth.displayHandle;
 
-class _FundWalletViewState extends State<FundWalletView> {
-  final _amountController = TextEditingController();
-  bool _isLoading = false;
-  String _statusMessage = '';
-  int _coinsPreview = 0;
-  final MonnifyService _monnify = getIt<MonnifyService>();
-  final _walletCubit = getIt<WalletCubit>();
-
-  @override
-  void initState() {
-    super.initState();
-    _amountController.addListener(_updateCoinsPreview);
-  }
-
-  @override
-  void dispose() {
-    _amountController.removeListener(_updateCoinsPreview);
-    _amountController.dispose();
-    super.dispose();
-  }
-
-  void _updateCoinsPreview() {
-    final amount = double.tryParse(_amountController.text) ?? 0.0;
-    // Use the CoinService helper that encapsulates the conversion and flooring
-    final coins = CoinService.coinFromNaira(amount);
-    if (coins != _coinsPreview) {
-      setState(() => _coinsPreview = coins);
-    }
-  }
-
-  void _updateStatus(String message) {
-    if (mounted) {
-      setState(() => _statusMessage = message);
-    }
-  }
-
-  /// Launch payment URL with fallback strategies for Android 11+
-  Future<void> _launchPaymentUrl(String checkoutUrl) async {
-    final uri = Uri.parse(checkoutUrl);
-
-    try {
-      // First try: externalApplication mode (opens in external browser)
-      debugPrint('Attempting to launch URL in external application: $checkoutUrl');
-      bool launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-
-      if (launched) {
-        _updateStatus('Payment page opened in browser...');
-        return;
-      }
-
-      // Second try: platformDefault mode (system default behavior)
-      debugPrint('External app launch failed, trying platformDefault mode');
-      launched = await launchUrl(
-        uri,
-        mode: LaunchMode.platformDefault,
-      );
-
-      if (launched) {
-        _updateStatus('Payment page opened...');
-        return;
-      }
-
-      // If both fail, throw exception with helpful message
-      throw Exception(
-        'Could not launch payment URL. Please ensure your device has a web browser installed.',
-      );
-    } catch (e) {
-      debugPrint('URL launch error: $e');
-      throw Exception('Failed to open payment page: ${e.toString()}');
-    }
-  }
-
-  Future<void> _startFunding() async {
-    final amount = double.tryParse(_amountController.text) ?? 0.0;
-
-    // Use the constant name that exists in CoinService
-    if (amount < CoinService.COIN_VALUE_IN_NAIRA) {
-      _showErrorSnackBar(
-        'Minimum amount is ₦${CoinService.COIN_VALUE_IN_NAIRA.toStringAsFixed(0)} (1 coin)',
-      );
-      return;
-    }
-
-    // Use the helper to convert Naira to coin count
-    final coinAmount = CoinService.coinFromNaira(amount);
-    if (coinAmount <= 0) {
-      _showErrorSnackBar('Please enter a valid amount greater than 0');
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    _updateStatus('Initializing payment...');
-
-    try {
-      final user = AppAuth.currentUser;
-      if (user == null) {
-        throw Exception('User not authenticated');
-      }
-
-      final customerEmail = user.email ?? 'user@nigergram.app';
-      final customerName = AppAuth.displayHandle;
-
-      _updateStatus('Contacting payment gateway...');
-
-      final init = await _monnify.initTransaction(
-        amount: amount,
-        customerEmail: customerEmail,
-        customerName: customerName,
-      );
-
-      final checkoutUrl = init['checkoutUrl'] as String?;
-      final paymentReference = init['paymentReference'] as String?;
-      final transactionReference = init['transactionReference'] as String?;
-
-      if (checkoutUrl == null ||
-          paymentReference == null ||
-          transactionReference == null) {
-        throw Exception(
-          'Invalid response from payment gateway. Missing checkout URL or reference.',
-        );
-      }
-
-      _updateStatus('Opening payment page...');
-
-      // Launch payment URL with fallback strategies
-      await _launchPaymentUrl(checkoutUrl);
-
-      // Start polling with generous timeout (bank transfers can take a few minutes to confirm)
-      _updateStatus('Waiting for payment confirmation...');
-      final paid = await _pollUntilPaid(
-        transactionReference,
-        coinAmount: coinAmount,
-        timeout: const Duration(minutes: 5),
-      );
-
-      if (paid) {
-        // Polling already credited coins and showed success; close view
-        _updateStatus('Completed');
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) Navigator.of(context).pop();
-      } else {
-        _showErrorSnackBar(
-          'Payment verification timeout. Please check your payment status and try again.',
-        );
-        _updateStatus('');
-      }
-    } on SocketException catch (e) {
-      _showErrorSnackBar('Network error: ${e.message}. Please check your connection.');
-      _updateStatus('');
-    } on TimeoutException catch (_) {
-      _showErrorSnackBar('Request timeout. Please try again.');
-      _updateStatus('');
-    } catch (e) {
-      _showErrorSnackBar('Payment failed: $e');
-      _updateStatus('');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<bool> _pollUntilPaid(
-    String transactionReference, {
-    required int coinAmount,
-    Duration timeout = const Duration(minutes: 5),
-  }) async {
-    final end = DateTime.now().add(timeout);
-    int pollCount = 0;
-    const pollInterval = Duration(milliseconds: 2000); // Poll every 2 seconds
-
-    while (DateTime.now().isBefore(end)) {
-      try {
-        pollCount++;
-        _updateStatus(
-          'Waiting for payment confirmation... (${pollCount * 2}s)',
-        );
-
-        final res = await _monnify.queryTransaction(transactionReference);
-
-        // Monnify returns paymentStatus in the response
-        final status = (res['paymentStatus'] as String?) ?? '';
-        final transactionStatus = (res['status'] as String?) ?? '';
-        final statusUpper = status.toUpperCase();
-        final transStatusUpper = transactionStatus.toUpperCase();
-
-        debugPrint(
-          '[FundWallet] paymentStatus=$statusUpper status=$transStatusUpper transactionRef=$transactionReference',
-        );
-
-        // Check for successful payment statuses
-        if (statusUpper == 'PAID' ||
-            statusUpper == 'SUCCESS' ||
-            transStatusUpper == 'COMPLETED' ||
-            transStatusUpper == 'SUCCESSFUL') {
-          _updateStatus('Payment confirmed! Crediting coins...');
-
-          // Credit coins immediately (idempotent on backend)
-          try {
-            debugPrint('[FundWallet] Crediting $coinAmount coins for tx=$transactionReference');
-            await _walletCubit.fundWallet(
-              coinAmount: coinAmount,
-              monnifyTransactionReference: transactionReference,
-            );
-            debugPrint('[FundWallet] Credit succeeded for tx=$transactionReference');
-
-            if (mounted) {
-              _showSuccessSnackBar(
-                'Wallet funded successfully with $coinAmount coin${coinAmount == 1 ? '' : 's'}!',
-              );
-            }
-          } catch (e) {
-            // Log and notify, but still return true because payment is confirmed
-            debugPrint('[FundWallet] Error crediting coins for tx=$transactionReference: $e');
-            if (mounted) {
-              _showErrorSnackBar('Payment confirmed but credit failed: $e');
-            }
-          }
-
-          return true;
-        }
-
-        // Check for failed payment statuses
-        if (statusUpper.contains('FAILED') ||
-            statusUpper.contains('DECLINED') ||
-            statusUpper.contains('CANCELLED') ||
-            transStatusUpper.contains('FAILED')) {
-          throw Exception(
-            'Payment was declined or cancelled. Status: $status',
-          );
-        }
-
-        // Continue polling if pending
-        await Future.delayed(pollInterval);
-      } on SocketException {
-        // Network error - continue polling, we'll timeout if persistent
-        await Future.delayed(pollInterval);
-      } catch (e) {
-        // Log the error but continue trying to verify
-        debugPrint('[FundWallet] Payment verification error for tx=$transactionReference: $e');
-        await Future.delayed(pollInterval);
-      }
-    }
-
-    // Timeout reached without confirmation
-    return false;
-  }
-
-  void _showSuccessSnackBar(String message) {
-    if (!mounted) return;
+  void _copyAccountNumber(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: _accountNumber));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
+      const SnackBar(
+        content: Text('Account number copied'),
         backgroundColor: Colors.green,
-        duration: const Duration(seconds: 4),
-      ),
-    );
-  }
-
-  void _showErrorSnackBar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 5),
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -290,7 +36,7 @@ class _FundWalletViewState extends State<FundWalletView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: const Color(0xFF0F0F14),
       appBar: AppBar(
         title: const Text('Fund Wallet', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.transparent,
@@ -298,128 +44,147 @@ class _FundWalletViewState extends State<FundWalletView> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Enter Amount to Fund',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFF0050), Color(0xFF7B0033)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(20),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _amountController,
-                enabled: !_isLoading,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                ],
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Amount (₦)',
-                  labelStyle: const TextStyle(color: Colors.grey),
-                  enabledBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Your NigerGram Account Number',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                  disabledBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey),
-                  ),
-                  focusedBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.greenAccent),
-                  ),
-                  prefixText: '₦ ',
-                  prefixStyle: const TextStyle(color: Colors.white),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _coinsPreview > 0
-                    ? 'You will receive $_coinsPreview coin${_coinsPreview == 1 ? '' : 's'}'
-                    : 'Minimum ₦${CoinService.COIN_VALUE_IN_NAIRA.toStringAsFixed(0)} = 1 coin',
-                style: TextStyle(
-                  color: _coinsPreview > 0 ? Colors.greenAccent : Colors.grey[400],
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Status message display
-              if (_statusMessage.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blueAccent.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blueAccent),
-                  ),
-                  child: Column(
+                  const SizedBox(height: 10),
+                  Row(
                     children: [
-                      if (_isLoading)
-                        const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.blueAccent,
-                            strokeWidth: 2,
+                      Expanded(
+                        child: Text(
+                          _accountNumber,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
                           ),
                         ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _statusMessage,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy_rounded, color: Colors.white),
+                        onPressed: () => _copyAccountNumber(context),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 24),
-              ],
-              ElevatedButton(
-                onPressed: _isLoading ? null : _startFunding,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.greenAccent,
-                  disabledBackgroundColor: Colors.grey,
-                  foregroundColor: Colors.black,
-                  disabledForegroundColor: Colors.black54,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'This is your ZetraID — the same number ZTC uses for your account.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              'How to fund your wallet',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _stepTile(
+              icon: Icons.apps_rounded,
+              title: 'Fastest way',
+              body: 'Open ZTC, tap the NigerGram card on your dashboard, and send. It goes straight into this wallet.',
+            ),
+            const SizedBox(height: 12),
+            _stepTile(
+              icon: Icons.copy_all_rounded,
+              title: 'Or send manually',
+              body: 'Copy your account number above, open ZTC, use "Send Money," and paste it in as the recipient.',
+            ),
+            const SizedBox(height: 28),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.blueAccent.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Colors.blueAccent, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'No need to wait here — your balance updates automatically the moment ZTC sends it.',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _stepTile({required IconData icon, required String title, required String body}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A24),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF0050).withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: const Color(0xFFFF0050), size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.black,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        'Pay via Monnify',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'You will be redirected to complete payment securely.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 12,
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: TextStyle(color: Colors.grey[400], fontSize: 12, height: 1.4),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
