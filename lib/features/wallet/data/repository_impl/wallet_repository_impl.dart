@@ -1,5 +1,6 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart';
 import 'package:nigergram/features/wallet/domain/entities/transaction_entity.dart';
 import 'package:nigergram/features/wallet/domain/entities/wallet_entity.dart';
 import 'package:nigergram/features/wallet/domain/repositories/wallet_repository.dart';
@@ -11,6 +12,10 @@ class WalletRepositoryImpl implements WalletRepository {
 
   CollectionReference get _wallets => firestore.collection('wallets');
   CollectionReference get _transactions => firestore.collection('wallet_transactions');
+
+  String _hashPin(String pin) {
+    return sha256.convert(utf8.encode(pin)).toString();
+  }
 
   @override
   Stream<WalletEntity?> walletStream(String uid) {
@@ -65,7 +70,7 @@ class WalletRepositoryImpl implements WalletRepository {
       final fromData = fromSnap.data() as Map<String, dynamic>?;
       final fromBalance = (fromData?['coinBalance'] as num?)?.toInt() ?? 0;
       if (fromBalance < coinAmount) {
-        throw Exception('Insufficient coin balance');
+        throw Exception('Insufficient cent balance');
       }
 
       final newFromBalance = fromBalance - coinAmount;
@@ -107,65 +112,14 @@ class WalletRepositoryImpl implements WalletRepository {
     });
   }
 
-  @override
-  Future<void> fundWallet({
-    required String userId,
-    required int coinAmount,
-    required String monnifyTransactionReference,
-  }) async {
-    final ref = _wallets.doc(userId);
-
-    // Idempotency: if we've already recorded a purchase with this monnifyTransactionReference, skip.
-    final existing = await _transactions
-        .where('monnifyTransactionReference', isEqualTo: monnifyTransactionReference)
-        .limit(1)
-        .get();
-
-    if (existing.docs.isNotEmpty) {
-      debugPrint('[WalletRepository] fundWallet skipped - existing transaction for monnifyTransactionReference=$monnifyTransactionReference');
-      return;
-    }
-
-    await firestore.runTransaction((transaction) async {
-      final snap = await transaction.get(ref);
-
-      final snapData = snap.data() as Map<String, dynamic>?;
-      final current = (snapData?['coinBalance'] as num?)?.toInt() ?? 0;
-      final newBalance = current + coinAmount;
-
-      transaction.set(
-        ref,
-        {
-          'userId': userId,
-          'coinBalance': newBalance,
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-
-      final txRef = _transactions.doc();
-      transaction.set(txRef, {
-        'fromUserId': userId,
-        'toUserId': userId,
-        'fromUsername': '',
-        'toUsername': '',
-        'coinAmount': coinAmount,
-        'type': 'purchase',
-        'status': 'completed',
-        'monnifyTransactionReference': monnifyTransactionReference,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    });
-  }
-
+  /// Cash-out request. NigerGram never moves real money — this simply
+  /// records the request and deducts the cent balance. The user's ZTC
+  /// account (their ZetraID) is what actually gets credited, handled
+  /// entirely on ZTC's side.
   @override
   Future<void> requestWithdrawal({
     required String userId,
-    required double amount,
-    required String bankName,
-    required String bankAccountNumber,
-    required String bankAccountName,
-    required String bankCode,
+    required int centAmount,
   }) async {
     final ref = _wallets.doc(userId);
     final txRef = _transactions.doc();
@@ -174,18 +128,14 @@ class WalletRepositoryImpl implements WalletRepository {
       final snap = await transaction.get(ref);
 
       final snapData = snap.data() as Map<String, dynamic>?;
-      final current = (snapData?['balance'] as num?)?.toDouble() ?? 0.0;
+      final current = (snapData?['coinBalance'] as num?)?.toInt() ?? 0;
 
-      if (current < amount) {
-        throw Exception('Insufficient balance');
+      if (current < centAmount) {
+        throw Exception('Insufficient cent balance');
       }
-      final newBalance = current - amount;
+      final newBalance = current - centAmount;
       transaction.update(ref, {
-        'balance': newBalance,
-        'bankAccountNumber': bankAccountNumber,
-        'bankName': bankName,
-        'bankAccountName': bankAccountName,
-        'bankCode': bankCode,
+        'coinBalance': newBalance,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -194,32 +144,44 @@ class WalletRepositoryImpl implements WalletRepository {
         'toUserId': userId,
         'fromUsername': '',
         'toUsername': '',
-        'amount': amount,
+        'coinAmount': centAmount,
         'type': 'withdrawal',
         'videoId': null,
         'message': null,
         'status': 'pending',
-        'bankCode': bankCode,
         'timestamp': FieldValue.serverTimestamp(),
       });
     });
   }
 
   @override
-  Future<void> saveBankInfo({
+  Future<void> setPin({
     required String userId,
-    required String bankName,
-    required String bankAccountNumber,
-    required String bankAccountName,
-    required String bankCode,
+    required String pin,
   }) async {
     final ref = _wallets.doc(userId);
     await ref.set({
-      'bankAccountNumber': bankAccountNumber,
-      'bankName': bankName,
-      'bankAccountName': bankAccountName,
-      'bankCode': bankCode,
+      'pinHash': _hashPin(pin),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  @override
+  Future<bool> verifyPin({
+    required String userId,
+    required String pin,
+  }) async {
+    final doc = await _wallets.doc(userId).get();
+    final data = doc.data() as Map<String, dynamic>?;
+    final storedHash = data?['pinHash'] as String?;
+    if (storedHash == null) return false;
+    return storedHash == _hashPin(pin);
+  }
+
+  @override
+  Future<bool> hasPinSet(String userId) async {
+    final doc = await _wallets.doc(userId).get();
+    final data = doc.data() as Map<String, dynamic>?;
+    return (data?['pinHash'] as String?) != null;
   }
 }
