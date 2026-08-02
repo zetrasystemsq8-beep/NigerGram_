@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/wallet/data/repository_impl/wallet_repository_impl.dart';
+import 'package:nigergram/features/wallet/data/services/ztc_wallet_bridge.dart';
 import 'package:nigergram/features/wallet/domain/entities/transaction_entity.dart';
 import 'package:nigergram/features/wallet/domain/entities/wallet_entity.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_state.dart';
@@ -16,6 +17,7 @@ class WalletCubit extends Cubit<WalletState> {
     if (AppAuth.isLoggedIn) {
       watchWallet(AppAuth.uid);
       watchTransactions(AppAuth.uid);
+      ZtcWalletBridge.start();
     }
   }
 
@@ -70,53 +72,37 @@ class WalletCubit extends Cubit<WalletState> {
     }
   }
 
-  Future<void> fundWallet({
-    required int coinAmount,
-    required String monnifyTransactionReference,
-  }) async {
-    await repository.fundWallet(
-      userId: AppAuth.uid,
-      coinAmount: coinAmount,
-      monnifyTransactionReference: monnifyTransactionReference,
-    );
-  }
-
+  /// Submits a cash-out request for [centAmount] cents. NigerGram
+  /// doesn't move real money — the actual payout happens on ZTC, tied
+  /// to the user's ZetraID. This just records the request and deducts
+  /// the balance.
   Future<void> requestWithdrawal({
-    required double amount,
-    required String bankName,
-    required String bankAccountNumber,
-    required String bankAccountName,
-    required String bankCode,
+    required int centAmount,
   }) async {
     await repository.requestWithdrawal(
       userId: AppAuth.uid,
-      amount: amount,
-      bankName: bankName,
-      bankAccountNumber: bankAccountNumber,
-      bankAccountName: bankAccountName,
-      bankCode: bankCode,
+      centAmount: centAmount,
     );
   }
 
-  Future<void> saveBankInfo({
-    required String bankName,
-    required String bankAccountNumber,
-    required String bankAccountName,
-    required String bankCode,
-  }) async {
-    await repository.saveBankInfo(
-      userId: AppAuth.uid,
-      bankName: bankName,
-      bankAccountNumber: bankAccountNumber,
-      bankAccountName: bankAccountName,
-      bankCode: bankCode,
-    );
+  Future<void> setPin(String pin) async {
+    await repository.setPin(userId: AppAuth.uid, pin: pin);
+  }
+
+  Future<bool> verifyPin(String pin) async {
+    return repository.verifyPin(userId: AppAuth.uid, pin: pin);
+  }
+
+  Future<bool> hasPinSet() async {
+    if (!AppAuth.isLoggedIn) return false;
+    return repository.hasPinSet(AppAuth.uid);
   }
 
   @override
   Future<void> close() {
     _walletSub?.cancel();
     _txSub?.cancel();
+    ZtcWalletBridge.stop();
     return super.close();
   }
 }
