@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nigergram/core/utils/app_auth.dart';
 
 /// NigerGram no longer processes payments directly. To fund their
 /// wallet, a user sends cents (CP) from ZTC to their NigerGram
-/// account — identified by their ZetraID.
+/// account — identified by their real ZetraID (e.g. ZTR-100020),
+/// fetched live from ZTC's profiles table.
 ///
 /// Two ways to do that:
 /// 1. Open ZTC, tap the NigerGram card on the ZTC dashboard — ZTC
@@ -17,13 +19,51 @@ import 'package:nigergram/core/utils/app_auth.dart';
 /// polls or waits — the balance updates the moment ZTC credits it,
 /// because the wallet screen is already listening to Firestore in
 /// real time.
-class FundWalletView extends StatelessWidget {
+class FundWalletView extends StatefulWidget {
   const FundWalletView({super.key});
 
-  String get _accountNumber => AppAuth.displayHandle;
+  @override
+  State<FundWalletView> createState() => _FundWalletViewState();
+}
+
+class _FundWalletViewState extends State<FundWalletView> {
+  String? _zetraId;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadZetraId();
+  }
+
+  Future<void> _loadZetraId() async {
+    try {
+      final uid = AppAuth.uid;
+      if (uid.isEmpty) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final row = await Supabase.instance.client
+          .from('profiles')
+          .select('zetra_id')
+          .eq('id', uid)
+          .maybeSingle();
+
+      if (mounted) {
+        setState(() {
+          _zetraId = row?['zetra_id'] as String?;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   void _copyAccountNumber(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: _accountNumber));
+    if (_zetraId == null) return;
+    Clipboard.setData(ClipboardData(text: _zetraId!));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Account number copied'),
@@ -73,20 +113,32 @@ class FundWalletView extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          _accountNumber,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 26,
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                _zetraId ?? 'Unavailable',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                      ),
+                      if (_zetraId != null)
+                        IconButton(
+                          icon: const Icon(Icons.copy_rounded, color: Colors.white),
+                          onPressed: () => _copyAccountNumber(context),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.copy_rounded, color: Colors.white),
-                        onPressed: () => _copyAccountNumber(context),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
