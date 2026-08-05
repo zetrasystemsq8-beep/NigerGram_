@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nigergram/features/wallet/domain/entities/transaction_entity.dart';
 import 'package:nigergram/features/wallet/domain/entities/wallet_entity.dart';
 import 'package:nigergram/features/wallet/domain/repositories/wallet_repository.dart';
@@ -9,6 +10,8 @@ class WalletRepositoryImpl implements WalletRepository {
   final FirebaseFirestore firestore;
 
   WalletRepositoryImpl({required this.firestore});
+
+  static const String _ztcAppId = 'nigergram';
 
   CollectionReference get _wallets => firestore.collection('wallets');
   CollectionReference get _transactions => firestore.collection('wallet_transactions');
@@ -112,32 +115,52 @@ class WalletRepositoryImpl implements WalletRepository {
     });
   }
 
-  /// Cash-out request. NigerGram never moves real money — this simply
-  /// records the request and deducts the cent balance. The user's ZTC
-  /// account (their ZetraID) is what actually gets credited, handled
-  /// entirely on ZTC's side.
+  /// Cash-out. Calls ZTC's own spend_app_currency RPC — the same
+  /// secured function pattern ZTC's Send Money screen uses — so this
+  /// is now a REAL, immediate debit on ZTC's side, not just a note
+  /// in NigerGram's own database. spend_app_currency acts on the
+  /// currently authenticated user, so [userId] is only used for the
+  /// Firestore side (optimistic balance + transaction log) — the
+  /// actual debit always happens against whoever is signed in.
   @override
   Future<void> requestWithdrawal({
     required String userId,
     required int centAmount,
   }) async {
+    final Map<String, dynamic> result;
+    try {
+      final response = await Supabase.instance.client.rpc(
+        'spend_app_currency',
+        params: {
+          'p_app_id': _ztcAppId,
+          'p_unit_amount': centAmount,
+        },
+      );
+      result = response is Map<String, dynamic> ? response : {};
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+
+    if (result['success'] != true) {
+      throw Exception(result['error']?.toString() ?? 'Cash out failed');
+    }
+
     final ref = _wallets.doc(userId);
     final txRef = _transactions.doc();
 
+    // Optimistic local update — ZtcWalletBridge will overwrite this
+    // with the authoritative value once the realtime update arrives,
+    // so this is just for a snappy UI, not a source of truth.
     await firestore.runTransaction((transaction) async {
       final snap = await transaction.get(ref);
-
       final snapData = snap.data() as Map<String, dynamic>?;
       final current = (snapData?['coinBalance'] as num?)?.toInt() ?? 0;
+      final newBalance = (current - centAmount).clamp(0, current);
 
-      if (current < centAmount) {
-        throw Exception('Insufficient cent balance');
-      }
-      final newBalance = current - centAmount;
-      transaction.update(ref, {
+      transaction.set(ref, {
         'coinBalance': newBalance,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
 
       transaction.set(txRef, {
         'fromUserId': userId,
@@ -148,7 +171,7 @@ class WalletRepositoryImpl implements WalletRepository {
         'type': 'withdrawal',
         'videoId': null,
         'message': null,
-        'status': 'pending',
+        'status': 'completed',
         'timestamp': FieldValue.serverTimestamp(),
       });
     });
