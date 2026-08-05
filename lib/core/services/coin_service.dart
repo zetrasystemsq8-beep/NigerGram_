@@ -6,21 +6,12 @@
 ///
 /// NigerGram no longer processes real money directly. Cents are
 /// funded and cashed out through each user's linked ZTC account
-/// (their ZetraID). This service only tracks the constants NigerGram
-/// itself needs — minimums for actions taken inside the app.
+/// (their ZetraID). No artificial minimums here — if someone has
+/// 3 cents or 40 cents, they can send or cash out exactly that.
 /// ════════════════════════════════════════════════════════════════
 
 class CoinService {
-  // ────────────────────────────────────────────────────────────────
-  // CONSTANTS
-  // ────────────────────────────────────────────────────────────────
-
-  /// Minimum cents required for a creator to submit a cash-out request.
-  static const int MIN_WITHDRAWAL_CENTS = 100;
-
-  /// Maximum cents a creator can request to cash out per calendar month.
-  static const int MAX_MONTHLY_WITHDRAWAL_CENTS = 1000;
-
-  /// Minimum cents required to send a gift/tip.
-  static const int MIN_GIFT_CENTS = 1;
+  /// Smallest amount that can be sent, gifted, or cashed out. 1 cent
+  /// is the real floor — there's nothing smaller than that.
+  static const int MIN_UNIT_CENTS = 1;
 }
