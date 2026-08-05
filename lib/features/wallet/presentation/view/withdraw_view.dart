@@ -90,9 +90,9 @@ class _WithdrawViewState extends State<WithdrawView> {
 
   Future<void> _submit() async {
     final centAmount = int.tryParse(_amountController.text) ?? 0;
-    if (centAmount < CoinService.MIN_WITHDRAWAL_CENTS) {
+    if (centAmount < CoinService.MIN_UNIT_CENTS) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Minimum cash-out is ${CoinService.MIN_WITHDRAWAL_CENTS} cents')),
+        SnackBar(content: Text('Minimum cash-out is ${CoinService.MIN_UNIT_CENTS} cent')),
       );
       return;
     }
@@ -181,7 +181,7 @@ class _WithdrawViewState extends State<WithdrawView> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Minimum ${CoinService.MIN_WITHDRAWAL_CENTS} cents per request.',
+                    'Minimum ${CoinService.MIN_UNIT_CENTS} cent per request.',
                     style: TextStyle(color: Colors.grey[500], fontSize: 12),
                   ),
                   const SizedBox(height: 24),
