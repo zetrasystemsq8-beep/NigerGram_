@@ -1,3 +1,4 @@
+// lib/features/dashboard/presentation/view/dashboard_view.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -19,14 +20,6 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   int _currentIndex = 0;
 
-  late final List<Widget> _navigationPages = [
-    const VideoFeedView(),
-    const GistHubView(),
-    const SizedBox(),
-    const InboxView(), // ✅ CHANGED: Replaced _InboxPlaceholder
-    const ProfileView(),
-  ];
-
   void _handleTabSelection(int index) {
     if (index == 2) {
       context.push(RouterEnum.uploadView.routeName);
@@ -46,7 +39,15 @@ class _DashboardViewState extends State<DashboardView> {
           Positioned.fill(
             child: IndexedStack(
               index: _currentIndex,
-              children: _navigationPages,
+              children: [
+                // Pass isActive to VideoFeedView so it knows whether the
+                // tab is currently visible (true when selected).
+                VideoFeedView(isActive: _currentIndex == 0),
+                const GistHubView(),
+                const SizedBox(),
+                const InboxView(),
+                const ProfileView(),
+              ],
             ),
           ),
           Positioned(
@@ -224,5 +225,3 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
 }
-
-// ✅ REMOVED _InboxPlaceholder - no longer needed
