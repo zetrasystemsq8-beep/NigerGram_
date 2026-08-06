@@ -31,10 +31,23 @@ class _WalletHomeViewState extends State<WalletHomeView> {
     setState(() => _isRefreshing = false);
   }
 
-  String _formatBalance(int coinCount) {
-    if (coinCount >= 1000000) return '${(coinCount / 1000000).toStringAsFixed(1)}M';
-    if (coinCount >= 1000) return '${(coinCount / 1000).toStringAsFixed(1)}K';
-    return coinCount.toStringAsFixed(0);
+  String _formatCp(int cp) {
+    return cp.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+  }
+
+  String _formatCent(int cent) {
+    return cent.toString().padLeft(3, '0');
+  }
+
+  /// Splits a raw cent amount (as stored on transactions) into a
+  /// "X CP" / "X CP Y Cent" / "Y Cent" display string, same rule as
+  /// the balance card: no Cent segment shown when there's none.
+  String _formatCentAmount(int rawCents) {
+    final cp = rawCents ~/ 1000;
+    final cent = rawCents % 1000;
+    if (cp > 0 && cent > 0) return '${_formatCp(cp)} CP ${_formatCent(cent)} Cent';
+    if (cp > 0) return '${_formatCp(cp)} CP';
+    return '$cent Cent';
   }
 
   String _formatDate(Timestamp? timestamp) {
@@ -136,6 +149,8 @@ class _WalletHomeViewState extends State<WalletHomeView> {
           final wallet = state.wallet;
           final transactions = state.transactions;
           final coinBalance = wallet?.coinBalance ?? 0;
+          final centBalance = wallet?.centBalance ?? 0;
+          final canWithdraw = (wallet?.balanceCents ?? 0) > 0;
 
           return RefreshIndicator(
             color: const Color(0xFFFF0050),
@@ -177,13 +192,24 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '${_formatBalance(coinBalance)} coins',
+                          '${_formatCp(coinBalance)} CP',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 38,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        if (centBalance > 0) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '+ ${_formatCent(centBalance)} Cent',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         Row(
                           children: [
@@ -218,7 +244,7 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                             Expanded(
                               child: OutlinedButton(
                                 onPressed: () {
-                                  if (coinBalance <= 0) {
+                                  if (!canWithdraw) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text('Insufficient balance to withdraw'),
@@ -323,7 +349,9 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                       itemCount: transactions.length > 30 ? 30 : transactions.length,
                       itemBuilder: (context, index) {
                         final tx = transactions[index];
-                        final isCredit = tx.type == 'gift_received' || tx.type == 'purchase';
+                        final isCredit = tx.type == 'gift_received' ||
+                            tx.type == 'purchase' ||
+                            tx.type == 'deposit';
                         final coinAmount = tx.coinAmount;
 
                         final transactionName = _getTransactionName(tx.type);
@@ -379,7 +407,7 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                                 ),
                               ),
                               Text(
-                                '${isCredit ? '+' : '-'}$coinAmount coins',
+                                '${isCredit ? '+' : '-'}${_formatCentAmount(coinAmount)}',
                                 style: TextStyle(
                                   color: isCredit ? Colors.green : Colors.red,
                                   fontWeight: FontWeight.bold,
@@ -407,6 +435,8 @@ class _WalletHomeViewState extends State<WalletHomeView> {
       case 'gift_received':
         return 'Gift Received';
       case 'purchase':
+        return 'Wallet Funding';
+      case 'deposit':
         return 'Wallet Funding';
       case 'withdrawal':
         return 'Withdrawal';
