@@ -14,7 +14,14 @@ import 'package:video_player/video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class VideoFeedView extends StatefulWidget {
-  const VideoFeedView({super.key});
+  /// When used inside an IndexedStack/tab shell, set [isActive] to true
+  /// when this tab is the currently visible one. Video playback will
+  /// pause when isActive becomes false and resume when it becomes true.
+  ///
+  /// Default is true so existing instantiations (routes) keep current behavior.
+  const VideoFeedView({super.key, this.isActive = true});
+
+  final bool isActive;
 
   @override
   State<VideoFeedView> createState() => _VideoFeedViewState();
@@ -49,6 +56,21 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant VideoFeedView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the visibility of this tab changed, pause/resume the focused controller.
+    if (oldWidget.isActive != widget.isActive) {
+      if (!widget.isActive) {
+        debugPrint('🟡 VideoFeedView became INACTIVE — pausing focused controller');
+        _controllers[_focusedIndex]?.pause();
+      } else {
+        debugPrint('🟢 VideoFeedView became ACTIVE — resuming focused controller');
+        _controllers[_focusedIndex]?.play();
+      }
+    }
+  }
+
   void _clearAndDisposeAllControllers() {
     for (var index in _controllers.keys) {
       final controller = _controllers[index];
@@ -81,8 +103,13 @@ class _VideoFeedViewState extends State<VideoFeedView> {
   }
 
   void _manageControllerLifecycle(int index, List<VideoEntity> videos) {
-    // Play current focused item
-    _getOrCreateController(index, videos)?.play();
+    // Play current focused item only if the tab is active (visible).
+    if (widget.isActive) {
+      _getOrCreateController(index, videos)?.play();
+    } else {
+      // Ensure it is paused when tab isn't active
+      _getOrCreateController(index, videos)?.pause();
+    }
 
     // Pause adjacent buffers
     _getOrCreateController(index - 1, videos)?.pause();
@@ -154,9 +181,12 @@ class _VideoFeedViewState extends State<VideoFeedView> {
       controller.setLooping(true);
       _initializationStatus[index] = true;
       
-      // If this is the focused index, play automatically
-      if (index == _focusedIndex) {
+      // If this is the focused index, play automatically only if tab is active.
+      if (index == _focusedIndex && widget.isActive) {
         controller.play();
+      } else {
+        // Ensure new controllers are paused when tab is not active
+        controller.pause();
       }
       
       // 🔥 FIX: Force rebuild to update UI
