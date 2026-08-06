@@ -6,7 +6,7 @@ This repository contains the Flutter app (UI, business logic) plus infra-related
 
 ## Author
 
-Created by: Oyedele Toluwani ("Connect Baba")
+Created by: Oyedele Toluwani Emmanuel ("Connect Baba")
 
 ## Stack
 
