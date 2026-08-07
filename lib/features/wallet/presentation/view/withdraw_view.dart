@@ -9,6 +9,12 @@ import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 /// happens on ZTC, tied to the user's ZetraID. CP and Cent are the same
 /// currency at two denominations (1 CP = 1000 Cent), so the amount
 /// entered here is always in the smallest unit (Cent) for precision.
+///
+/// First-time PIN setup requires entering the PIN twice (set + confirm)
+/// so a typo doesn't silently lock the user into a PIN they never meant
+/// to set. Setting the PIN and spending are two separate taps — after
+/// setting, the user must tap "Request Withdrawal" again to actually
+/// withdraw, using the PIN they just confirmed.
 class WithdrawView extends StatefulWidget {
   const WithdrawView({super.key});
 
@@ -90,6 +96,46 @@ class _WithdrawViewState extends State<WithdrawView> {
     );
   }
 
+  /// Runs first-time PIN setup: enter, then re-enter to confirm. Returns
+  /// true only if both entries matched and the PIN was saved. Does NOT
+  /// proceed to withdrawal — the user must tap the button again so the
+  /// PIN they just set is the one they explicitly use to authorize a
+  /// spend, rather than silently reusing the setup entry.
+  Future<bool> _setupPin() async {
+    final newPin = await _promptForPin(
+      title: 'Set a Wallet PIN',
+      body: 'Choose a 4-digit PIN. You\'ll use this to confirm withdrawals going forward.',
+    );
+    if (newPin == null || newPin.length != 4) return false;
+
+    final confirmPin = await _promptForPin(
+      title: 'Confirm Your PIN',
+      body: 'Enter the same 4-digit PIN again to confirm.',
+    );
+    if (confirmPin == null) return false;
+
+    if (newPin != confirmPin) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PINs didn\'t match. Try again.'), backgroundColor: Colors.red),
+        );
+      }
+      return false;
+    }
+
+    await _cubit.setPin(newPin);
+    if (mounted) {
+      setState(() => _hasPin = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Wallet PIN set. Keep it safe — you\'ll need it for every withdrawal.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+    return true;
+  }
+
   Future<void> _submit() async {
     final centAmount = int.tryParse(_amountController.text) ?? 0;
     if (centAmount < CoinService.MIN_UNIT_CENTS) {
@@ -99,30 +145,26 @@ class _WithdrawViewState extends State<WithdrawView> {
       return;
     }
 
-    // Set up a PIN the first time, otherwise verify it before proceeding.
     if (!_hasPin) {
-      final newPin = await _promptForPin(
-        title: 'Set a Wallet PIN',
-        body: 'Choose a 4-digit PIN. You\'ll use this to confirm withdrawals going forward.',
-      );
-      if (newPin == null || newPin.length != 4) return;
-      await _cubit.setPin(newPin);
-      setState(() => _hasPin = true);
-    } else {
-      final pin = await _promptForPin(
-        title: 'Enter Your PIN',
-        body: 'Confirm this withdrawal with your wallet PIN.',
-      );
-      if (pin == null || pin.isEmpty) return;
-      final valid = await _cubit.verifyPin(pin);
-      if (!valid) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Incorrect PIN'), backgroundColor: Colors.red),
-          );
-        }
-        return;
+      // First-time setup only — the user must tap "Request Withdrawal"
+      // again afterward to actually spend, using their new PIN.
+      await _setupPin();
+      return;
+    }
+
+    final pin = await _promptForPin(
+      title: 'Enter Your PIN',
+      body: 'Confirm this withdrawal with your wallet PIN.',
+    );
+    if (pin == null || pin.isEmpty) return;
+    final valid = await _cubit.verifyPin(pin);
+    if (!valid) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Incorrect PIN'), backgroundColor: Colors.red),
+        );
       }
+      return;
     }
 
     setState(() => _isSubmitting = true);
@@ -194,14 +236,16 @@ class _WithdrawViewState extends State<WithdrawView> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.info_outline_rounded, color: Colors.blueAccent, size: 20),
-                        SizedBox(width: 10),
+                        const Icon(Icons.info_outline_rounded, color: Colors.blueAccent, size: 20),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'This leaves your NigerGram wallet now and is credited straight to your ZTC balance (CP + Cent).',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                            _hasPin
+                                ? 'This leaves your NigerGram wallet now and is credited straight to your ZTC balance (CP + Cent).'
+                                : 'You\'ll be asked to set a wallet PIN first — enter it twice to confirm, then tap this button again to withdraw.',
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
                           ),
                         ),
                       ],
@@ -221,9 +265,9 @@ class _WithdrawViewState extends State<WithdrawView> {
                             height: 20,
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
-                        : const Text(
-                            'Request Withdrawal',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                        : Text(
+                            _hasPin ? 'Request Withdrawal' : 'Set PIN to Continue',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
                           ),
                   ),
                 ],
