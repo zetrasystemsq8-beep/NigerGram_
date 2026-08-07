@@ -115,13 +115,14 @@ class WalletRepositoryImpl implements WalletRepository {
     });
   }
 
-  /// Cash-out. Calls ZTC's own spend_app_currency RPC — the same
-  /// secured function pattern ZTC's Send Money screen uses — so this
-  /// is now a REAL, immediate debit on ZTC's side, not just a note
-  /// in NigerGram's own database. spend_app_currency acts on the
-  /// currently authenticated user, so [userId] is only used for the
-  /// Firestore side (optimistic balance + transaction log) — the
-  /// actual debit always happens against whoever is signed in.
+  /// Cash-out. Calls ZTC's cash_out_app_currency RPC, which debits
+  /// NigerGram's app_currency_balances AND credits the real CP wallet
+  /// on ZTC's side in the same DB transaction — a genuine, immediate
+  /// transfer, not just a note in NigerGram's own database.
+  /// cash_out_app_currency acts on the currently authenticated user,
+  /// so [userId] is only used for the Firestore side (optimistic
+  /// balance + transaction log) — the actual debit/credit always
+  /// happens against whoever is signed in.
   @override
   Future<void> requestWithdrawal({
     required String userId,
@@ -130,10 +131,10 @@ class WalletRepositoryImpl implements WalletRepository {
     final Map<String, dynamic> result;
     try {
       final response = await Supabase.instance.client.rpc(
-        'spend_app_currency',
+        'cash_out_app_currency',
         params: {
           'p_app_id': _ztcAppId,
-          'p_unit_amount': centAmount,
+          'p_cent_amount': centAmount,
         },
       );
       result = response is Map<String, dynamic> ? response : {};
