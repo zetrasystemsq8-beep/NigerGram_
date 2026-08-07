@@ -115,10 +115,13 @@ class WalletRepositoryImpl implements WalletRepository {
     });
   }
 
-  /// Cash-out. Calls ZTC's cash_out_app_currency RPC, which debits
+  /// Withdrawal. Calls ZTC's cash_out_app_currency RPC, which debits
   /// NigerGram's app_currency_balances AND credits the real CP wallet
-  /// on ZTC's side in the same DB transaction — a genuine, immediate
-  /// transfer, not just a note in NigerGram's own database.
+  /// on ZTC's side (both `balance` and `balance_cents`) in the same DB
+  /// transaction — a genuine, immediate transfer, not just a note in
+  /// NigerGram's own database. CP and Cent are the same currency at two
+  /// denominations (1 CP = 1000 Cent), so this moves value back to ZTC
+  /// regardless of which unit the user thinks in.
   /// cash_out_app_currency acts on the currently authenticated user,
   /// so [userId] is only used for the Firestore side (optimistic
   /// balance + transaction log) — the actual debit/credit always
@@ -134,7 +137,7 @@ class WalletRepositoryImpl implements WalletRepository {
         'cash_out_app_currency',
         params: {
           'p_app_id': _ztcAppId,
-          'p_cent_amount': centAmount,
+          'p_amount': centAmount,
         },
       );
       result = response is Map<String, dynamic> ? response : {};
@@ -143,7 +146,7 @@ class WalletRepositoryImpl implements WalletRepository {
     }
 
     if (result['success'] != true) {
-      throw Exception(result['error']?.toString() ?? 'Cash out failed');
+      throw Exception(result['error']?.toString() ?? 'Withdrawal failed');
     }
 
     final ref = _wallets.doc(userId);
