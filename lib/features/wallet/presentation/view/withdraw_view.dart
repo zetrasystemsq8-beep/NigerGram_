@@ -4,9 +4,11 @@ import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/core/services/coin_service.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 
-/// Cash-out request screen. NigerGram doesn't move real money here —
-/// this just deducts the cent balance and logs a request. The actual
-/// payout happens on ZTC, tied to the user's ZetraID.
+/// Withdrawal request screen. NigerGram doesn't move real money here —
+/// this just deducts the balance and logs a request. The actual payout
+/// happens on ZTC, tied to the user's ZetraID. CP and Cent are the same
+/// currency at two denominations (1 CP = 1000 Cent), so the amount
+/// entered here is always in the smallest unit (Cent) for precision.
 class WithdrawView extends StatefulWidget {
   const WithdrawView({super.key});
 
@@ -92,7 +94,7 @@ class _WithdrawViewState extends State<WithdrawView> {
     final centAmount = int.tryParse(_amountController.text) ?? 0;
     if (centAmount < CoinService.MIN_UNIT_CENTS) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Minimum cash-out is ${CoinService.MIN_UNIT_CENTS} cent')),
+        SnackBar(content: Text('Minimum withdrawal is ${CoinService.MIN_UNIT_CENTS} cent')),
       );
       return;
     }
@@ -109,7 +111,7 @@ class _WithdrawViewState extends State<WithdrawView> {
     } else {
       final pin = await _promptForPin(
         title: 'Enter Your PIN',
-        body: 'Confirm this cash-out request with your wallet PIN.',
+        body: 'Confirm this withdrawal with your wallet PIN.',
       );
       if (pin == null || pin.isEmpty) return;
       final valid = await _cubit.verifyPin(pin);
@@ -128,14 +130,14 @@ class _WithdrawViewState extends State<WithdrawView> {
       await _cubit.requestWithdrawal(centAmount: centAmount);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cash-out requested'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Withdrawal sent to ZTC'), backgroundColor: Colors.green),
         );
         Navigator.of(context).pop();
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Cash-out failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Withdrawal failed: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -148,7 +150,7 @@ class _WithdrawViewState extends State<WithdrawView> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F14),
       appBar: AppBar(
-        title: const Text('Cash Out', style: TextStyle(color: Colors.white)),
+        title: const Text('Withdraw', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -161,7 +163,7 @@ class _WithdrawViewState extends State<WithdrawView> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'Amount to cash out',
+                    'Amount to withdraw',
                     style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 10),
@@ -172,7 +174,7 @@ class _WithdrawViewState extends State<WithdrawView> {
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     style: const TextStyle(color: Colors.white, fontSize: 18),
                     decoration: InputDecoration(
-                      hintText: 'Cents (CP)',
+                      hintText: 'Amount (in Cent — 1000 Cent = 1 CP)',
                       hintStyle: TextStyle(color: Colors.grey[600]),
                       filled: true,
                       fillColor: const Color(0xFF1A1A24),
@@ -198,7 +200,7 @@ class _WithdrawViewState extends State<WithdrawView> {
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'These cents leave your NigerGram wallet now. They\'ll be available to convert to real money on ZTC afterward.',
+                            'This leaves your NigerGram wallet now and is credited straight to your ZTC balance (CP + Cent).',
                             style: TextStyle(color: Colors.white70, fontSize: 12),
                           ),
                         ),
@@ -220,7 +222,7 @@ class _WithdrawViewState extends State<WithdrawView> {
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
                         : const Text(
-                            'Request Cash Out',
+                            'Request Withdrawal',
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
                           ),
                   ),
