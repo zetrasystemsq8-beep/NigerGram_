@@ -74,7 +74,7 @@ class _UploadPageState extends State<UploadPage> {
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final videoFileName = '${user.id}_$timestamp.mp4';
-      final supabase = Supabase.instance.client;
+      final objectKey = 'videos/$videoFileName';
 
       // Show an immediate snackbar so testers can see compression started
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -82,11 +82,12 @@ class _UploadPageState extends State<UploadPage> {
         duration: Duration(seconds: 2),
       ));
 
-      // Use MediaRepository to compress on-device, upload in a single-shot, and
-      // delete the original cached file after successful upload. Pass chosen quality.
+      // Compress on-device, then upload to Backblaze B2 via a short-lived
+      // presigned URL (issued by our get-upload-url Edge Function), and
+      // delete the original cached file after successful upload.
       await _mediaRepository.compressUploadAndCleanup(
         _videoFile!,
-        videoFileName,
+        objectKey,
         onCompressProgress: (p) {
           // Map compress progress to 0.05 -> 0.35
           setState(() => _uploadProgress = 0.05 + (p * 0.3));
@@ -95,14 +96,10 @@ class _UploadPageState extends State<UploadPage> {
           // Map upload progress to 0.35 -> 1.0
           setState(() => _uploadProgress = 0.35 + (p * 0.65));
         },
-        bucketName: 'videos',
         quality: _qualitySlider.toInt(),
       );
 
-      // After successful upload, get public URL and create Firestore doc
       setState(() => _uploadProgress = 0.95);
-
-      final videoUrl = supabase.storage.from('videos').getPublicUrl(videoFileName);
 
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -116,9 +113,11 @@ class _UploadPageState extends State<UploadPage> {
           .where((t) => t.startsWith('#'))
           .toList();
 
-      // Firestore document matches the absolute clean model schema
+      // Firestore stores only the object key, never a full URL — the
+      // app builds the playable URL at read time via
+      // MediaRepository.publicUrlFor().
       await FirebaseFirestore.instance.collection('videos').add({
-        'videoUrl': videoUrl,
+        'videoKey': objectKey,
         'description': _descriptionController.text.trim(),
         'userId': user.id,
         'username': username,
@@ -199,7 +198,6 @@ class _UploadPageState extends State<UploadPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Small active banner so it's obvious this build contains the new media engine
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -216,7 +214,6 @@ class _UploadPageState extends State<UploadPage> {
                   ),
                   _buildVideoSelector(),
                   const SizedBox(height: 12),
-                  // Compression quality slider (production UI)
                   Text('Compression quality', style: TextStyle(color: Colors.white, fontSize: 13)),
                   Slider(
                     value: _qualitySlider,
