@@ -5,7 +5,8 @@ class VideoResponseModel {
   final String id;
   final String username;
   final String description;
-  final String videoUrl;
+  final String? videoKey;
+  final String? legacyVideoUrl;
   final String profileImageUrl;
   final int likeCount;
   final int commentCount;
@@ -16,7 +17,8 @@ class VideoResponseModel {
     required this.id,
     required this.username,
     required this.description,
-    required this.videoUrl,
+    this.videoKey,
+    this.legacyVideoUrl,
     required this.profileImageUrl,
     required this.likeCount,
     required this.commentCount,
@@ -36,7 +38,8 @@ class VideoResponseModel {
       id: doc.id,
       username: data['username'] as String? ?? '',
       description: data['description'] as String? ?? '',
-      videoUrl: data['videoUrl'] as String? ?? '',
+      videoKey: data['videoKey'] as String?,
+      legacyVideoUrl: data['videoUrl'] as String?,
       profileImageUrl: data['profileImageUrl'] as String? ?? '',
       likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
       commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
@@ -50,7 +53,8 @@ class VideoResponseModel {
       id: id,
       username: username,
       description: description,
-      videoUrl: videoUrl,
+      videoKey: videoKey,
+      legacyVideoUrl: legacyVideoUrl,
       profileImageUrl: profileImageUrl,
       likeCount: likeCount,
       commentCount: commentCount,
