@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/media/repository/media_repository.dart';
@@ -72,9 +71,9 @@ class _UploadPageState extends State<UploadPage> {
 
       setState(() => _uploadProgress = 0.05);
 
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final videoFileName = '${user.id}_$timestamp.mp4';
-      final objectKey = 'videos/$videoFileName';
+      // Safe, unique object key scoped to this user — required by the
+      // Cloudflare Worker's auth check (videos/<userId>_<timestamp>_<random>.mp4).
+      final objectKey = MediaRepository.generateVideoKey(user.id);
 
       // Show an immediate snackbar so testers can see compression started
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -82,9 +81,10 @@ class _UploadPageState extends State<UploadPage> {
         duration: Duration(seconds: 2),
       ));
 
-      // Compress on-device, then upload to Backblaze B2 via a short-lived
-      // presigned URL (issued by our get-upload-url Edge Function), and
-      // delete the original cached file after successful upload.
+      // Compress on-device, then upload to Backblaze B2 through the
+      // Cloudflare Worker (zetra-media) — the Worker signs the request
+      // to B2 server-side, so no storage credentials ever touch this
+      // app. Original cached file is deleted after a successful upload.
       await _mediaRepository.compressUploadAndCleanup(
         _videoFile!,
         objectKey,
@@ -115,7 +115,7 @@ class _UploadPageState extends State<UploadPage> {
 
       // Firestore stores only the object key, never a full URL — the
       // app builds the playable URL at read time via
-      // MediaRepository.publicUrlFor().
+      // MediaRepository.publicUrlFor(), routed through the Worker.
       await FirebaseFirestore.instance.collection('videos').add({
         'videoKey': objectKey,
         'description': _descriptionController.text.trim(),
