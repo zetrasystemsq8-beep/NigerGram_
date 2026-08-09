@@ -51,7 +51,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
         title: Row(
           children: [
             const Text(
-              '🇳🇬 Gist Hub',
+              '🔨 The Forge',
               style: TextStyle(
                 color: NGColors.textPrimary,
                 fontWeight: FontWeight.bold,
@@ -78,7 +78,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '$_totalGists Gists',
+                    '$_totalGists Builds',
                     style: TextStyle(
                       color: NGColors.textPrimary,
                       fontSize: 12,
@@ -110,7 +110,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                 fontWeight: FontWeight.w500,
               ),
               tabs: const [
-                Tab(text: '🔥 Trending'),
+                Tab(text: '🔥 Heating Up'),
                 Tab(text: '📰 Latest'),
                 Tab(text: '📊 Polls'),
               ],
@@ -227,10 +227,10 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                 const SizedBox(height: 16),
                 Text(
                   filter == 'trending'
-                      ? 'Nothing trending yet 🔥'
+                      ? 'Nothing heating up yet 🔥'
                       : filter == 'polls'
                           ? 'No polls yet 📊'
-                          : 'No gist yet',
+                          : 'Nothing here yet',
                   style: TextStyle(
                     color: NGColors.textSecondary,
                     fontSize: 16,
@@ -240,10 +240,10 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                 const SizedBox(height: 8),
                 Text(
                   filter == 'trending'
-                      ? 'Be the first to start a trend!'
+                      ? 'Be the first to start something!'
                       : filter == 'polls'
                           ? 'Create a poll and get opinions!'
-                          : 'Drop your first gist now 🇳🇬',
+                          : 'Share what you\'re building 🔨',
                   style: TextStyle(
                     color: NGColors.textMuted,
                     fontSize: 13,
@@ -261,7 +261,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                     });
                   },
                   icon: const Icon(Icons.add, color: Colors.white, size: 18),
-                  label: const Text('Drop Gist'),
+                  label: const Text('Post to the Forge'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: NGColors.accent,
                     shape: RoundedRectangleBorder(
