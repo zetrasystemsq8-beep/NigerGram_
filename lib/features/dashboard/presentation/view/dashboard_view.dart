@@ -82,7 +82,7 @@ class _DashboardViewState extends State<DashboardView> {
                         _buildNavigationTabItem(
                           index: 1,
                           icon: Icons.grid_view_rounded,
-                          label: 'Gist Hub',
+                          label: 'The Forge',
                         ),
                         GestureDetector(
                           onTap: () => _handleTabSelection(2),
