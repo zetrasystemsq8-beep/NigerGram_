@@ -1,0 +1,165 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
+import 'package:nigergram/features/gist_hub/domain/entities/community_entity.dart';
+
+class CommunityService {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  static const double communityCreationCostCp = 50.0;
+
+  CollectionReference get _communities => _firestore.collection('communities');
+
+  /// Charges 50 CP via Supabase (real money-side ledger), then creates
+  /// the community in Firestore and adds the creator as owner-member.
+  Future<String> createCommunity({
+    required String name,
+    required String description,
+    required CommunityType type,
+    required List<String> rules,
+    bool isPrivate = false,
+  }) async {
+    if (!AppAuth.isLoggedIn) throw Exception('Not logged in');
+    final uid = AppAuth.uid;
+
+    try {
+      final response = await _supabase.rpc('spend_cp', params: {
+        'p_amount': communityCreationCostCp,
+        'p_reason': 'Created community: $name',
+      });
+      if (response is! Map || response['success'] != true) {
+        throw Exception('Payment failed');
+      }
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+
+    final docRef = _communities.doc();
+    await docRef.set({
+      'name': name,
+      'description': description,
+      'type': type == CommunityType.channel ? 'channel' : 'group',
+      'creatorId': uid,
+      'moderatorIds': <String>[],
+      'memberCount': 1,
+      'rules': rules,
+      'iconUrl': null,
+      'isPrivate': isPrivate,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    await docRef.collection('members').doc(uid).set({
+      'role': 'owner',
+      'joinedAt': FieldValue.serverTimestamp(),
+    });
+
+    return docRef.id;
+  }
+
+  Stream<List<CommunityEntity>> browseStream({String? searchQuery}) {
+    Query query = _communities.orderBy('memberCount', descending: true).limit(50);
+    return query.snapshots().map((snap) {
+      final all = snap.docs
+          .map((d) => CommunityEntity.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .toList();
+      if (searchQuery == null || searchQuery.trim().isEmpty) return all;
+      final q = searchQuery.toLowerCase();
+      return all.where((c) => c.name.toLowerCase().contains(q)).toList();
+    });
+  }
+
+  Future<String?> getMemberRole(String communityId, String userId) async {
+    final doc = await _communities.doc(communityId).collection('members').doc(userId).get();
+    return doc.exists ? (doc.data()?['role'] as String?) : null;
+  }
+
+  Future<void> joinCommunity(String communityId) async {
+    if (!AppAuth.isLoggedIn) throw Exception('Not logged in');
+    final uid = AppAuth.uid;
+    final communityRef = _communities.doc(communityId);
+    final memberRef = communityRef.collection('members').doc(uid);
+
+    await _firestore.runTransaction((tx) async {
+      final existing = await tx.get(memberRef);
+      if (existing.exists) return; // already a member
+      tx.set(memberRef, {'role': 'member', 'joinedAt': FieldValue.serverTimestamp()});
+      tx.update(communityRef, {'memberCount': FieldValue.increment(1)});
+    });
+  }
+
+  Future<void> leaveCommunity(String communityId) async {
+    if (!AppAuth.isLoggedIn) throw Exception('Not logged in');
+    final uid = AppAuth.uid;
+    final communityRef = _communities.doc(communityId);
+    final memberRef = communityRef.collection('members').doc(uid);
+
+    await _firestore.runTransaction((tx) async {
+      final existing = await tx.get(memberRef);
+      if (!existing.exists) return;
+      if ((existing.data()?['role']) == 'owner') {
+        throw Exception('Owner cannot leave — transfer ownership or delete the community');
+      }
+      tx.delete(memberRef);
+      tx.update(communityRef, {'memberCount': FieldValue.increment(-1)});
+    });
+  }
+
+  /// Owner-only: promotes an existing member to moderator.
+  Future<void> promoteModerator(String communityId, String targetUserId) async {
+    final uid = AppAuth.uid;
+    final communityRef = _communities.doc(communityId);
+    final communityDoc = await communityRef.get();
+    if ((communityDoc.data() as Map<String, dynamic>?)?['creatorId'] != uid) {
+      throw Exception('Only the owner can assign moderators');
+    }
+
+    await communityRef.update({
+      'moderatorIds': FieldValue.arrayUnion([targetUserId]),
+    });
+    await communityRef.collection('members').doc(targetUserId).update({'role': 'moderator'});
+  }
+
+  /// Owner-only: demotes a moderator back to a regular member.
+  Future<void> demoteModerator(String communityId, String targetUserId) async {
+    final uid = AppAuth.uid;
+    final communityRef = _communities.doc(communityId);
+    final communityDoc = await communityRef.get();
+    if ((communityDoc.data() as Map<String, dynamic>?)?['creatorId'] != uid) {
+      throw Exception('Only the owner can remove moderators');
+    }
+
+    await communityRef.update({
+      'moderatorIds': FieldValue.arrayRemove([targetUserId]),
+    });
+    await communityRef.collection('members').doc(targetUserId).update({'role': 'member'});
+  }
+
+  /// Owner or moderator: removes a member from the community.
+  Future<void> removeMember(String communityId, String targetUserId) async {
+    final uid = AppAuth.uid;
+    final role = await getMemberRole(communityId, uid);
+    if (role != 'owner' && role != 'moderator') {
+      throw Exception('Not authorized to remove members');
+    }
+
+    final communityRef = _communities.doc(communityId);
+    await _firestore.runTransaction((tx) async {
+      final memberRef = communityRef.collection('members').doc(targetUserId);
+      final existing = await tx.get(memberRef);
+      if (!existing.exists) return;
+      tx.delete(memberRef);
+      tx.update(communityRef, {'memberCount': FieldValue.increment(-1)});
+    });
+  }
+
+  /// Owner or moderator: updates the rules list.
+  Future<void> updateRules(String communityId, List<String> rules) async {
+    final uid = AppAuth.uid;
+    final role = await getMemberRole(communityId, uid);
+    if (role != 'owner' && role != 'moderator') {
+      throw Exception('Not authorized to edit rules');
+    }
+    await _communities.doc(communityId).update({'rules': rules});
+  }
+}
