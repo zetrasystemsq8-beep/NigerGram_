@@ -5,6 +5,8 @@ import 'package:nigergram/features/gist_hub/data/services/gist_service.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/gist_post_card.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/browse_communities_view.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/browse_bounties_view.dart';
 
 class GistHubView extends StatefulWidget {
   const GistHubView({super.key});
@@ -21,7 +23,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadGistCount();
   }
 
@@ -96,6 +98,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TabBar(
               controller: _tabController,
+              isScrollable: true,
               indicatorColor: NGColors.accent,
               indicatorWeight: 3,
               indicatorSize: TabBarIndicatorSize.tab,
@@ -113,6 +116,8 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                 Tab(text: '🔥 Heating Up'),
                 Tab(text: '📰 Latest'),
                 Tab(text: '📊 Polls'),
+                Tab(text: '👥 Communities'),
+                Tab(text: '🎯 Bounties'),
               ],
             ),
           ),
@@ -124,24 +129,34 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
           _buildFeed('trending'),
           _buildFeed('latest'),
           _buildFeed('polls'),
+          const BrowseCommunitiesView(),
+          const BrowseBountiesView(),
         ],
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 100.0),
-        child: FloatingActionButton(
-          backgroundColor: NGColors.accent,
-          elevation: 8,
-          child: const Icon(Icons.add, color: Colors.white, size: 30),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const GistCreatePost()),
-            ).then((_) {
-              _loadGistCount();
-              setState(() {});
-            });
-          },
-        ),
+      floatingActionButton: AnimatedBuilder(
+        animation: _tabController,
+        builder: (context, _) {
+          // Only show the "Drop Gist" FAB on the first 3 tabs — Communities
+          // and Bounties have their own "+" button in their own AppBar.
+          if (_tabController.index >= 3) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 100.0),
+            child: FloatingActionButton(
+              backgroundColor: NGColors.accent,
+              elevation: 8,
+              child: const Icon(Icons.add, color: Colors.white, size: 30),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const GistCreatePost()),
+                ).then((_) {
+                  _loadGistCount();
+                  setState(() {});
+                });
+              },
+            ),
+          );
+        },
       ),
     );
   }
