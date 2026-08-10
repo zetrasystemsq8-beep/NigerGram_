@@ -36,6 +36,7 @@ class _DiscoverFeedViewState extends State<DiscoverFeedView> {
           videoKey: data['videoKey'] as String?,
           legacyVideoUrl: data['videoUrl'] as String?,
           profileImageUrl: data['profileImageUrl'] ?? '',
+          category: data['category'] as String?,
           likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
           commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
           shareCount: (data['shareCount'] as num?)?.toInt() ?? 0,
