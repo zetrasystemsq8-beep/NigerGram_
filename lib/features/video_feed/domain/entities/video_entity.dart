@@ -17,6 +17,7 @@ class VideoEntity {
   final String? videoKey; // new videos: B2 object key only
   final String? legacyVideoUrl; // old videos: full URL, pre-migration
   final String profileImageUrl;
+  final String? category; // domain tag: Software, AI/ML, Business, etc.
   final int likeCount;
   final int commentCount;
   final int shareCount;
@@ -32,6 +33,7 @@ class VideoEntity {
     this.videoKey,
     this.legacyVideoUrl,
     required this.profileImageUrl,
+    this.category,
     required this.likeCount,
     required this.commentCount,
     required this.shareCount,
@@ -59,6 +61,7 @@ class VideoEntity {
       videoKey: data['videoKey'] as String?,
       legacyVideoUrl: data['videoUrl'] as String?,
       profileImageUrl: data['profileImageUrl'] as String? ?? '',
+      category: data['category'] as String?,
       likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
       commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
       shareCount: (data['shareCount'] as num?)?.toInt() ?? 0,
