@@ -19,11 +19,10 @@ class _UploadPageState extends State<UploadPage> {
   File? _videoFile;
   bool _isUploading = false;
   double _uploadProgress = 0;
-  String _selectedCategory = 'For You';
+  String _selectedCategory = 'Software';
 
   final List<String> _categories = [
-    'For You', 'Comedy', 'Music', 'Dance',
-    'Skit', 'News', 'Sports', 'Fashion', 'Food'
+    'Software', 'AI/ML', 'Business', 'Engineering', 'Design', 'Research', 'Other'
   ];
 
   final MediaRepository _mediaRepository = MediaRepository();
@@ -53,7 +52,7 @@ class _UploadPageState extends State<UploadPage> {
     if (_descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please add a description'),
+          content: Text('Tell us what you built'),
           backgroundColor: Colors.red,
         ),
       );
@@ -71,29 +70,20 @@ class _UploadPageState extends State<UploadPage> {
 
       setState(() => _uploadProgress = 0.05);
 
-      // Safe, unique object key scoped to this user — required by the
-      // Cloudflare Worker's auth check (videos/<userId>_<timestamp>_<random>.mp4).
       final objectKey = MediaRepository.generateVideoKey(user.id);
 
-      // Show an immediate snackbar so testers can see compression started
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Compression started — Media Engine ACTIVE'),
         duration: Duration(seconds: 2),
       ));
 
-      // Compress on-device, then upload to Backblaze B2 through the
-      // Cloudflare Worker (zetra-media) — the Worker signs the request
-      // to B2 server-side, so no storage credentials ever touch this
-      // app. Original cached file is deleted after a successful upload.
       await _mediaRepository.compressUploadAndCleanup(
         _videoFile!,
         objectKey,
         onCompressProgress: (p) {
-          // Map compress progress to 0.05 -> 0.35
           setState(() => _uploadProgress = 0.05 + (p * 0.3));
         },
         onUploadProgress: (p) {
-          // Map upload progress to 0.35 -> 1.0
           setState(() => _uploadProgress = 0.35 + (p * 0.65));
         },
         quality: _qualitySlider.toInt(),
@@ -113,9 +103,6 @@ class _UploadPageState extends State<UploadPage> {
           .where((t) => t.startsWith('#'))
           .toList();
 
-      // Firestore stores only the object key, never a full URL — the
-      // app builds the playable URL at read time via
-      // MediaRepository.publicUrlFor(), routed through the Worker.
       await FirebaseFirestore.instance.collection('videos').add({
         'videoKey': objectKey,
         'description': _descriptionController.text.trim(),
@@ -136,7 +123,7 @@ class _UploadPageState extends State<UploadPage> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🎉 Video posted to NigerGram!'),
+            content: Text('🎉 Published to NigerGram!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -258,7 +245,7 @@ class _UploadPageState extends State<UploadPage> {
           const Icon(Icons.cloud_upload, color: Colors.red, size: 80),
           const SizedBox(height: 24),
           const Text(
-            'Uploading your video...',
+            'Publishing your build...',
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -267,7 +254,7 @@ class _UploadPageState extends State<UploadPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Optimizing compression assets for Naija 🇳🇬',
+            'Optimizing compression assets 🔨',
             style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
           ),
           const SizedBox(height: 32),
@@ -400,7 +387,7 @@ class _UploadPageState extends State<UploadPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Description',
+          'What I Built',
           style: TextStyle(
               color: Colors.white,
               fontSize: 15,
@@ -418,7 +405,7 @@ class _UploadPageState extends State<UploadPage> {
             maxLines: 3,
             maxLength: 150,
             decoration: InputDecoration(
-              hintText: 'Tell Naija what this video is about...',
+              hintText: 'What problem does this solve? What inspired it?',
               hintStyle: TextStyle(color: Colors.grey.shade600),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(16),
@@ -435,7 +422,7 @@ class _UploadPageState extends State<UploadPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Tags',
+          'Stack',
           style: TextStyle(
               color: Colors.white,
               fontSize: 15,
@@ -451,7 +438,7 @@ class _UploadPageState extends State<UploadPage> {
             controller: _tagController,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              hintText: '#naija #comedy #viral',
+              hintText: '#flutter #supabase #buildinpublic',
               hintStyle: TextStyle(color: Colors.grey.shade600),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(16),
@@ -469,7 +456,7 @@ class _UploadPageState extends State<UploadPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Category',
+          'Domain',
           style: TextStyle(
               color: Colors.white,
               fontSize: 15,
@@ -535,7 +522,7 @@ class _UploadPageState extends State<UploadPage> {
           ),
         ),
         child: const Text(
-          'Post to NigerGram 🇳🇬',
+          'Publish to NigerGram 🔨',
           style: TextStyle(
             color: Colors.white,
             fontSize: 16,
