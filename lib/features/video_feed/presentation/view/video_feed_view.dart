@@ -13,12 +13,11 @@ import 'package:nigergram/features/video_feed/presentation/view/widgets/video_fe
 import 'package:video_player/video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+const List<String> feedDomains = [
+  'All', 'Software', 'AI/ML', 'Business', 'Engineering', 'Design', 'Research',
+];
+
 class VideoFeedView extends StatefulWidget {
-  /// When used inside an IndexedStack/tab shell, set [isActive] to true
-  /// when this tab is the currently visible one. Video playback will
-  /// pause when isActive becomes false and resume when it becomes true.
-  ///
-  /// Default is true so existing instantiations (routes) keep current behavior.
   const VideoFeedView({super.key, this.isActive = true});
 
   final bool isActive;
@@ -39,8 +38,9 @@ class _VideoFeedViewState extends State<VideoFeedView> {
   /// Track loop counts per video in-session to report loopCount increments
   final Map<String, int> _loopCounts = {};
 
-  // 🔥 FIX: Track initialization status per index
   final Map<int, bool> _initializationStatus = {};
+
+  String _selectedDomain = 'All';
 
   @override
   void initState() {
@@ -59,7 +59,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
   @override
   void didUpdateWidget(covariant VideoFeedView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // If the visibility of this tab changed, pause/resume the focused controller.
     if (oldWidget.isActive != widget.isActive) {
       if (!widget.isActive) {
         debugPrint('🟡 VideoFeedView became INACTIVE — pausing focused controller');
@@ -87,6 +86,26 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     _initializationStatus.clear();
   }
 
+  /// Called whenever the domain filter changes — resets playback state
+  /// since the underlying video list (and therefore indices) changes.
+  void _onDomainChanged(String domain) {
+    if (domain == _selectedDomain) return;
+    _clearAndDisposeAllControllers();
+    setState(() {
+      _selectedDomain = domain;
+      _focusedIndex = 0;
+    });
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
+    context.read<VideoFeedCubit>().onPageChanged(0);
+  }
+
+  List<VideoEntity> _filteredVideos(List<VideoEntity> all) {
+    if (_selectedDomain == 'All') return all;
+    return all.where((v) => v.category == _selectedDomain).toList();
+  }
+
   void _onPageChanged(int index, List<VideoEntity> videos) {
     if (!mounted) return;
 
@@ -96,26 +115,21 @@ class _VideoFeedViewState extends State<VideoFeedView> {
       _focusedIndex = index;
     });
 
-    // Notify Cubit of page change for state tracking and pagination
     context.read<VideoFeedCubit>().onPageChanged(index);
 
     _manageControllerLifecycle(index, videos);
   }
 
   void _manageControllerLifecycle(int index, List<VideoEntity> videos) {
-    // Play current focused item only if the tab is active (visible).
     if (widget.isActive) {
       _getOrCreateController(index, videos)?.play();
     } else {
-      // Ensure it is paused when tab isn't active
       _getOrCreateController(index, videos)?.pause();
     }
 
-    // Pause adjacent buffers
     _getOrCreateController(index - 1, videos)?.pause();
     _getOrCreateController(index + 1, videos)?.pause();
 
-    // Aggressively dispose distant players to save cellular data and RAM
     _controllers.removeWhere((key, controller) {
       if ((key - index).abs() > 1) {
         final listener = _activeListeners[key];
@@ -130,7 +144,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
       return false;
     });
 
-    // Prefetch next 2 videos to disk cache (no controller instantiation)
     for (int i = 1; i <= 2; i++) {
       final preIndex = index + i;
       if (preIndex >= 0 && preIndex < videos.length) {
@@ -138,7 +151,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
       }
     }
 
-    // Ensure retention/view reporting attached for focused video
     if (index >= 0 && index < videos.length) {
       _attachViewListener(index, videos[index].id);
     }
@@ -154,13 +166,11 @@ class _VideoFeedViewState extends State<VideoFeedView> {
 
   VideoPlayerController? _getOrCreateController(int index, List<VideoEntity> videos) {
     if (index < 0 || index >= videos.length) return null;
-    
-    // Return existing controller if we have one
+
     if (_controllers.containsKey(index)) {
       return _controllers[index];
     }
 
-    // 🔥 FIX: Mark as initializing
     _initializationStatus[index] = false;
 
     final controller = VideoPlayerController.networkUrl(
@@ -169,29 +179,22 @@ class _VideoFeedViewState extends State<VideoFeedView> {
 
     _controllers[index] = controller;
 
-    // 🔥 FIX: Proper initialization with state updates
     controller.initialize().then((_) {
       if (!mounted) return;
-      
-      // Only proceed if this controller is still the one for this index
       if (_controllers[index] != controller) return;
-      
+
       debugPrint('✅ Video initialized for index $index: ${videos[index].id}');
-      
+
       controller.setLooping(true);
       _initializationStatus[index] = true;
-      
-      // If this is the focused index, play automatically only if tab is active.
+
       if (index == _focusedIndex && widget.isActive) {
         controller.play();
       } else {
-        // Ensure new controllers are paused when tab is not active
         controller.pause();
       }
-      
-      // 🔥 FIX: Force rebuild to update UI
+
       setState(() {});
-      
     }).catchError((error) {
       debugPrint('❌ Video initialization failed for index $index: $error');
       if (mounted) {
@@ -207,7 +210,6 @@ class _VideoFeedViewState extends State<VideoFeedView> {
     final controller = _controllers[index];
     if (controller == null) return;
 
-    // Remove old listener on this slot if it exists before assigning a new one
     final oldListener = _activeListeners[index];
     if (oldListener != null) {
       controller.removeListener(oldListener);
@@ -261,6 +263,43 @@ class _VideoFeedViewState extends State<VideoFeedView> {
 
     _activeListeners[index] = currentListener;
     controller.addListener(currentListener);
+  }
+
+  Widget _buildDomainFilterBar() {
+    return Container(
+      color: Colors.black.withOpacity(0.4),
+      height: 44,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        itemCount: feedDomains.length,
+        itemBuilder: (context, index) {
+          final domain = feedDomains[index];
+          final selected = domain == _selectedDomain;
+          return GestureDetector(
+            onTap: () => _onDomainChanged(domain),
+            child: Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: selected ? Colors.white : Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Center(
+                child: Text(
+                  domain,
+                  style: TextStyle(
+                    color: selected ? Colors.black : Colors.white,
+                    fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -379,92 +418,134 @@ class _VideoFeedViewState extends State<VideoFeedView> {
           );
         }
 
-        if (state.videos.isEmpty) {
+        final filteredVideos = _filteredVideos(state.videos);
+
+        if (filteredVideos.isEmpty) {
           return Scaffold(
             backgroundColor: const Color(0xFF0F0F11),
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.video_collection_rounded,
-                    color: Colors.white24,
-                    size: context.sq(64),
-                  ),
-                  SizedBox(height: context.h(16)),
-                  Text(
-                    'No videos uploaded yet',
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: context.fontSize(15),
-                      fontWeight: FontWeight.w500,
+            body: Column(
+              children: [
+                SafeArea(bottom: false, child: _buildDomainFilterBar()),
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.video_collection_rounded,
+                          color: Colors.white24,
+                          size: context.sq(64),
+                        ),
+                        SizedBox(height: context.h(16)),
+                        Text(
+                          _selectedDomain == 'All'
+                              ? 'No showcases yet'
+                              : 'No $_selectedDomain builds yet',
+                          style: TextStyle(
+                            color: Colors.white60,
+                            fontSize: context.fontSize(15),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           );
         }
 
         return Scaffold(
           backgroundColor: Colors.black,
-          body: Padding(
-            padding: EdgeInsets.only(bottom: bottomNavigationPadding),
-            child: PageView.builder(
-              controller: _pageController,
-              scrollDirection: Axis.vertical,
-              onPageChanged: (index) => _onPageChanged(index, state.videos),
-              itemCount: state.videos.length,
-              itemBuilder: (context, index) {
-                // 🔥 FIX: Get or create controller, but we need to rebuild when initialized
-                final controller = _controllers[index];
-                final isInitialized = _initializationStatus[index] ?? false;
-                
-                // 🔥 FIX: If controller doesn't exist yet, create it
-                if (controller == null) {
-                  _getOrCreateController(index, state.videos);
-                }
-                
-                // 🔥 FIX: Always use the latest controller from the map
-                final currentController = _controllers[index];
-                
-                return Stack(
-                  children: [
-                    Positioned.fill(
-                      child: VideoFeedViewItem(
-                        key: ValueKey('${state.videos[index].id}_${isInitialized ? 'init' : 'loading'}'),
-                        videoItem: state.videos[index],
-                        controller: currentController,
-                      ),
-                    ),
-                    
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: context.h(180),
-                      child: IgnorePointer(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withOpacity(0.15),
-                                Colors.black.withOpacity(0.50),
-                                Colors.black.withOpacity(0.85),
-                              ],
-                              stops: const [0.0, 0.3, 0.6, 1.0],
+          body: Stack(
+            children: [
+              Padding(
+                padding: EdgeInsets.only(bottom: bottomNavigationPadding),
+                child: PageView.builder(
+                  key: ValueKey(_selectedDomain),
+                  controller: _pageController,
+                  scrollDirection: Axis.vertical,
+                  onPageChanged: (index) => _onPageChanged(index, filteredVideos),
+                  itemCount: filteredVideos.length,
+                  itemBuilder: (context, index) {
+                    final controller = _controllers[index];
+                    final isInitialized = _initializationStatus[index] ?? false;
+
+                    if (controller == null) {
+                      _getOrCreateController(index, filteredVideos);
+                    }
+
+                    final currentController = _controllers[index];
+
+                    return Stack(
+                      children: [
+                        Positioned.fill(
+                          child: VideoFeedViewItem(
+                            key: ValueKey('${filteredVideos[index].id}_${isInitialized ? 'init' : 'loading'}'),
+                            videoItem: filteredVideos[index],
+                            controller: currentController,
+                          ),
+                        ),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          height: context.h(180),
+                          child: IgnorePointer(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black.withOpacity(0.15),
+                                    Colors.black.withOpacity(0.50),
+                                    Colors.black.withOpacity(0.85),
+                                  ],
+                                  stops: const [0.0, 0.3, 0.6, 1.0],
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+                        // "What was built" label, sitting just above the
+                        // username/description — reframes the caption area
+                        // as a build log rather than a generic post caption.
+                        Positioned(
+                          left: 16,
+                          right: 16,
+                          bottom: context.h(96),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFE2C55).withOpacity(0.85),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  filteredVideos[index].category?.isNotEmpty == true
+                                      ? filteredVideos[index].category!
+                                      : 'Build',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              SafeArea(bottom: false, child: _buildDomainFilterBar()),
+            ],
           ),
         );
       },
