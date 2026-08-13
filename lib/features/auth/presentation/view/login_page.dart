@@ -246,7 +246,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'The Heartbeat of Naija Content',
+              'Where Naija Builds',
               style: TextStyle(
                 color: NGColors.textSecondary,
                 fontSize: 14,
@@ -340,7 +340,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'The Heartbeat of Naija Content',
+                      'Where Naija Builds',
                       style: TextStyle(
                         color: NGColors.textMuted,
                         fontSize: 12,
