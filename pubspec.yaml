@@ -1,5 +1,5 @@
 name: nigergram
-description: "NigerGram - Nigeria's Video Platform"
+description: "NigerGram - Professional Innovation Sharing Platform"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -40,12 +40,57 @@ dependencies:
   share_plus: ^10.1.0
   uuid: ^4.5.1
 
+  # NEW: Advanced Video Editing
+  video_editor: ^4.1.0              # Professional video editing timeline
+  ffmpeg_kit_flutter: ^4.5.0        # FFmpeg for video processing
+  
+  # NEW: Audio Recording & Processing
+  record: ^5.0.0                    # High-quality audio recording
+  audioplayers: ^6.1.0              # Audio playback with control
+  flutter_sound: ^9.2.13            # Professional audio library (alternate)
+  
+  # NEW: Podcast & Metadata
+  podcast_player: ^1.0.0            # Podcast playback
+  audio_session: ^0.1.15            # Audio session management
+  
+  # NEW: Waveform Visualization
+  flutter_audio_waveforms: ^1.2.5   # Real-time waveform display
+  
+  # NEW: Text & Image Processing
+  google_ml_kit: ^0.14.2            # ML Kit for text recognition & face detection
+  image: ^4.1.0                     # Image processing
+  
+  # NEW: Captions & Subtitles
+  subtitle_wrapper_future: ^1.2.1   # Subtitle support
+  
+  # NEW: File Management
+  file_picker: ^6.1.0               # File selection dialog
+  
+  # NEW: Notifications
+  flutter_local_notifications: ^16.0.0  # Push notifications
+  firebase_messaging: ^15.1.0       # Firebase Cloud Messaging
+  
+  # NEW: State Management Enhancement
+  riverpod: ^2.4.0                  # Alternative state management
+  riverpod_generator: ^2.3.0        # Code generation for riverpod
+  
+  # NEW: Analytics & Monitoring
+  firebase_analytics: ^11.1.0       # Track user engagement
+  
+  # NEW: Permissions
+  permission_handler: ^11.4.4       # Handle microphone, camera permissions
+  
+  # NEW: Network & API
+  dio: ^5.4.0                       # HTTP client with interceptors
+  connectivity_plus: ^5.0.1         # Check network connectivity
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   build_runner: ^2.4.13
   json_serializable: ^6.8.0
   very_good_analysis: ^6.0.0
+  riverpod_generator: ^2.3.0        # Code generation
 
 flutter:
   generate: true
