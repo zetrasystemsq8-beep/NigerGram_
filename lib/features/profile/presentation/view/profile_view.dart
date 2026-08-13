@@ -2088,7 +2088,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                                           ),
                                         )
                                       : Text(
-                                          _isFollowing ? 'Following' : 'Follow',
+                                          _isFollowing ? 'Connected' : 'Connect',
                                           style: const TextStyle(
                                             color: NGColors.textPrimary,
                                             fontSize: 13,
@@ -2158,6 +2158,35 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                               height: 1.4,
                             ),
                           ),
+                        if (_userData?['nowBuilding'] != null && _userData!['nowBuilding'].toString().isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _accentColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _accentColor.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('🔨', style: TextStyle(fontSize: 13)),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    'Building: ${_userData!['nowBuilding']}',
+                                    style: TextStyle(
+                                      color: _accentColor,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (_bioLinks.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Wrap(
@@ -2264,7 +2293,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                         ],
                         const SizedBox(height: 16),
                         Row(children: [
-                          _statNode('${_userData?['videoCount'] ?? 0}', 'Videos'),
+                          _statNode('${_userData?['videoCount'] ?? 0}', 'Showcases'),
                           _statSpacer(),
                           _statNode('${_userData?['following'] ?? 0}', 'Following'),
                           _statSpacer(),
@@ -3002,3 +3031,5 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   }
   @override bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => false;
 }
+
+10
