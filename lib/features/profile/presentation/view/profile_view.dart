@@ -2402,4 +2402,239 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                                 children: [
                                   Text(a['icon'] ?? '🏆', style: const TextStyle(fontSize: 12)),
                                   const SizedBox(width: 4),
+                                  Text(
+                                    a['title'] ?? '',
+                                    style: const TextStyle(
+                                      color: NGColors.textPrimary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )).toList(),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        Row(children: [
+                          _statNode('${_userData?['videoCount'] ?? 0}', 'Showcases'),
+                          _statSpacer(),
+                          _statNode('${_userData?['following'] ?? 0}', 'Following'),
+                          _statSpacer(),
+                          _statNode('${_userData?['followers'] ?? 0}', 'Followers'),
+                          _statSpacer(),
+                          _statNode('${_userData?['likes'] ?? 0}', 'Likes'),
+                          _statSpacer(),
+                          _statNode('${_userData?['profileViews'] ?? 0}', 'Views'),
+                        ]),
+                        const SizedBox(height: 20),
+                        if (_featuredVideo != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: NGColors.surfaceLight,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: NGColors.accent.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: NGColors.surface,
+                                  ),
+                                  child: _featuredVideo!['thumbnailUrl'] != null
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: CachedNetworkImage(
+                                            imageUrl: _featuredVideo!['thumbnailUrl'],
+                                            fit: BoxFit.cover,
+                                          ),
+                                        )
+                                      : const Icon(Icons.play_circle_outline, size: 40, color: NGColors.textMuted),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        '⭐ Featured Video',
+                                        style: TextStyle(
+                                          color: NGColors.accent,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _featuredVideo!['description'] ?? 'Featured video',
+                                        style: const TextStyle(
+                                          color: NGColors.textPrimary,
+                                          fontSize: 13,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${_featuredVideo!['viewCount'] ?? 0} views',
+                                        style: TextStyle(
+                                          color: NGColors.textMuted,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (_isCurrentUser)
+                                  IconButton(
+                                    icon: const Icon(Icons.close, color: NGColors.textMuted, size: 16),
+                                    onPressed: () async {
+                                      await FirebaseFirestore.instance
+                                          .collection('videos')
+                                          .doc(_featuredVideo!['videoId'])
+                                          .update({'isFeatured': false});
+                                      await _loadFeaturedVideo();
+                                    },
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_pinnedVideos.isNotEmpty) ...[
+                          Row(children: [
+                            const Icon(Icons.push_pin, color: NGColors.premium, size: 16),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Pinned',
+                              style: TextStyle(
+                                color: NGColors.premium,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ]),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 180,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _pinnedVideos.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 8),
+                              itemBuilder: (context, idx) {
+                                final v = _pinnedVideos[idx];
+                                return GestureDetector(
+                                  onTap: () => context.push('/video/${v['videoId']}'),
+                                  onLongPress: () => _isCurrentUser ? _showVideoOptions(v) : null,
+                                  child: Container(
+                                    width: 120,
+                                    decoration: BoxDecoration(
+                                      color: NGColors.surfaceLight,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(children: [
+                                      Expanded(
+                                        child: ClipRRect(
+                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                                          child: v['thumbnailUrl'] != null && v['thumbnailUrl'].toString().isNotEmpty
+                                              ? CachedNetworkImage(
+                                                  imageUrl: v['thumbnailUrl'],
+                                                  fit: BoxFit.cover,
+                                                  width: double.infinity,
+                                                )
+                                              : const Center(
+                                                  child: Icon(
+                                                    Icons.play_circle_outline,
+                                                    color: NGColors.textMuted,
+                                                    size: 32,
+                                                  ),
+                                                ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(6),
+                                        child: Row(children: [
+                                          const Icon(Icons.play_arrow_rounded, color: NGColors.textPrimary, size: 12),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            '${v['viewCount'] ?? 0}',
+                                            style: const TextStyle(
+                                              color: NGColors.textPrimary,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          const Icon(Icons.push_pin, color: NGColors.premium, size: 10),
+                                        ]),
+                                      ),
+                                    ]),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                      ]),
+                    ),
+                  ),
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _SliverTabBarDelegate(
+                      TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        indicatorColor: _accentColor,
+                        labelColor: NGColors.textPrimary,
+                        unselectedLabelColor: NGColors.textMuted,
+                        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        tabs: [
+                          const Tab(text: 'Videos'),
+                          const Tab(text: 'Pinned'),
+                          if (_isCurrentUser) const Tab(text: 'Private'),
+                          const Tab(text: 'Q&A'),
+                          if (_isCurrentUser) const Tab(text: 'Drafts'),
+                          const Tab(text: 'Likes'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ];
+              },
+              body: _isTabLoading
+                  ? const Center(child: CircularProgressIndicator(color: NGColors.accent))
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildGrid(_userVideos, 'videos'),
+                        _buildGrid(_pinnedVideos, 'pinned'),
+                        if (_isCurrentUser) _buildGrid(_privateVideos, 'private'),
+                        _buildQATab(),
+                        if (_isCurrentUser) _buildDraftsTab(),
+                        _buildGrid(_likedVideos, 'likes'),
+                      ],
+                    ),
+            ),
+          ),
+          if (_isUploadingContent) _buildUploadOverlay(),
+        ],
+      ),
+      floatingActionButton: _isCurrentUser
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 80.0),
+              child: FloatingActionButton(
+                backgroundColor: NGColors.accent,
+                child: const Icon(Icons.add, color: NGColors.textPrimary, size: 28),
+                onPressed: _showUploadSheet,
+              ),
+            )
+          : null,
+    );
+  }
          
