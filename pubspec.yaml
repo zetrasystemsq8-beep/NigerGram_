@@ -58,7 +58,7 @@ dependencies:
   image: ^4.1.0                     # Image processing
   
   # NEW: File Management
-  file_picker: ^6.1.0               # File selection dialog
+  file_picker: ^8.1.2               # File selection dialog
   
   # NEW: Notifications
   flutter_local_notifications: ^16.0.0  # Push notifications
