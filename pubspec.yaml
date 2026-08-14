@@ -78,6 +78,14 @@ dev_dependencies:
   json_serializable: ^6.8.0
   very_good_analysis: ^6.0.0
 
+dependency_overrides:
+  # record's Linux platform implementation (0.7.2) doesn't satisfy the
+  # record_platform_interface version record itself pulls in — mismatch
+  # causes compileFlutterBuildDebug to fail even on Android-only builds,
+  # since Dart still compiles all federated platform implementations.
+  # Not used at runtime for this app (Android target), just needs to compile.
+  record_linux: ^1.1.0
+
 flutter:
   generate: true
   uses-material-design: true
