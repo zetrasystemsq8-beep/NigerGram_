@@ -6,6 +6,7 @@
 // ║  Built For Nigeria • Ready For The World             ║
 // ╚══════════════════════════════════════════════════════════╝
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
@@ -68,6 +69,13 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   
   // Bio Links
   List<Map<String, dynamic>> _bioLinks = [];
+
+  // Domain tags (derived from this user's own showcase videos)
+  List<String> _domainTags = [];
+
+  // Communities joined + bounties completed (from The Forge)
+  List<String> _communityNames = [];
+  int _bountiesCompleted = 0;
   
   // Online status
   bool _isOnline = false;
@@ -214,6 +222,10 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       
       // Load bio links
       _loadBioLinks();
+
+      // Load communities + bounties (Forge identity)
+      unawaited(_loadCommunities());
+      unawaited(_loadBountiesCompleted());
       
       // Check online status
       _checkOnlineStatus();
@@ -253,6 +265,7 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
         _checkStoryStatus().catchError((_) {}),
         _loadAchievements().catchError((_) {}),
       ]);
+      _loadDomainTags();
     } catch (e) {
       print('❌ Profile load error: $e');
       if (mounted) setState(() => _hasError = true);
@@ -319,6 +332,62 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
       });
     } catch (_) {
       _mutualFollowers = 0;
+    }
+  }
+
+  /// Derives the domains this user actively builds in from the
+  /// category field on their own public videos — no new query needed,
+  /// just summarizing data already loaded via _loadPublicVideos.
+  void _loadDomainTags() {
+    final tags = _userVideos
+        .map((v) => v['category'] as String?)
+        .where((c) => c != null && c.isNotEmpty && c != 'All')
+        .cast<String>()
+        .toSet()
+        .toList();
+    if (mounted) setState(() => _domainTags = tags);
+  }
+
+  /// Communities this user belongs to, via a collectionGroup query on
+  /// the 'members' subcollection filtered by document ID (the uid).
+  /// Falls back silently to an empty list on any error — this is a
+  /// profile enhancement, not core functionality.
+  Future<void> _loadCommunities() async {
+    if (_targetUserId.isEmpty) return;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collectionGroup('members')
+          .where(FieldPath.documentId, isEqualTo: _targetUserId)
+          .limit(10)
+          .get();
+
+      final names = <String>[];
+      for (final doc in snap.docs) {
+        final communityRef = doc.reference.parent.parent;
+        if (communityRef == null) continue;
+        final communityDoc = await communityRef.get();
+        final name = communityDoc.data()?['name'] as String?;
+        if (name != null && name.isNotEmpty) names.add(name);
+      }
+      if (mounted) setState(() => _communityNames = names);
+    } catch (_) {
+      // Silent — profile still works without this.
+    }
+  }
+
+  /// Count of bounties this user has completed (claimed AND paid out).
+  Future<void> _loadBountiesCompleted() async {
+    if (_targetUserId.isEmpty) return;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('bounties')
+          .where('claimedByUserId', isEqualTo: _targetUserId)
+          .where('status', isEqualTo: 'completed')
+          .count()
+          .get();
+      if (mounted) setState(() => _bountiesCompleted = snap.count ?? 0);
+    } catch (_) {
+      // Silent — profile still works without this.
     }
   }
   
@@ -2187,6 +2256,61 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                             ),
                           ),
                         ],
+                        if (_domainTags.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: _domainTags.map((tag) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: NGColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                tag,
+                                style: TextStyle(
+                                  color: NGColors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )).toList(),
+                          ),
+                        ],
+                        if (_communityNames.isNotEmpty || _bountiesCompleted > 0) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              if (_communityNames.isNotEmpty) ...[
+                                const Icon(Icons.groups_outlined, size: 14, color: NGColors.textMuted),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    _communityNames.length == 1
+                                        ? _communityNames.first
+                                        : '${_communityNames.first} +${_communityNames.length - 1} more',
+                                    style: TextStyle(color: NGColors.textMuted, fontSize: 12),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                              if (_communityNames.isNotEmpty && _bountiesCompleted > 0)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 8),
+                                  child: Text('·', style: TextStyle(color: NGColors.textMuted)),
+                                ),
+                              if (_bountiesCompleted > 0) ...[
+                                const Icon(Icons.emoji_events_outlined, size: 14, color: NGColors.textMuted),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$_bountiesCompleted ${_bountiesCompleted == 1 ? 'bounty' : 'bounties'} completed',
+                                  style: TextStyle(color: NGColors.textMuted, fontSize: 12),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
                         if (_bioLinks.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Wrap(
@@ -2278,756 +2402,4 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                                 children: [
                                   Text(a['icon'] ?? '🏆', style: const TextStyle(fontSize: 12)),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    a['title'] ?? '',
-                                    style: const TextStyle(
-                                      color: NGColors.textPrimary,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )).toList(),
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        Row(children: [
-                          _statNode('${_userData?['videoCount'] ?? 0}', 'Showcases'),
-                          _statSpacer(),
-                          _statNode('${_userData?['following'] ?? 0}', 'Following'),
-                          _statSpacer(),
-                          _statNode('${_userData?['followers'] ?? 0}', 'Followers'),
-                          _statSpacer(),
-                          _statNode('${_userData?['likes'] ?? 0}', 'Likes'),
-                          _statSpacer(),
-                          _statNode('${_userData?['profileViews'] ?? 0}', 'Views'),
-                        ]),
-                        const SizedBox(height: 20),
-                        if (_featuredVideo != null) ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: NGColors.surfaceLight,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: NGColors.accent.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 80,
-                                  height: 80,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: NGColors.surface,
-                                  ),
-                                  child: _featuredVideo!['thumbnailUrl'] != null
-                                      ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: CachedNetworkImage(
-                                            imageUrl: _featuredVideo!['thumbnailUrl'],
-                                            fit: BoxFit.cover,
-                                          ),
-                                        )
-                                      : const Icon(Icons.play_circle_outline, size: 40, color: NGColors.textMuted),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        '⭐ Featured Video',
-                                        style: TextStyle(
-                                          color: NGColors.accent,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _featuredVideo!['description'] ?? 'Featured video',
-                                        style: const TextStyle(
-                                          color: NGColors.textPrimary,
-                                          fontSize: 13,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${_featuredVideo!['viewCount'] ?? 0} views',
-                                        style: TextStyle(
-                                          color: NGColors.textMuted,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (_isCurrentUser)
-                                  IconButton(
-                                    icon: const Icon(Icons.close, color: NGColors.textMuted, size: 16),
-                                    onPressed: () async {
-                                      await FirebaseFirestore.instance
-                                          .collection('videos')
-                                          .doc(_featuredVideo!['videoId'])
-                                          .update({'isFeatured': false});
-                                      await _loadFeaturedVideo();
-                                    },
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        if (_pinnedVideos.isNotEmpty) ...[
-                          Row(children: [
-                            const Icon(Icons.push_pin, color: NGColors.premium, size: 16),
-                            const SizedBox(width: 4),
-                            const Text(
-                              'Pinned',
-                              style: TextStyle(
-                                color: NGColors.premium,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ]),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            height: 180,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _pinnedVideos.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 8),
-                              itemBuilder: (context, idx) {
-                                final v = _pinnedVideos[idx];
-                                return GestureDetector(
-                                  onTap: () => context.push('/video/${v['videoId']}'),
-                                  onLongPress: () => _isCurrentUser ? _showVideoOptions(v) : null,
-                                  child: Container(
-                                    width: 120,
-                                    decoration: BoxDecoration(
-                                      color: NGColors.surfaceLight,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Column(children: [
-                                      Expanded(
-                                        child: ClipRRect(
-                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                                          child: v['thumbnailUrl'] != null && v['thumbnailUrl'].toString().isNotEmpty
-                                              ? CachedNetworkImage(
-                                                  imageUrl: v['thumbnailUrl'],
-                                                  fit: BoxFit.cover,
-                                                  width: double.infinity,
-                                                )
-                                              : const Center(
-                                                  child: Icon(
-                                                    Icons.play_circle_outline,
-                                                    color: NGColors.textMuted,
-                                                    size: 32,
-                                                  ),
-                                                ),
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.all(6),
-                                        child: Row(children: [
-                                          const Icon(Icons.play_arrow_rounded, color: NGColors.textPrimary, size: 12),
-                                          const SizedBox(width: 2),
-                                          Text(
-                                            '${v['viewCount'] ?? 0}',
-                                            style: const TextStyle(
-                                              color: NGColors.textPrimary,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          const Icon(Icons.push_pin, color: NGColors.premium, size: 10),
-                                        ]),
-                                      ),
-                                    ]),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
-                      ]),
-                    ),
-                  ),
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: _SliverTabBarDelegate(
-                      TabBar(
-                        controller: _tabController,
-                        isScrollable: true,
-                        indicatorColor: _accentColor,
-                        labelColor: NGColors.textPrimary,
-                        unselectedLabelColor: NGColors.textMuted,
-                        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                        tabs: [
-                          const Tab(text: 'Videos'),
-                          const Tab(text: 'Pinned'),
-                          if (_isCurrentUser) const Tab(text: 'Private'),
-                          const Tab(text: 'Q&A'),
-                          if (_isCurrentUser) const Tab(text: 'Drafts'),
-                          const Tab(text: 'Likes'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ];
-              },
-              body: _isTabLoading
-                  ? const Center(child: CircularProgressIndicator(color: NGColors.accent))
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildGrid(_userVideos, 'videos'),
-                        _buildGrid(_pinnedVideos, 'pinned'),
-                        if (_isCurrentUser) _buildGrid(_privateVideos, 'private'),
-                        _buildQATab(),
-                        if (_isCurrentUser) _buildDraftsTab(),
-                        _buildGrid(_likedVideos, 'likes'),
-                      ],
-                    ),
-            ),
-          ),
-          if (_isUploadingContent) _buildUploadOverlay(),
-        ],
-      ),
-      floatingActionButton: _isCurrentUser
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 80.0),
-              child: FloatingActionButton(
-                backgroundColor: NGColors.accent,
-                child: const Icon(Icons.add, color: NGColors.textPrimary, size: 28),
-                onPressed: _showUploadSheet,
-              ),
-            )
-          : null,
-    );
-  }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // GRID BUILDER
-  // ─────────────────────────────────────────────────────────────────────────
-  
-  Widget _buildGrid(List<Map<String, dynamic>> items, String tabName) {
-    if (items.isEmpty) {
-      return RefreshIndicator(
-        color: NGColors.accent,
-        onRefresh: _refreshCurrentTab,
-        child: ListView(
-          children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.5,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      tabName == 'private'
-                          ? Icons.lock_outline
-                          : tabName == 'pinned'
-                              ? Icons.push_pin
-                              : tabName == 'likes'
-                                  ? Icons.favorite_border
-                                  : Icons.videocam_outlined,
-                      color: NGColors.textMuted,
-                      size: 48,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      tabName == 'private'
-                          ? 'No private videos'
-                          : tabName == 'pinned'
-                              ? 'No pinned videos'
-                              : tabName == 'likes'
-                                  ? 'No liked videos'
-                                  : 'No videos yet',
-                      style: const TextStyle(
-                        color: NGColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return RefreshIndicator(
-      color: NGColors.accent,
-      onRefresh: _refreshCurrentTab,
-      child: CustomScrollView(
-        key: PageStorageKey(tabName),
-        slivers: [
-          SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 9 / 14,
-              crossAxisSpacing: 1,
-              mainAxisSpacing: 1,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, idx) {
-                final item = items[idx];
-                return GestureDetector(
-                  onTap: () => context.push('/video/${item['videoId']}'),
-                  onLongPress: _isCurrentUser && item['userId'] == _currentUid
-                      ? () => _showVideoOptions(item)
-                      : null,
-                  child: Container(
-                    color: NGColors.surface,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        item['thumbnailUrl'] != null && item['thumbnailUrl'].toString().isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: item['thumbnailUrl'],
-                                fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(color: NGColors.surfaceLight),
-                                errorWidget: (_, __, ___) => const Center(
-                                  child: Icon(
-                                    Icons.play_circle_outline,
-                                    color: NGColors.textMuted,
-                                    size: 28,
-                                  ),
-                                ),
-                              )
-                            : const Center(
-                                child: Icon(
-                                  Icons.play_circle_outline,
-                                  color: NGColors.textMuted,
-                                  size: 28,
-                                ),
-                              ),
-                        if (item['isPrivate'] == true)
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: Icon(
-                              Icons.lock,
-                              color: _accentColor.withOpacity(0.7),
-                              size: 12,
-                            ),
-                          ),
-                        if (item['isPinned'] == true)
-                          Positioned(
-                            top: 4,
-                            left: 4,
-                            child: const Icon(
-                              Icons.push_pin,
-                              color: NGColors.premium,
-                              size: 12,
-                            ),
-                          ),
-                        Positioned(
-                          left: 4,
-                          bottom: 4,
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.play_arrow_rounded,
-                                color: NGColors.textPrimary,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                '${item['viewCount'] ?? 0}',
-                                style: const TextStyle(
-                                  color: NGColors.textPrimary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-              childCount: items.length,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // Q&A TAB
-  // ─────────────────────────────────────────────────────────────────────────
-  
-  Widget _buildQATab() {
-    if (_qaItems.isEmpty) {
-      return RefreshIndicator(
-        color: NGColors.accent,
-        onRefresh: _refreshCurrentTab,
-        child: ListView(
-          children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.5,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.question_answer_outlined,
-                      color: NGColors.textMuted,
-                      size: 48,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'No questions yet',
-                      style: TextStyle(
-                        color: NGColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (!_isCurrentUser) ...[
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: NGColors.accent,
-                        ),
-                        onPressed: _askQuestion,
-                        child: const Text(
-                          'Ask a Question',
-                          style: TextStyle(color: NGColors.textPrimary),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return RefreshIndicator(
-      color: NGColors.accent,
-      onRefresh: _refreshCurrentTab,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _qaItems.length + (_isCurrentUser ? 0 : 1),
-        itemBuilder: (context, idx) {
-          if (!_isCurrentUser && idx == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: NGColors.accent,
-                ),
-                onPressed: _askQuestion,
-                icon: const Icon(Icons.help_outline, color: NGColors.textPrimary),
-                label: const Text(
-                  'Ask a Question',
-                  style: TextStyle(color: NGColors.textPrimary),
-                ),
-              ),
-            );
-          }
-          final item = _qaItems[_isCurrentUser ? idx : idx - 1];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: NGColors.surfaceLight,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item['question'] ?? '',
-                  style: const TextStyle(
-                    color: NGColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (item['answer'] != null) ...[
-                  const SizedBox(height: 8),
-                  const Divider(color: NGColors.divider),
-                  const SizedBox(height: 8),
-                  Text(
-                    item['answer'],
-                    style: const TextStyle(
-                      color: NGColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-  
-  Future<void> _askQuestion() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: NGColors.surface,
-        title: const Text(
-          'Ask a Question',
-          style: TextStyle(color: NGColors.textPrimary),
-        ),
-        content: TextField(
-          controller: controller,
-          style: const TextStyle(color: NGColors.textPrimary),
-          decoration: _inputDeco('Your question...'),
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: NGColors.textMuted),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: Text(
-              'Send',
-              style: TextStyle(color: _accentColor),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (result != null && result.trim().isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_targetUserId)
-          .collection('qa')
-          .add({
-            'question': result.trim(),
-            'askedBy': _currentUid,
-            'timestamp': FieldValue.serverTimestamp(),
-            'answer': null,
-          });
-      await _loadQAItems();
-      if (mounted) _showSnack('Question sent!', isSuccess: true);
-    }
-  }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // DRAFTS TAB
-  // ─────────────────────────────────────────────────────────────────────────
-  
-  Widget _buildDraftsTab() {
-    if (_draftVideos.isEmpty) {
-      return RefreshIndicator(
-        color: NGColors.accent,
-        onRefresh: _refreshCurrentTab,
-        child: ListView(
-          children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.5,
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.drafts_outlined, color: NGColors.textMuted, size: 48),
-                    SizedBox(height: 12),
-                    Text(
-                      'No drafts',
-                      style: TextStyle(
-                        color: NGColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Unfinished uploads will appear here',
-                      style: TextStyle(
-                        color: NGColors.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return RefreshIndicator(
-      color: NGColors.accent,
-      onRefresh: _refreshCurrentTab,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _draftVideos.length,
-        itemBuilder: (context, idx) {
-          final draft = _draftVideos[idx];
-          return ListTile(
-            leading: const Icon(Icons.videocam, color: NGColors.textSecondary),
-            title: Text(
-              draft['title'] ?? 'Untitled Draft',
-              style: const TextStyle(color: NGColors.textPrimary),
-            ),
-            subtitle: Text(
-              '${draft['progress'] ?? 0}% uploaded',
-              style: const TextStyle(color: NGColors.textMuted),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.upload, color: NGColors.success),
-                  onPressed: () {},
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: NGColors.error),
-                  onPressed: () {},
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // UPLOAD OVERLAY
-  // ─────────────────────────────────────────────────────────────────────────
-  
-  Widget _buildUploadOverlay() {
-    return Container(
-      color: Colors.black.withOpacity(0.85),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                value: _uploadProgress,
-                color: NGColors.accent,
-                strokeWidth: 4,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                _uploadLabel,
-                style: const TextStyle(
-                  color: NGColors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: _uploadProgress,
-                  color: NGColors.accent,
-                  backgroundColor: NGColors.divider,
-                  minHeight: 6,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${(_uploadProgress * 100).toInt()}%',
-                style: const TextStyle(
-                  color: NGColors.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // STAT HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
-  
-  Widget _statNode(String val, String title) => Row(
-        children: [
-          Text(
-            val,
-            style: const TextStyle(
-              color: NGColors.textPrimary,
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              color: NGColors.textSecondary,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      );
-  
-  Widget _statSpacer() => const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 10),
-        child: Text('|', style: TextStyle(color: NGColors.divider)),
-      );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// STORY RING PAINTER
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _StoryRingPainter extends CustomPainter {
-  final List<Color> colors;
-  final double rotation;
-  _StoryRingPainter({required this.colors, required this.rotation});
-  
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-    final gradient = SweepGradient(
-      startAngle: rotation,
-      endAngle: rotation + 2 * math.pi,
-      colors: colors,
-    );
-    final paint = Paint()
-      ..shader = gradient.createShader(Rect.fromCircle(center: center, radius: radius))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-    canvas.drawCircle(center, radius - 1.5, paint);
-  }
-  
-  @override
-  bool shouldRepaint(covariant _StoryRingPainter oldDelegate) => true;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TAB BAR DELEGATE
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-  _SliverTabBarDelegate(this.tabBar);
-  @override double get minExtent => tabBar.preferredSize.height;
-  @override double get maxExtent => tabBar.preferredSize.height;
-  @override Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(color: NGColors.background, child: tabBar);
-  }
-  @override bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => false;
-}
+         
