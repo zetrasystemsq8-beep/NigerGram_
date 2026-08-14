@@ -51,7 +51,7 @@ dependencies:
   audio_session: ^0.1.15            # Audio session management
   
   # NEW: Waveform Visualization
-  flutter_audio_waveforms: ^1.2.5   # Real-time waveform display
+  audio_waveforms: ^2.0.2           # Real-time waveform display
   
   # NEW: Text & Image Processing
   google_ml_kit: ^0.19.0            # ML Kit for text recognition & face detection
