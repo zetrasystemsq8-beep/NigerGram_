@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:nigergram/core/design_system/colors.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/gist_hub/data/services/community_service.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/community_entity.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/create_community_view.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/community_detail_view.dart';
 
 class BrowseCommunitiesView extends StatefulWidget {
   const BrowseCommunitiesView({super.key});
@@ -69,42 +71,60 @@ class _BrowseCommunitiesViewState extends State<BrowseCommunitiesView> {
                   itemCount: communities.length,
                   itemBuilder: (context, index) {
                     final c = communities[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: NGColors.surface,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: NGColors.accent.withOpacity(0.15),
-                            child: Icon(
-                              c.type == CommunityType.channel ? Icons.campaign_outlined : Icons.groups_outlined,
-                              color: NGColors.accent,
-                            ),
+                    return FutureBuilder<String?>(
+                      future: _service.getMemberRole(c.id, AppAuth.uid),
+                      builder: (context, roleSnap) {
+                        final isMember = roleSnap.data != null;
+                        return GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => CommunityDetailView(communityId: c.id)),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: NGColors.surface,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
                               children: [
-                                Text(c.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${c.memberCount} members • ${c.type == CommunityType.channel ? "Channel" : "Group"}',
-                                  style: TextStyle(color: NGColors.textMuted, fontSize: 12),
+                                CircleAvatar(
+                                  backgroundColor: NGColors.accent.withOpacity(0.15),
+                                  child: Icon(
+                                    c.type == CommunityType.channel ? Icons.campaign_outlined : Icons.groups_outlined,
+                                    color: NGColors.accent,
+                                  ),
                                 ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(c.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${c.memberCount} members • ${c.type == CommunityType.channel ? "Channel" : "Group"}',
+                                        style: TextStyle(color: NGColors.textMuted, fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isMember)
+                                  Text('Open', style: TextStyle(color: NGColors.accent, fontWeight: FontWeight.bold))
+                                else
+                                  TextButton(
+                                    onPressed: () async {
+                                      await _service.joinCommunity(c.id);
+                                      setState(() {});
+                                    },
+                                    child: const Text('Join'),
+                                  ),
                               ],
                             ),
                           ),
-                          TextButton(
-                            onPressed: () => _service.joinCommunity(c.id),
-                            child: const Text('Join'),
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     );
                   },
                 );
