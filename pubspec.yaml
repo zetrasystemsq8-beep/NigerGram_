@@ -41,7 +41,7 @@ dependencies:
   uuid: ^4.5.1
 
   # NEW: Advanced Video Editing
-  video_editor: ^4.1.0              # Professional video editing timeline
+  video_editor: ^3.0.0              # Professional video editing timeline
   
   # NEW: Audio Recording & Processing
   record: ^5.0.0                    # High-quality audio recording
