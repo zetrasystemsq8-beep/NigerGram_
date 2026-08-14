@@ -61,7 +61,7 @@ dependencies:
   file_picker: ^8.1.2               # File selection dialog
   
   # NEW: Notifications
-  flutter_local_notifications: ^16.0.0  # Push notifications
+  flutter_local_notifications: ^18.0.1  # Push notifications
   firebase_messaging: ^15.1.0       # Firebase Cloud Messaging
   
   # NEW: Permissions (FIXED VERSION)
