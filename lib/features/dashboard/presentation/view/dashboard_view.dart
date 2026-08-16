@@ -17,12 +17,52 @@ class DashboardView extends StatefulWidget {
   State<DashboardView> createState() => _DashboardViewState();
 }
 
-class _DashboardViewState extends State<DashboardView> {
+class _DashboardViewState extends State<DashboardView> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
-  void _handleTabSelection(int index) {
+  // Becomes false whenever NigerGram itself isn't the foreground surface —
+  // either because the OS backgrounded the whole app (home button, app
+  // switcher, another app opened, phone locked) or because a pushed route
+  // like Upload is now covering the Home tab. Combined with _currentIndex,
+  // this is what VideoFeedView's isActive actually needs to correctly
+  // pause playback in every "user left the video" scenario, not just
+  // in-app tab switches.
+  bool _isForegrounded = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Fires when the app is backgrounded/foregrounded at the OS level —
+    // covers switching to another app, the app switcher, or locking the
+    // phone. This is the case in-app tab logic can never catch on its own.
+    if (!mounted) return;
+    setState(() {
+      _isForegrounded = state == AppLifecycleState.resumed;
+    });
+  }
+
+  Future<void> _handleTabSelection(int index) async {
     if (index == 2) {
-      context.push(RouterEnum.uploadView.routeName);
+      // Upload is pushed as a new route on top of Dashboard rather than
+      // swapping the IndexedStack — so Home (and its video) stays mounted
+      // underneath unless we explicitly mark it not-foregrounded here,
+      // and restore it once the user backs out of Upload.
+      setState(() => _isForegrounded = false);
+      await context.push(RouterEnum.uploadView.routeName);
+      if (mounted) {
+        setState(() => _isForegrounded = true);
+      }
       return;
     }
     setState(() => _currentIndex = index);
@@ -40,9 +80,11 @@ class _DashboardViewState extends State<DashboardView> {
             child: IndexedStack(
               index: _currentIndex,
               children: [
-                // Pass isActive to VideoFeedView so it knows whether the
-                // tab is currently visible (true when selected).
-                VideoFeedView(isActive: _currentIndex == 0),
+                // isActive is now true only when Home is the selected tab
+                // AND NigerGram is actually the foreground surface —
+                // covers both OS-level backgrounding and pushed routes
+                // like Upload covering this screen.
+                VideoFeedView(isActive: _currentIndex == 0 && _isForegrounded),
                 const GistHubView(),
                 const SizedBox(),
                 const InboxView(),
