@@ -89,3 +89,5 @@ dependency_overrides:
 flutter:
   generate: true
   uses-material-design: true
+  assets:
+    - assets/sounds/zetra_spoken.wav
