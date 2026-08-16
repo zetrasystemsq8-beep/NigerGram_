@@ -5,15 +5,38 @@ import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:video_player/video_player.dart';
 
+/// Rotating pool of default captions shown on every video — the "Day 1"
+/// style tag RedNote uses, reframed for a builder/innovation feed instead
+/// of a generic entertainment one. Picked deterministically per video
+/// (via id hash) so it doesn't flicker/change on every rebuild.
+const List<String> kVideoFeedDefaultTaglines = [
+  '🤔🤔🤔 I no know o... but you sha know 👀',
+  'Day 1. Still building. 🛠️',
+  'Not magic, just code. 💻',
+  'From idea to build. 🚀',
+  'Small small, e go better. 🔧',
+];
+
+String taglineForVideo(String videoId) {
+  if (videoId.isEmpty) return kVideoFeedDefaultTaglines.first;
+  final index = videoId.hashCode.abs() % kVideoFeedDefaultTaglines.length;
+  return kVideoFeedDefaultTaglines[index];
+}
+
 class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
   const VideoFeedViewOptimizedVideoPlayer({
-    required this.controller, 
-    required this.videoId, 
-    super.key
+    required this.controller,
+    required this.videoId,
+    this.creatorUsername,
+    super.key,
   });
 
   final VideoPlayerController? controller;
   final String videoId;
+
+  /// Shown alongside the default tagline, e.g. "@zetra_dev".
+  /// Optional so this widget doesn't break if a caller doesn't pass it.
+  final String? creatorUsername;
 
   @override
   State<VideoFeedViewOptimizedVideoPlayer> createState() => _VideoFeedViewOptimizedVideoPlayerState();
@@ -257,14 +280,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return Container(
         color: Colors.black,
         child: Center(
-          child: RotationTransition(
-            turns: Tween<double>(begin: 0, end: 1).animate(_loadingController),
-            child: Icon(
-              Icons.loop_rounded,
-              color: Colors.white.withAlpha(180),
-              size: context.sq(32),
-            ),
-          ),
+          child: _NigerGramSpinner(controller: _loadingController, size: context.sq(46)),
         ),
       );
     }
@@ -329,17 +345,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
-          // Low-Data Buffering Spin Segment
+          // Low-Data Buffering Spin Segment — now brand-styled instead of default
           if (_isBuffering && _isControllerInitialized)
             Center(
-              child: SizedBox(
-                width: context.sq(36),
-                height: context.sq(36),
-                child: const CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2.5,
-                ),
-              ),
+              child: _NigerGramSpinner(controller: _loadingController, size: context.sq(34)),
             ),
             
           // Connection Error State Layer
@@ -364,8 +373,105 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
                 ),
               ),
             ),
+
+          // Persistent tagline + creator caption — the "Day 1" style tag,
+          // reframed for a builder feed. Sits near the top so it never
+          // collides with the username/description block anchored at
+          // the bottom of VideoFeedViewItem.
+          Positioned(
+            top: context.h(12),
+            left: 16,
+            right: 16,
+            child: IgnorePointer(
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.45),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    widget.creatorUsername != null && widget.creatorUsername!.isNotEmpty
+                        ? '${taglineForVideo(widget.videoId)}  ·  @${widget.creatorUsername}'
+                        : taglineForVideo(widget.videoId),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.92),
+                      fontSize: context.fontSize(12),
+                      fontWeight: FontWeight.w600,
+                      shadows: const [Shadow(color: Colors.black87, blurRadius: 3, offset: Offset(0, 1))],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+/// Branded loading spinner — replaces the default Flutter spinner/loop icon
+/// with a NigerGram-accent-colored rotating arc, matching the story-ring
+/// visual language already used on the profile screen.
+class _NigerGramSpinner extends StatelessWidget {
+  const _NigerGramSpinner({required this.controller, required this.size});
+
+  final AnimationController controller;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        return Transform.rotate(
+          angle: controller.value * 6.28318530718, // 2 * pi
+          child: CustomPaint(
+            size: Size(size, size),
+            painter: _BrandArcSpinnerPainter(color: NGColors.accent),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BrandArcSpinnerPainter extends CustomPainter {
+  _BrandArcSpinnerPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 3;
+
+    final trackPaint = Paint()
+      ..color = color.withOpacity(0.18)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.2;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    final arcPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.2
+      ..strokeCap = StrokeCap.round;
+
+    const startAngle = -1.5707963268; // -90deg, start at top
+    const sweepAngle = 4.18879020479; // ~240deg arc
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      false,
+      arcPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _BrandArcSpinnerPainter oldDelegate) => oldDelegate.color != color;
 }
