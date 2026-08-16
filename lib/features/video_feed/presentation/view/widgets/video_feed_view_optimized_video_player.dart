@@ -5,23 +5,11 @@ import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:video_player/video_player.dart';
 
-/// Rotating pool of default captions shown on every video — the "Day 1"
-/// style tag RedNote uses, reframed for a builder/innovation feed instead
-/// of a generic entertainment one. Picked deterministically per video
-/// (via id hash) so it doesn't flicker/change on every rebuild.
-const List<String> kVideoFeedDefaultTaglines = [
-  '🤔🤔🤔 I no know o... but you sha know 👀',
-  'Day 1. Still building. 🛠️',
-  'Not magic, just code. 💻',
-  'From idea to build. 🚀',
-  'Small small, e go better. 🔧',
-];
-
-String taglineForVideo(String videoId) {
-  if (videoId.isEmpty) return kVideoFeedDefaultTaglines.first;
-  final index = videoId.hashCode.abs() % kVideoFeedDefaultTaglines.length;
-  return kVideoFeedDefaultTaglines[index];
-}
+/// Fixed default caption shown on every video — the "Day 1" style tag
+/// RedNote uses, reframed around the app's own brand word. Kept as a
+/// function (rather than a bare constant) so the caption logic in the
+/// widget below doesn't need to change if this ever becomes dynamic again.
+String taglineForVideo(String videoId) => '🤝 Connect';
 
 class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
   const VideoFeedViewOptimizedVideoPlayer({
