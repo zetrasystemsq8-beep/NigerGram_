@@ -70,6 +70,7 @@ class VideoFeedViewItem extends StatelessWidget {
           child: VideoFeedViewOptimizedVideoPlayer(
             controller: controller,
             videoId: videoItem.id,
+            creatorUsername: videoItem.username,
           ),
         ),
 
