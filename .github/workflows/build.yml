@@ -80,6 +80,23 @@ jobs:
           cp /tmp/ic_launcher_fixed.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
           cp /tmp/ic_launcher_fixed.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
+      - name: Add ProGuard rules for ML Kit
+        run: |
+          mkdir -p android/app
+          cat >> android/app/proguard-rules.pro << 'EOF'
+
+          # --- ML Kit optional language recognizers not used by this app ---
+          -dontwarn com.google.mlkit.vision.text.chinese.**
+          -dontwarn com.google.mlkit.vision.text.devanagari.**
+          -dontwarn com.google.mlkit.vision.text.japanese.**
+          -dontwarn com.google.mlkit.vision.text.korean.**
+          -dontwarn com.google.firebase.iid.FirebaseInstanceId
+          -dontwarn com.google.mlkit.common.sdkinternal.**
+          -dontwarn com.google.mlkit.linkfirebase.**
+          -keep class com.google.mlkit.vision.text.** { *; }
+          -keep class com.google.mlkit.nl.** { *; }
+          EOF
+
       - name: Get dependencies
         run: flutter pub get
 
