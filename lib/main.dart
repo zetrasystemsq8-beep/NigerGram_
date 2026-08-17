@@ -9,11 +9,17 @@ import 'package:nigergram/core/init/app_widget.dart';
 import 'package:nigergram/core/utils/debug/firebase_debugger.dart';
 import 'package:nigergram/firebase_options.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+const String kAppId = 'nigergram';
+const String kCurrentVersion = '1.0.0';
+
+const String _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+const String _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ FIXED: Add timeout and error handling to Firebase initialization
   try {
     debugPrint('🟡 [STARTUP] Initializing Firebase...');
     await Firebase.initializeApp(
@@ -27,7 +33,6 @@ void main() async {
     );
     debugPrint('✅ [STARTUP] Firebase initialized successfully');
 
-    // ✅ CRITICAL: Enable offline persistence to fix [cloud_firestore/unavailable] crashes
     debugPrint('🟡 [STARTUP] Enabling Firestore offline persistence...');
     await FirebaseFirestore.instance.disableNetwork();
     await FirebaseFirestore.instance.enableNetwork();
@@ -43,12 +48,14 @@ void main() async {
     debugPrint('⚠️ [STARTUP] Continuing anyway - app can work offline');
   }
 
-  // ✅ FIXED: Add timeout and error handling to Supabase initialization
   try {
     debugPrint('🟡 [STARTUP] Initializing Supabase...');
+    if (_supabaseUrl.isEmpty || _supabaseAnonKey.isEmpty) {
+      throw Exception('Supabase credentials not provided at build time');
+    }
     await Supabase.initialize(
-      url: 'https://ssmwuihkafrulmvtiuam.supabase.co',
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzbXd1aWhrYWZydWxtdnRpdWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4Mjk2NjAsImV4cCI6MjA5NjQwNTY2MH0.e1PxmDW77ZhbonS-Z96SWA_sPyVGedzpZNZbJQz7pQo',
+      url: _supabaseUrl,
+      anonKey: _supabaseAnonKey,
     ).timeout(
       const Duration(seconds: 15),
       onTimeout: () {
@@ -69,13 +76,88 @@ void main() async {
   injectionSetup();
   debugPrint('✅ [STARTUP] Dependency injection setup complete');
 
-  // ✅ DEBUG: Validate Firebase setup on debug mode
   if (kDebugMode) {
     debugPrint('🟡 [STARTUP] Running Firebase diagnostics...');
     await Future.delayed(const Duration(milliseconds: 500));
     await FirebaseDebugger.validateFirebaseSetup();
   }
 
+  String? forceUpdateUrl;
+  try {
+    debugPrint('🟡 [STARTUP] Checking app version...');
+    final update = await Supabase.instance.client
+        .from('app_release_versions')
+        .select()
+        .eq('app_id', kAppId)
+        .single();
+
+    if (_isOutdated(kCurrentVersion, update['minimum_version'] as String)) {
+      forceUpdateUrl = update['apk_url'] as String;
+      debugPrint('🔴 [STARTUP] App is outdated, blocking launch');
+    } else {
+      debugPrint('✅ [STARTUP] App version is current');
+    }
+  } catch (e) {
+    debugPrint('⚠️ [STARTUP] Version check failed, continuing anyway: $e');
+  }
+
+  if (forceUpdateUrl != null) {
+    runApp(_ForceUpdateApp(apkUrl: forceUpdateUrl));
+    return;
+  }
+
   debugPrint('🟡 [STARTUP] Starting app...');
   runApp(const AppWidget());
+}
+
+bool _isOutdated(String current, String minimum) {
+  List<int> parse(String v) =>
+      v.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+
+  final c = parse(current);
+  final m = parse(minimum);
+  final len = c.length > m.length ? c.length : m.length;
+
+  for (var i = 0; i < len; i++) {
+    final cv = i < c.length ? c[i] : 0;
+    final mv = i < m.length ? m[i] : 0;
+    if (cv != mv) return cv < mv;
+  }
+  return false;
+}
+
+class _ForceUpdateApp extends StatelessWidget {
+  final String apkUrl;
+  const _ForceUpdateApp({required this.apkUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'A new version of this app is required to continue.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => launchUrl(
+                    Uri.parse(apkUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  child: const Text('Update Required'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
