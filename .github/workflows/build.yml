@@ -34,7 +34,7 @@ jobs:
 
             const artifacts = response.data.artifacts;
             for (const artifact of artifacts) {
-              if (artifact.name === 'NigerGram-debug') {
+              if (artifact.name === 'NigerGram-debug' || artifact.name === 'NigerGram-release') {
                 console.log(`Force deleting artifact: ${artifact.name} (ID: ${artifact.id}) to clear space`);
                 await github.rest.actions.deleteArtifact({
                   owner: owner,
@@ -67,16 +67,18 @@ jobs:
 
       - name: Fix app icon
         run: |
+          sudo apt-get update && sudo apt-get install -y imagemagick
           mkdir -p android/app/src/main/res/mipmap-hdpi
           mkdir -p android/app/src/main/res/mipmap-mdpi
           mkdir -p android/app/src/main/res/mipmap-xhdpi
           mkdir -p android/app/src/main/res/mipmap-xxhdpi
           mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          convert android/app/src/main/res/ic_launcher.png -strip -define png:color-type=6 /tmp/ic_launcher_fixed.png
+          cp /tmp/ic_launcher_fixed.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          cp /tmp/ic_launcher_fixed.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          cp /tmp/ic_launcher_fixed.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          cp /tmp/ic_launcher_fixed.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          cp /tmp/ic_launcher_fixed.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
       - name: Get dependencies
         run: flutter pub get
@@ -92,6 +94,7 @@ jobs:
         with:
           name: NigerGram-release
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 1
 
       - name: Create GitHub Release
         if: github.event_name == 'push'
