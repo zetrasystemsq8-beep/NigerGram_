@@ -1,6 +1,7 @@
 // lib/features/video_feed/presentation/view/widgets/video_feed_view_optimized_video_player.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:video_player/video_player.dart';
@@ -46,6 +47,45 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   // 🔥 FIX: Track initialization state separately
   bool _isControllerInitialized = false;
   bool _isInitializing = false;
+
+  // --- Added: end-of-video "connect" sound ---
+  // setLooping(true) below means video_player never actually reports
+  // "completed" — it just silently jumps back to position 0 and keeps
+  // playing. So there's no completion event to hook into; instead we
+  // watch playback position on every listener tick, and treat a sudden
+  // drop from near-the-end back to near-zero as "the video just looped",
+  // which is the same moment as "the video just finished". One AudioPlayer
+  // instance is reused for the whole widget lifetime rather than created
+  // per-play, to avoid platform channel overhead on every single loop.
+  final AudioPlayer _endSoundPlayer = AudioPlayer();
+  Duration? _lastKnownPosition;
+  static const _loopEndProximity = Duration(milliseconds: 400);
+  static const _loopRestartJump = Duration(milliseconds: 500);
+
+  Future<void> _playEndOfVideoSound() async {
+    try {
+      await _endSoundPlayer.stop();
+      await _endSoundPlayer.play(AssetSource('sounds/zetra_spoken.wav'));
+    } catch (_) {
+      // Never let a sound-playback failure disrupt video playback itself.
+    }
+  }
+
+  void _checkForLoopRestart(VideoPlayerController controller) {
+    final duration = controller.value.duration;
+    final position = controller.value.position;
+    if (duration <= Duration.zero) return;
+
+    final lastPosition = _lastKnownPosition;
+    if (lastPosition != null &&
+        lastPosition >= (duration - _loopEndProximity) &&
+        position < (lastPosition - _loopRestartJump)) {
+      _playEndOfVideoSound();
+    }
+
+    _lastKnownPosition = position;
+  }
+  // --- end added ---
 
   @override
   void initState() {
@@ -112,6 +152,11 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     _oldController = controller;
     _isControllerInitialized = true;
     _isInitializing = false;
+
+    // Added: reset loop-detection state for the new video — otherwise a
+    // stale position from the previous video could false-trigger the
+    // sound on the very first tick of a new one.
+    _lastKnownPosition = null;
     
     _applyLowDataOptimization(controller);
     _addControllerListener(controller);
@@ -173,6 +218,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     _oldController?.removeListener(_onControllerUpdate);
     _oldController?.removeListener(_onControllerInitListener);
     _oldController = null;
+    _endSoundPlayer.dispose();
     super.dispose();
   }
 
@@ -213,6 +259,13 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
+
+    // Added: only check for a loop restart while actually playing —
+    // avoids false triggers from position jumps caused by seeking/
+    // scrubbing while paused.
+    if (isPlaying) {
+      _checkForLoopRestart(controller);
+    }
 
     // 🔥 FIX: Only show buffering if playing and buffer is loading
     bool shouldShowBuffering = isBuffering && isPlaying;
