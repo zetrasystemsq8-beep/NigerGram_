@@ -24,7 +24,7 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            console.log("Scanning repository storage for matching NigerGram-debug artifacts...");
+            console.log("Scanning repository storage for matching NigerGram artifacts...");
 
             const response = await github.rest.actions.listArtifactsForRepo({
               owner: owner,
@@ -34,8 +34,8 @@ jobs:
 
             const artifacts = response.data.artifacts;
             for (const artifact of artifacts) {
-              if (artifact.name === 'NigerGram-debug') {
-                console.log(`Force deleting artifact: ${artifact.name} (ID: ${artifact.id}) to clear space`);
+              if (artifact.name.includes('NigerGram')) {
+                console.log(`Force deleting artifact: ${artifact.name} (ID: ${artifact.id})`);
                 await github.rest.actions.deleteArtifact({
                   owner: owner,
                   repo: repo,
@@ -43,7 +43,7 @@ jobs:
                 });
               }
             }
-            console.log("Storage optimization step completed.");
+            console.log("Storage optimization completed.");
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -78,16 +78,43 @@ jobs:
           cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
           cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
+      - name: Copy audio assets
+        run: |
+          mkdir -p assets/sounds
+          cp assets/sounds/zetra_spoken.wav assets/sounds/ || true
+
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build APK
+      - name: Build Debug APK
         run: flutter build apk --debug --no-tree-shake-icons
 
-      - name: Upload APK
+      - name: Build Release APK
+        run: flutter build apk --release --android-skip-build-dependency-validation
+
+      - name: Build Release AAB
+        run: flutter build appbundle --release --android-skip-build-dependency-validation
+
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: NigerGram-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 1
+          overwrite: true
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NigerGram-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+          overwrite: true
+
+      - name: Upload Release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: NigerGram-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
           overwrite: true
