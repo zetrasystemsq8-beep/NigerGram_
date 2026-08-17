@@ -24,31 +24,26 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-
-            console.log("Scanning repository storage...");
+            console.log("Scanning repository storage for matching NigerGram-debug artifacts...");
 
             const response = await github.rest.actions.listArtifactsForRepo({
-              owner,
-              repo,
+              owner: owner,
+              repo: repo,
               per_page: 100
             });
 
-            for (const artifact of response.data.artifacts) {
-              if (
-                artifact.name === 'NigerGram-debug' ||
-                artifact.name === 'NigerGram-release'
-              ) {
-                console.log(`Deleting old artifact: ${artifact.name} (${artifact.id})`);
-
+            const artifacts = response.data.artifacts;
+            for (const artifact of artifacts) {
+              if (artifact.name === 'NigerGram-debug') {
+                console.log(`Force deleting artifact: ${artifact.name} (ID: ${artifact.id}) to clear space`);
                 await github.rest.actions.deleteArtifact({
-                  owner,
-                  repo,
+                  owner: owner,
+                  repo: repo,
                   artifact_id: artifact.id,
                 });
               }
             }
-
-            console.log("Storage optimization completed.");
+            console.log("Storage optimization step completed.");
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -77,7 +72,6 @@ jobs:
           mkdir -p android/app/src/main/res/mipmap-xhdpi
           mkdir -p android/app/src/main/res/mipmap-xxhdpi
           mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-
           cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
           cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
           cp android/app/src/main/res/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
@@ -87,34 +81,26 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build Release APK
-        run: flutter build apk --release --no-tree-shake-icons
+      - name: Build APK
+        run: flutter build apk --debug --no-tree-shake-icons
 
-      - name: Rename APK
-        run: |
-          cp build/app/outputs/flutter-apk/app-release.apk \
-             build/app/outputs/flutter-apk/NigerGram-release.apk
-
-      - name: Upload Release APK as Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NigerGram-release
-          path: build/app/outputs/flutter-apk/NigerGram-release.apk
+          name: NigerGram-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 1
           overwrite: true
 
-      - name: Create GitHub Release
+      # ADDED ONLY — creates a public download link
+      - name: Create Public APK Download
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: nigergram-v${{ github.run_number }}
-          name: NigerGram v${{ github.run_number }}
+          tag_name: nigergram-latest
+          name: NigerGram Latest
           body: |
-            ## NigerGram Release v${{ github.run_number }}
-
-            New NigerGram APK release.
-
-            Built automatically from the `main` branch.
+            Download the latest NigerGram APK below.
           files: |
-            build/app/outputs/flutter-apk/NigerGram-release.apk
-          generate_release_notes: true
+            build/app/outputs/flutter-apk/app-debug.apk
           make_latest: true
+          prerelease: false
