@@ -80,6 +80,12 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
+      - name: Copy audio assets
+        run: |
+          mkdir -p assets/sounds
+          if [ -f "assets/sounds/zetra_spoken.wav" ]; then
+            cp assets/sounds/zetra_spoken.wav build/app/outputs/ || true
+          fi
 
       - name: Build APK
         run: flutter build apk --debug --no-tree-shake-icons
