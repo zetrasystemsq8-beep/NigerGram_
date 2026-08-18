@@ -20,10 +20,29 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
   final GistService _service = GistService();
   int _totalGists = 0;
 
+  // Created exactly once per filter, in initState, and reused for the
+  // lifetime of this State object. Previously getGistFeedStream() was
+  // called fresh inline inside StreamBuilder's `stream:` parameter on
+  // every rebuild (pull-to-refresh, posting a gist, _loadGistCount, etc.
+  // all call setState here) — if the underlying stream from GistService
+  // isn't a broadcast stream, re-subscribing to what may be the same
+  // instance on a second call throws exactly the "Stream has already
+  // been listened to" error. Caching the Stream objects here guarantees
+  // each one is only ever listened to once, no matter how often this
+  // widget rebuilds.
+  late final Stream<List<Map<String, dynamic>>> _trendingStream;
+  late final Stream<List<Map<String, dynamic>>> _latestStream;
+  late final Stream<List<Map<String, dynamic>>> _pollsStream;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+
+    _trendingStream = _service.getGistFeedStream(filter: 'trending');
+    _latestStream = _service.getGistFeedStream(filter: 'latest');
+    _pollsStream = _service.getGistFeedStream(filter: 'polls');
+
     _loadGistCount();
   }
 
@@ -126,9 +145,9 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildFeed('trending'),
-          _buildFeed('latest'),
-          _buildFeed('polls'),
+          _buildFeed('trending', _trendingStream),
+          _buildFeed('latest', _latestStream),
+          _buildFeed('polls', _pollsStream),
           const BrowseCommunitiesView(),
           const BrowseBountiesView(),
         ],
@@ -161,9 +180,9 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildFeed(String filter) {
+  Widget _buildFeed(String filter, Stream<List<Map<String, dynamic>>> stream) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _service.getGistFeedStream(filter: filter),
+      stream: stream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(
