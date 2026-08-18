@@ -1,10 +1,28 @@
-# --- ML Kit optional language recognizers not used by this app ---
--dontwarn com.google.mlkit.vision.text.chinese.**
--dontwarn com.google.mlkit.vision.text.devanagari.**
--dontwarn com.google.mlkit.vision.text.japanese.**
--dontwarn com.google.mlkit.vision.text.korean.**
--dontwarn com.google.firebase.iid.FirebaseInstanceId
--dontwarn com.google.mlkit.common.sdkinternal.**
--dontwarn com.google.mlkit.linkfirebase.**
--keep class com.google.mlkit.vision.text.** { *; }
--keep class com.google.mlkit.nl.** { *; }
+# Flutter plugin embedding
+-keep class io.flutter.app.** { *; }
+-keep class io.flutter.plugin.**  { *; }
+-keep class io.flutter.util.**  { *; }
+-keep class io.flutter.view.**  { *; }
+-keep class io.flutter.**  { *; }
+-keep class io.flutter.plugins.**  { *; }
+
+# Firebase Messaging
+-keep class com.google.firebase.messaging.** { *; }
+-keep class com.google.firebase.iid.** { *; }
+
+# Supabase / Gotrue / Realtime (reflection-based JSON handling)
+-keep class io.supabase.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+
+# Firestore / gRPC
+-keep class com.google.firebase.firestore.** { *; }
+-keep class io.grpc.** { *; }
+-dontwarn io.grpc.**
+
+# Gson (used transitively by several of the above)
+-keepattributes *Annotation*
+-keep class com.google.gson.** { *; }
+-keep class * implements com.google.gson.TypeAdapterFactory
+-keep class * implements com.google.gson.JsonSerializer
+-keep class * implements com.google.gson.JsonDeserializer
