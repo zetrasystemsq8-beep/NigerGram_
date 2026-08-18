@@ -48,30 +48,104 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   bool _isControllerInitialized = false;
   bool _isInitializing = false;
 
-  // --- Added: end-of-video "connect" sound ---
-  // setLooping(true) below means video_player never actually reports
-  // "completed" — it just silently jumps back to position 0 and keeps
-  // playing. So there's no completion event to hook into; instead we
-  // watch playback position on every listener tick, and treat a sudden
-  // drop from near-the-end back to near-zero as "the video just looped",
-  // which is the same moment as "the video just finished". One AudioPlayer
-  // instance is reused for the whole widget lifetime rather than created
-  // per-play, to avoid platform channel overhead on every single loop.
-  final AudioPlayer _endSoundPlayer = AudioPlayer();
+  // --- Branded outro shown between every loop of a video ---
+  // When the creator's video reaches its end, instead of just silently
+  // looping (setLooping(true) below), we pause it, show a 4-second
+  // branded clip full-screen with narration audio playing over it, then
+  // once that finishes, seek the creator's video back to 0 and resume
+  // normal playback. Every video gets this treatment, every time it
+  // finishes — not just the very last video in the feed.
+  static const String _outroVideoAsset = 'assets/sounds/lv_732853827814200487_20260818020652.mp4';
+  static const String _narrationAsset = 'sounds/zetra_spoken.wav';
+
+  VideoPlayerController? _outroController;
+  final AudioPlayer _narrationPlayer = AudioPlayer();
+  bool _showingOutro = false;
+  bool _outroControllerReady = false;
+
   Duration? _lastKnownPosition;
   static const _loopEndProximity = Duration(milliseconds: 400);
   static const _loopRestartJump = Duration(milliseconds: 500);
 
-  Future<void> _playEndOfVideoSound() async {
+  Future<void> _ensureOutroControllerReady() async {
+    if (_outroControllerReady) return;
+    final outro = VideoPlayerController.asset(_outroVideoAsset);
     try {
-      await _endSoundPlayer.stop();
-      await _endSoundPlayer.play(AssetSource('sounds/zetra_spoken.wav'));
+      await outro.initialize();
+      await outro.setLooping(false);
+      // Muted — narration comes from the separate wav file, played
+      // alongside it, not from the outro clip's own audio track.
+      await outro.setVolume(0);
+      _outroController = outro;
+      _outroControllerReady = true;
     } catch (_) {
-      // Never let a sound-playback failure disrupt video playback itself.
+      // If the outro clip fails to load, we simply skip the outro step
+      // entirely later (see _playOutroThenResume) rather than get stuck.
+      _outroControllerReady = false;
     }
   }
 
+  Future<void> _playOutroThenResume(VideoPlayerController mainController) async {
+    if (_showingOutro) return; // already mid-outro, don't double-trigger
+
+    mainController.pause();
+
+    await _ensureOutroControllerReady();
+    final outro = _outroController;
+
+    if (!mounted) return;
+
+    if (outro == null || !_outroControllerReady) {
+      // Outro clip unavailable — just play the narration alone over the
+      // frozen frame, briefly, rather than get stuck forever.
+      try {
+        await _narrationPlayer.stop();
+        await _narrationPlayer.play(AssetSource(_narrationAsset));
+      } catch (_) {}
+      await Future.delayed(const Duration(seconds: 3));
+      _resumeMainVideo(mainController);
+      return;
+    }
+
+    setState(() => _showingOutro = true);
+
+    await outro.seekTo(Duration.zero);
+    await outro.play();
+
+    try {
+      await _narrationPlayer.stop();
+      await _narrationPlayer.play(AssetSource(_narrationAsset));
+    } catch (_) {
+      // Never let narration failure block the visual outro.
+    }
+
+    void onOutroTick() {
+      if (!mounted) return;
+      final value = outro.value;
+      if (!value.isInitialized) return;
+      final duration = value.duration;
+      if (duration.inMilliseconds > 0 &&
+          value.position >= duration - const Duration(milliseconds: 150)) {
+        outro.removeListener(onOutroTick);
+        _resumeMainVideo(mainController);
+      }
+    }
+
+    outro.addListener(onOutroTick);
+  }
+
+  void _resumeMainVideo(VideoPlayerController mainController) {
+    if (!mounted) return;
+    setState(() => _showingOutro = false);
+    _lastKnownPosition = null;
+    mainController.seekTo(Duration.zero).then((_) {
+      if (mounted) mainController.play();
+    });
+  }
+
   void _checkForLoopRestart(VideoPlayerController controller) {
+    if (_showingOutro) return;
+
     final duration = controller.value.duration;
     final position = controller.value.position;
     if (duration <= Duration.zero) return;
@@ -80,12 +154,13 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     if (lastPosition != null &&
         lastPosition >= (duration - _loopEndProximity) &&
         position < (lastPosition - _loopRestartJump)) {
-      _playEndOfVideoSound();
+      _playOutroThenResume(controller);
+      return;
     }
 
     _lastKnownPosition = position;
   }
-  // --- end added ---
+  // --- end outro logic ---
 
   @override
   void initState() {
@@ -153,10 +228,11 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     _isControllerInitialized = true;
     _isInitializing = false;
 
-    // Added: reset loop-detection state for the new video — otherwise a
-    // stale position from the previous video could false-trigger the
-    // sound on the very first tick of a new one.
+    // Reset outro/loop-detection state for the new video — otherwise a
+    // stale position or an in-flight outro from the previous video
+    // could carry over incorrectly.
     _lastKnownPosition = null;
+    _showingOutro = false;
     
     _applyLowDataOptimization(controller);
     _addControllerListener(controller);
@@ -179,7 +255,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
   void _applyLowDataOptimization(VideoPlayerController controller) {
     if (controller.value.isInitialized) {
-      controller.setLooping(true);
+      // Looping stays OFF at the platform level now — looping is instead
+      // driven manually by _resumeMainVideo() after each outro finishes,
+      // so every "loop" reliably passes through the outro step first.
+      controller.setLooping(false);
       controller.setVolume(1.0);
     }
   }
@@ -205,6 +284,12 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       _currentVideoId = widget.videoId;
       _playerKey = UniqueKey();
       _isBuffering = false;
+
+      // Swiped to a different video — cancel any in-progress outro for
+      // the previous one so it doesn't resume the wrong controller later.
+      _outroController?.pause();
+      _narrationPlayer.stop();
+      _showingOutro = false;
       
       // 🔥 FIX: Re-check controller setup
       _checkAndSetupController();
@@ -218,7 +303,8 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     _oldController?.removeListener(_onControllerUpdate);
     _oldController?.removeListener(_onControllerInitListener);
     _oldController = null;
-    _endSoundPlayer.dispose();
+    _outroController?.dispose();
+    _narrationPlayer.dispose();
     super.dispose();
   }
 
@@ -260,10 +346,9 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
 
-    // Added: only check for a loop restart while actually playing —
-    // avoids false triggers from position jumps caused by seeking/
-    // scrubbing while paused.
-    if (isPlaying) {
+    // Only check for a loop restart while actually playing and not
+    // already mid-outro — avoids false triggers from seeking/scrubbing.
+    if (isPlaying && !_showingOutro) {
       _checkForLoopRestart(controller);
     }
 
@@ -283,6 +368,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   }
 
   void _handleSingleTapToggle() {
+    if (_showingOutro) return; // ignore taps while the outro is playing
     final controller = widget.controller;
     if (controller == null || !controller.value.isInitialized) return;
 
@@ -348,8 +434,23 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             ),
           ),
 
+          // Branded outro overlay — fully covers the creator's (paused)
+          // video while the 4-second clip + narration play.
+          if (_showingOutro && _outroController != null && _outroController!.value.isInitialized)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black,
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: _outroController!.value.aspectRatio,
+                    child: VideoPlayer(_outroController!),
+                  ),
+                ),
+              ),
+            ),
+
           // Scale and Fade Animation Play/Pause Overlay Engine
-          if (_showPlayIconOverlay)
+          if (_showPlayIconOverlay && !_showingOutro)
             IgnorePointer(
               child: AnimatedBuilder(
                 animation: _actionIconAnimationController,
@@ -387,7 +488,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             ),
 
           // Low-Data Buffering Spin Segment — now brand-styled instead of default
-          if (_isBuffering && _isControllerInitialized)
+          if (_isBuffering && _isControllerInitialized && !_showingOutro)
             Center(
               child: _NigerGramSpinner(controller: _loadingController, size: context.sq(34)),
             ),
@@ -415,38 +516,37 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
-          // Persistent tagline + creator caption — the "Day 1" style tag,
-          // reframed for a builder feed. Sits near the top so it never
-          // collides with the username/description block anchored at
-          // the bottom of VideoFeedViewItem.
-          Positioned(
-            top: context.h(12),
-            left: 16,
-            right: 16,
-            child: IgnorePointer(
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.45),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    widget.creatorUsername != null && widget.creatorUsername!.isNotEmpty
-                        ? '${taglineForVideo(widget.videoId)}  ·  @${widget.creatorUsername}'
-                        : taglineForVideo(widget.videoId),
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.92),
-                      fontSize: context.fontSize(12),
-                      fontWeight: FontWeight.w600,
-                      shadows: const [Shadow(color: Colors.black87, blurRadius: 3, offset: Offset(0, 1))],
+          // Persistent tagline + creator caption — hidden during the
+          // outro so it doesn't overlap the branded clip.
+          if (!_showingOutro)
+            Positioned(
+              top: context.h(12),
+              left: 16,
+              right: 16,
+              child: IgnorePointer(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.45),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      widget.creatorUsername != null && widget.creatorUsername!.isNotEmpty
+                          ? '${taglineForVideo(widget.videoId)}  ·  @${widget.creatorUsername}'
+                          : taglineForVideo(widget.videoId),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.92),
+                        fontSize: context.fontSize(12),
+                        fontWeight: FontWeight.w600,
+                        shadows: const [Shadow(color: Colors.black87, blurRadius: 3, offset: Offset(0, 1))],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
