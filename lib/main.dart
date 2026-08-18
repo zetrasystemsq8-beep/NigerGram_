@@ -66,8 +66,6 @@ void main() async {
     debugPrint('⚠️ [STARTUP] Continuing anyway - Supabase is optional for video feed');
   }
 
-  // Wrapped in try/catch now too — the only previously-unguarded step
-  // before runApp(). If this ever throws, we still reach runApp().
   try {
     debugPrint('🟡 [STARTUP] Setting up dependency injection...');
     injectionSetup();
@@ -197,6 +195,7 @@ class _NigerGramUpdateWrapperState extends State<_NigerGramUpdateWrapper> {
       ),
     );
   }
+}
 
 // ============================================================
 // FORCE UPDATE SCREEN
