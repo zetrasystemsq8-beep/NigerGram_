@@ -184,17 +184,19 @@ class _NigerGramUpdateWrapperState extends State<_NigerGramUpdateWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        const AppWidget(),
-        if (_forceUpdate && _apkUrl != null)
-          Positioned.fill(
-            child: _ForceUpdateScreen(apkUrl: _apkUrl!),
-          ),
-      ],
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Stack(
+        children: [
+          const AppWidget(),
+          if (_forceUpdate && _apkUrl != null)
+            Positioned.fill(
+              child: _ForceUpdateScreen(apkUrl: _apkUrl!),
+            ),
+        ],
+      ),
     );
   }
-}
 
 // ============================================================
 // FORCE UPDATE SCREEN
