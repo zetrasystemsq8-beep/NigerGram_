@@ -1,4 +1,5 @@
 // lib/features/video_feed/presentation/view/widgets/video_feed_view_optimized_video_player.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -6,10 +7,6 @@ import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:video_player/video_player.dart';
 
-/// Fixed default caption shown on every video — the "Day 1" style tag
-/// RedNote uses, reframed around the app's own brand word. Kept as a
-/// function (rather than a bare constant) so the caption logic in the
-/// widget below doesn't need to change if this ever becomes dynamic again.
 String taglineForVideo(String videoId) => '🤝 Connect';
 
 class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
@@ -22,9 +19,6 @@ class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
 
   final VideoPlayerController? controller;
   final String videoId;
-
-  /// Shown alongside the default tagline, e.g. "@zetra_dev".
-  /// Optional so this widget doesn't break if a caller doesn't pass it.
   final String? creatorUsername;
 
   @override
@@ -34,28 +28,23 @@ class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
 class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimizedVideoPlayer> with TickerProviderStateMixin {
   late AnimationController _loadingController;
   late AnimationController _actionIconAnimationController;
-  
+
   bool _isBuffering = false;
   VideoPlayerController? _oldController;
   String? _currentVideoId;
   bool _isPlaying = false;
   Key _playerKey = UniqueKey();
-  
+
   bool _showPlayIconOverlay = false;
   IconData _overlayIconData = Icons.play_arrow_rounded;
-  
-  // 🔥 FIX: Track initialization state separately
+
   bool _isControllerInitialized = false;
   bool _isInitializing = false;
 
-  // --- Branded outro shown between every loop of a video ---
-  // When the creator's video reaches its end, instead of just silently
-  // looping (setLooping(true) below), we pause it, show a 4-second
-  // branded clip full-screen with narration audio playing over it, then
-  // once that finishes, seek the creator's video back to 0 and resume
-  // normal playback. Every video gets this treatment, every time it
-  // finishes — not just the very last video in the feed.
-  static const String _outroVideoAsset = 'assets/sounds/lv_732853827814200487_20260818020652.mp4';
+  // --- Branded outro shown once a video finishes ---
+  // ⚠️ This string must match pubspec.yaml's assets entry EXACTLY,
+  // character for character — a mismatch here fails silently.
+  static const String _outroVideoAsset = 'assets/sounds/lv_7328538278142004487_20260818020652.mp4';
   static const String _narrationAsset = 'sounds/zetra_spoken.wav';
 
   VideoPlayerController? _outroController;
@@ -63,9 +52,11 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   bool _showingOutro = false;
   bool _outroControllerReady = false;
 
-  Duration? _lastKnownPosition;
-  static const _loopEndProximity = Duration(milliseconds: 400);
-  static const _loopRestartJump = Duration(milliseconds: 500);
+  // Fires once per play-through when the main video reaches its end —
+  // replaces the old "wait for a loop-restart jump" detection, since
+  // setLooping(false) means no restart ever happens on its own.
+  bool _endTriggeredForThisPlay = false;
+  static const _endProximity = Duration(milliseconds: 250);
 
   Future<void> _ensureOutroControllerReady() async {
     if (_outroControllerReady) return;
@@ -73,20 +64,16 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     try {
       await outro.initialize();
       await outro.setLooping(false);
-      // Muted — narration comes from the separate wav file, played
-      // alongside it, not from the outro clip's own audio track.
       await outro.setVolume(0);
       _outroController = outro;
       _outroControllerReady = true;
     } catch (_) {
-      // If the outro clip fails to load, we simply skip the outro step
-      // entirely later (see _playOutroThenResume) rather than get stuck.
       _outroControllerReady = false;
     }
   }
 
   Future<void> _playOutroThenResume(VideoPlayerController mainController) async {
-    if (_showingOutro) return; // already mid-outro, don't double-trigger
+    if (_showingOutro) return;
 
     mainController.pause();
 
@@ -96,14 +83,13 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     if (!mounted) return;
 
     if (outro == null || !_outroControllerReady) {
-      // Outro clip unavailable — just play the narration alone over the
-      // frozen frame, briefly, rather than get stuck forever.
+      // Outro clip unavailable — play narration alone, briefly, then pause.
       try {
         await _narrationPlayer.stop();
         await _narrationPlayer.play(AssetSource(_narrationAsset));
       } catch (_) {}
       await Future.delayed(const Duration(seconds: 3));
-      _resumeMainVideo(mainController);
+      _finishOutroAndPause(mainController);
       return;
     }
 
@@ -115,9 +101,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     try {
       await _narrationPlayer.stop();
       await _narrationPlayer.play(AssetSource(_narrationAsset));
-    } catch (_) {
-      // Never let narration failure block the visual outro.
-    }
+    } catch (_) {}
 
     void onOutroTick() {
       if (!mounted) return;
@@ -127,38 +111,36 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       if (duration.inMilliseconds > 0 &&
           value.position >= duration - const Duration(milliseconds: 150)) {
         outro.removeListener(onOutroTick);
-        _resumeMainVideo(mainController);
+        _finishOutroAndPause(mainController);
       }
     }
 
     outro.addListener(onOutroTick);
   }
 
-  void _resumeMainVideo(VideoPlayerController mainController) {
+  /// Outro (and narration) finished — everything stops here. The
+  /// creator's video does NOT auto-restart; user has to tap play again
+  /// if they want to rewatch, matching "if it finishes everything should
+  /// pause."
+  void _finishOutroAndPause(VideoPlayerController mainController) {
     if (!mounted) return;
     setState(() => _showingOutro = false);
-    _lastKnownPosition = null;
-    mainController.seekTo(Duration.zero).then((_) {
-      if (mounted) mainController.play();
-    });
+    mainController.pause();
+    mainController.seekTo(Duration.zero);
+    _endTriggeredForThisPlay = false;
   }
 
-  void _checkForLoopRestart(VideoPlayerController controller) {
-    if (_showingOutro) return;
+  void _checkForVideoEnd(VideoPlayerController controller) {
+    if (_showingOutro || _endTriggeredForThisPlay) return;
 
     final duration = controller.value.duration;
     final position = controller.value.position;
     if (duration <= Duration.zero) return;
 
-    final lastPosition = _lastKnownPosition;
-    if (lastPosition != null &&
-        lastPosition >= (duration - _loopEndProximity) &&
-        position < (lastPosition - _loopRestartJump)) {
+    if (position >= duration - _endProximity) {
+      _endTriggeredForThisPlay = true;
       _playOutroThenResume(controller);
-      return;
     }
-
-    _lastKnownPosition = position;
   }
   // --- end outro logic ---
 
@@ -166,7 +148,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   void initState() {
     super.initState();
     _loadingController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
-    
+
     _actionIconAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -174,12 +156,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
     _oldController = widget.controller;
     _currentVideoId = widget.videoId;
-    
-    // 🔥 FIX: Check if controller is already initialized
+
     _checkAndSetupController();
   }
 
-  // 🔥 FIX: New method to handle controller setup with proper state
   void _checkAndSetupController() {
     final controller = widget.controller;
     if (controller == null) {
@@ -190,26 +170,21 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
-    // If controller is already initialized, set up immediately
     if (controller.value.isInitialized) {
       _setupController(controller);
     } else {
-      // If not initialized, wait for it
       setState(() {
         _isInitializing = true;
         _isControllerInitialized = false;
       });
-      
-      // Add listener to catch when initialization completes
       controller.addListener(_onControllerInitListener);
     }
   }
 
-  // 🔥 FIX: Separate listener for initialization
   void _onControllerInitListener() {
     final controller = widget.controller;
     if (controller == null) return;
-    
+
     if (controller.value.isInitialized) {
       controller.removeListener(_onControllerInitListener);
       if (mounted) {
@@ -218,28 +193,22 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     }
   }
 
-  // 🔥 FIX: Setup controller once initialized
   void _setupController(VideoPlayerController controller) {
-    // Remove any old listeners
     _oldController?.removeListener(_onControllerUpdate);
     _oldController?.removeListener(_onControllerInitListener);
-    
+
     _oldController = controller;
     _isControllerInitialized = true;
     _isInitializing = false;
 
-    // Reset outro/loop-detection state for the new video — otherwise a
-    // stale position or an in-flight outro from the previous video
-    // could carry over incorrectly.
-    _lastKnownPosition = null;
     _showingOutro = false;
-    
+    _endTriggeredForThisPlay = false;
+
     _applyLowDataOptimization(controller);
     _addControllerListener(controller);
-    
-    // Play immediately
+
     _ensureAutoplay(controller);
-    
+
     if (mounted) {
       setState(() {});
     }
@@ -255,9 +224,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
   void _applyLowDataOptimization(VideoPlayerController controller) {
     if (controller.value.isInitialized) {
-      // Looping stays OFF at the platform level now — looping is instead
-      // driven manually by _resumeMainVideo() after each outro finishes,
-      // so every "loop" reliably passes through the outro step first.
       controller.setLooping(false);
       controller.setVolume(1.0);
     }
@@ -276,22 +242,19 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final bool controllerChanged = widget.controller != _oldController;
 
     if (videoIdChanged || controllerChanged) {
-      // Clean up old controller listeners
       _oldController?.removeListener(_onControllerUpdate);
       _oldController?.removeListener(_onControllerInitListener);
-      
+
       _oldController = widget.controller;
       _currentVideoId = widget.videoId;
       _playerKey = UniqueKey();
       _isBuffering = false;
 
-      // Swiped to a different video — cancel any in-progress outro for
-      // the previous one so it doesn't resume the wrong controller later.
       _outroController?.pause();
       _narrationPlayer.stop();
       _showingOutro = false;
-      
-      // 🔥 FIX: Re-check controller setup
+      _endTriggeredForThisPlay = false;
+
       _checkAndSetupController();
     }
   }
@@ -315,7 +278,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     if (controller == null) return;
     if (widget.videoId != _currentVideoId) return;
 
-    // 🔥 FIX: Check for initialization
     if (!controller.value.isInitialized) {
       if (mounted) {
         setState(() {
@@ -326,7 +288,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
-    // Update initialized state if needed
     if (!_isControllerInitialized) {
       if (mounted) {
         setState(() {
@@ -343,16 +304,16 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
+    // Check for end-of-video on every tick, playing or not — catches the
+    // case where the platform already auto-paused right at the end
+    // before our next "isPlaying" tick would have fired.
+    if (!_showingOutro) {
+      _checkForVideoEnd(controller);
+    }
+
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
 
-    // Only check for a loop restart while actually playing and not
-    // already mid-outro — avoids false triggers from seeking/scrubbing.
-    if (isPlaying && !_showingOutro) {
-      _checkForLoopRestart(controller);
-    }
-
-    // 🔥 FIX: Only show buffering if playing and buffer is loading
     bool shouldShowBuffering = isBuffering && isPlaying;
 
     if (_isBuffering != shouldShowBuffering || _isPlaying != isPlaying) {
@@ -368,7 +329,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   }
 
   void _handleSingleTapToggle() {
-    if (_showingOutro) return; // ignore taps while the outro is playing
+    if (_showingOutro) return;
     final controller = widget.controller;
     if (controller == null || !controller.value.isInitialized) return;
 
@@ -398,9 +359,8 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   Widget build(BuildContext context) {
     final controller = widget.controller;
 
-    // 🔥 FIX: More comprehensive initialization check
-    final bool isNotReady = controller == null || 
-                           !controller.value.isInitialized || 
+    final bool isNotReady = controller == null ||
+                           !controller.value.isInitialized ||
                            _isInitializing;
 
     if (isNotReady) {
@@ -421,7 +381,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Hardware Accelerated Media View Box
           Positioned.fill(
             child: FittedBox(
               key: _playerKey,
@@ -434,8 +393,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
             ),
           ),
 
-          // Branded outro overlay — fully covers the creator's (paused)
-          // video while the 4-second clip + narration play.
           if (_showingOutro && _outroController != null && _outroController!.value.isInitialized)
             Positioned.fill(
               child: Container(
@@ -449,7 +406,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
-          // Scale and Fade Animation Play/Pause Overlay Engine
           if (_showPlayIconOverlay && !_showingOutro)
             IgnorePointer(
               child: AnimatedBuilder(
@@ -487,13 +443,11 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
-          // Low-Data Buffering Spin Segment — now brand-styled instead of default
           if (_isBuffering && _isControllerInitialized && !_showingOutro)
             Center(
               child: _NigerGramSpinner(controller: _loadingController, size: context.sq(34)),
             ),
-            
-          // Connection Error State Layer
+
           if (controller.value.hasError)
             Container(
               color: Colors.black87,
@@ -516,16 +470,12 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
-          // Persistent tagline + creator caption — hidden during the
-          // outro so it doesn't overlap the branded clip.
+          // Tagline + creator caption — now cycles through all 4 corners
+          // instead of sitting fixed top-left.
           if (!_showingOutro)
-            Positioned(
-              top: context.h(12),
-              left: 16,
-              right: 16,
+            Positioned.fill(
               child: IgnorePointer(
-                child: Align(
-                  alignment: Alignment.topLeft,
+                child: _CornerCyclingBadge(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
@@ -553,9 +503,57 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   }
 }
 
-/// Branded loading spinner — replaces the default Flutter spinner/loop icon
-/// with a NigerGram-accent-colored rotating arc, matching the story-ring
-/// visual language already used on the profile screen.
+/// Cycles its child between the four corners of whatever space it's
+/// given (wrap in Positioned.fill to use the full video area).
+class _CornerCyclingBadge extends StatefulWidget {
+  const _CornerCyclingBadge({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_CornerCyclingBadge> createState() => _CornerCyclingBadgeState();
+}
+
+class _CornerCyclingBadgeState extends State<_CornerCyclingBadge> {
+  static const List<Alignment> _corners = [
+    Alignment.topLeft,
+    Alignment.topRight,
+    Alignment.bottomRight,
+    Alignment.bottomLeft,
+  ];
+
+  int _cornerIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      setState(() => _cornerIndex = (_cornerIndex + 1) % _corners.length);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+      child: AnimatedAlign(
+        alignment: _corners[_cornerIndex],
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeInOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class _NigerGramSpinner extends StatelessWidget {
   const _NigerGramSpinner({required this.controller, required this.size});
 
@@ -568,7 +566,7 @@ class _NigerGramSpinner extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         return Transform.rotate(
-          angle: controller.value * 6.28318530718, // 2 * pi
+          angle: controller.value * 6.28318530718,
           child: CustomPaint(
             size: Size(size, size),
             painter: _BrandArcSpinnerPainter(color: NGColors.accent),
@@ -601,8 +599,8 @@ class _BrandArcSpinnerPainter extends CustomPainter {
       ..strokeWidth = 3.2
       ..strokeCap = StrokeCap.round;
 
-    const startAngle = -1.5707963268; // -90deg, start at top
-    const sweepAngle = 4.18879020479; // ~240deg arc
+    const startAngle = -1.5707963268;
+    const sweepAngle = 4.18879020479;
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
