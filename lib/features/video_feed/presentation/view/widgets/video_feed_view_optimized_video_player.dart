@@ -44,6 +44,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   // --- Branded outro shown once a video finishes ---
   // ⚠️ This string must match pubspec.yaml's assets entry EXACTLY,
   // character for character — a mismatch here fails silently.
+  // Confirm this matches your real uploaded filename before relying on it.
   static const String _outroVideoAsset = 'assets/sounds/lv_7328538278142004487_20260818020652.mp4';
   static const String _narrationAsset = 'sounds/zetra_spoken.wav';
 
@@ -84,6 +85,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
     if (outro == null || !_outroControllerReady) {
       // Outro clip unavailable — play narration alone, briefly, then pause.
+      // _showingOutro still flips true here so the main video widget is
+      // removed from the tree for this fallback path too (nothing to
+      // decode, but keeps behavior/visuals consistent either way).
+      setState(() => _showingOutro = true);
       try {
         await _narrationPlayer.stop();
         await _narrationPlayer.play(AssetSource(_narrationAsset));
@@ -93,6 +98,15 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
+    // Setting _showingOutro = true here removes the creator's
+    // VideoPlayer widget from the tree on the very next build, before
+    // the outro's own VideoPlayer widget gets added — so there's never
+    // a frame where both are mounted simultaneously. Many Android
+    // devices only support a small number of simultaneously active
+    // hardware video decoders; leaving the creator's video Texture
+    // mounted (even paused) while the outro tries to decode competes
+    // for those same decoder slots, which was why the outro froze on
+    // its first frame while its audio/timing kept working fine.
     setState(() => _showingOutro = true);
 
     await outro.seekTo(Duration.zero);
@@ -381,18 +395,27 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Positioned.fill(
-            child: FittedBox(
-              key: _playerKey,
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: controller.value.size.width,
-                height: controller.value.size.height,
-                child: VideoPlayer(controller),
+          // Only mounted when the outro is NOT showing — this widget
+          // being fully removed from the tree (not just hidden behind
+          // the outro) during playback of the outro is the actual fix
+          // for the outro freezing on its first frame. See the note in
+          // _playOutroThenResume above for why.
+          if (!_showingOutro)
+            Positioned.fill(
+              child: FittedBox(
+                key: _playerKey,
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: controller.value.size.width,
+                  height: controller.value.size.height,
+                  child: VideoPlayer(controller),
+                ),
               ),
             ),
-          ),
 
+          // Branded outro overlay — now the ONLY video decoder active on
+          // screen while it plays, since the creator's video widget above
+          // is fully removed from the tree during this time.
           if (_showingOutro && _outroController != null && _outroController!.value.isInitialized)
             Positioned.fill(
               child: Container(
@@ -448,7 +471,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               child: _NigerGramSpinner(controller: _loadingController, size: context.sq(34)),
             ),
 
-          if (controller.value.hasError)
+          if (controller.value.hasError && !_showingOutro)
             Container(
               color: Colors.black87,
               child: Center(
@@ -470,8 +493,9 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
-          // Tagline + creator caption — now cycles through all 4 corners
-          // instead of sitting fixed top-left.
+          // Tagline + creator caption — now cycles through 8 positions
+          // around the perimeter (4 corners + 4 edge-midpoints), not
+          // just the corners.
           if (!_showingOutro)
             Positioned.fill(
               child: IgnorePointer(
@@ -503,8 +527,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   }
 }
 
-/// Cycles its child between the four corners of whatever space it's
-/// given (wrap in Positioned.fill to use the full video area).
+/// Cycles its child through 8 positions around the perimeter of
+/// whatever space it's given (wrap in Positioned.fill to use the full
+/// video area): all 4 corners plus all 4 edge-midpoints, in clockwise
+/// order.
 class _CornerCyclingBadge extends StatefulWidget {
   const _CornerCyclingBadge({required this.child});
 
@@ -515,14 +541,18 @@ class _CornerCyclingBadge extends StatefulWidget {
 }
 
 class _CornerCyclingBadgeState extends State<_CornerCyclingBadge> {
-  static const List<Alignment> _corners = [
+  static const List<Alignment> _positions = [
     Alignment.topLeft,
+    Alignment.topCenter,
     Alignment.topRight,
+    Alignment.centerRight,
     Alignment.bottomRight,
+    Alignment.bottomCenter,
     Alignment.bottomLeft,
+    Alignment.centerLeft,
   ];
 
-  int _cornerIndex = 0;
+  int _positionIndex = 0;
   Timer? _timer;
 
   @override
@@ -530,7 +560,7 @@ class _CornerCyclingBadgeState extends State<_CornerCyclingBadge> {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted) return;
-      setState(() => _cornerIndex = (_cornerIndex + 1) % _corners.length);
+      setState(() => _positionIndex = (_positionIndex + 1) % _positions.length);
     });
   }
 
@@ -545,7 +575,7 @@ class _CornerCyclingBadgeState extends State<_CornerCyclingBadge> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
       child: AnimatedAlign(
-        alignment: _corners[_cornerIndex],
+        alignment: _positions[_positionIndex],
         duration: const Duration(milliseconds: 700),
         curve: Curves.easeInOutCubic,
         child: widget.child,
