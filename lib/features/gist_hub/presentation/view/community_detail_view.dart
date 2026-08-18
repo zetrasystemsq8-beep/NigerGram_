@@ -42,6 +42,7 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
         'userId': AppAuth.uid,
         'username': AppAuth.displayHandle,
         'text': _postController.text.trim(),
+        'role': _myRole ?? 'member',
         'createdAt': FieldValue.serverTimestamp(),
       });
       _postController.clear();
@@ -63,6 +64,64 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       }
     }
+  }
+
+  static const List<Color> _avatarPalette = [
+    Color(0xFFE57373),
+    Color(0xFF64B5F6),
+    Color(0xFF81C784),
+    Color(0xFFFFB74D),
+    Color(0xFFBA68C8),
+    Color(0xFF4DB6AC),
+  ];
+
+  Color _colorForUsername(String username) {
+    if (username.isEmpty) return _avatarPalette[0];
+    final hash = username.codeUnits.fold<int>(0, (sum, unit) => sum + unit);
+    return _avatarPalette[hash % _avatarPalette.length];
+  }
+
+  String _relativeTime(Timestamp? ts) {
+    if (ts == null) return '';
+    final date = ts.toDate();
+    final diff = DateTime.now().difference(date);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Widget _roleBadge(String role) {
+    if (role == 'owner') {
+      return Container(
+        margin: const EdgeInsets.only(left: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFD54F).withOpacity(0.18),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Text(
+          'OWNER',
+          style: TextStyle(color: Color(0xFFFFD54F), fontSize: 9, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+    if (role == 'moderator') {
+      return Container(
+        margin: const EdgeInsets.only(left: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: BoxDecoration(
+          color: NGColors.accent.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          'MOD',
+          style: TextStyle(color: NGColors.accent, fontSize: 9, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   @override
@@ -213,20 +272,60 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final data = posts[index].data() as Map<String, dynamic>;
+                        final username = (data['username'] ?? 'user').toString();
+                        final role = (data['role'] ?? 'member').toString();
+                        final isOwnerPost = role == 'owner';
+                        final avatarColor = _colorForUsername(username);
+
                         return Container(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: NGColors.surface,
                             borderRadius: BorderRadius.circular(10),
+                            border: isOwnerPost
+                                ? Border.all(color: const Color(0xFFFFD54F).withOpacity(0.35), width: 1)
+                                : null,
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('@${data['username'] ?? 'user'}',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                              const SizedBox(height: 4),
-                              Text(data['text'] ?? '', style: TextStyle(color: NGColors.textSecondary)),
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: avatarColor,
+                                    child: Text(
+                                      username.isNotEmpty ? username[0].toUpperCase() : '?',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Text('@$username',
+                                            style: const TextStyle(
+                                                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                        _roleBadge(role),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    _relativeTime(data['createdAt'] as Timestamp?),
+                                    style: TextStyle(color: NGColors.textMuted, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 36),
+                                child: Text(data['text'] ?? '', style: TextStyle(color: NGColors.textSecondary)),
+                              ),
                             ],
                           ),
                         );
