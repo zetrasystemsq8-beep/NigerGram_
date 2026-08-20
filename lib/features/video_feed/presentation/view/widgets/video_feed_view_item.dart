@@ -9,6 +9,8 @@ import 'video_feed_view_interaction_buttons.dart';
 import 'comments_viewer_bottom_sheet.dart';
 import 'video_feed_view_description_text.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:nigergram/features/video_feed/repository/interaction_repository.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 
 class VideoFeedViewItem extends StatefulWidget {
   final VideoEntity videoItem;
@@ -27,6 +29,7 @@ class VideoFeedViewItem extends StatefulWidget {
 class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
   late bool _isLiked;
   late int _likeCount;
+  bool _likePending = false;
 
   @override
   void initState() {
@@ -77,19 +80,53 @@ class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
     }
   }
 
-  void _handleDoubleTapLike(String videoId) {
-    HapticFeedback.selectionClick();
-
-    // Optimistically update UI
-    if (!_isLiked) {
-      setState(() {
-        _isLiked = true;
-        _likeCount = _likeCount + 1;
-      });
+  Future<void> _handleDoubleTapLike(String videoId) async {
+    if (!AppAuth.isLoggedIn) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to like videos')),
+        );
+      }
+      return;
     }
 
-    // TODO: Call backend like endpoint or analytics here.
-    debugPrint('Double-tap like triggered for video: $videoId');
+    if (_likePending) return;
+    _likePending = true;
+
+    final previousLiked = _isLiked;
+    final previousCount = _likeCount;
+
+    // Optimistically update UI
+    setState(() {
+      _isLiked = !_isLiked;
+      _likeCount += _isLiked ? 1 : -1;
+      if (_likeCount < 0) _likeCount = 0;
+    });
+
+    final repo = InteractionRepository();
+    try {
+      final newStatus = await repo.toggleLike(videoId, AppAuth.uid);
+      if (!mounted) return;
+      setState(() {
+        _isLiked = newStatus;
+        // Leave _likeCount as-is (listener on the video doc will correct authoritative count)
+      });
+    } catch (e) {
+      // Rollback on error
+      if (mounted) {
+        setState(() {
+          _isLiked = previousLiked;
+          _likeCount = previousCount;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update like: $e')),
+        );
+      }
+    } finally {
+      _likePending = false;
+    }
+
+    debugPrint('Double-tap like processed for video: $videoId');
   }
 
   @override
