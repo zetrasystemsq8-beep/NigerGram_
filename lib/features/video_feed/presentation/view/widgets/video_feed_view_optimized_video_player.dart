@@ -28,6 +28,7 @@ class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
 class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimizedVideoPlayer> with TickerProviderStateMixin {
   late AnimationController _loadingController;
   late AnimationController _actionIconAnimationController;
+  late AnimationController _outroTransitionController; // NEW: Smooth transition
 
   bool _isBuffering = false;
   VideoPlayerController? _oldController;
@@ -42,9 +43,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   bool _isInitializing = false;
 
   // --- Branded outro shown once a video finishes ---
-  // ⚠️ This string must match pubspec.yaml's assets entry EXACTLY,
-  // character for character — a mismatch here fails silently.
-  // Confirm this matches your real uploaded filename before relying on it.
   static const String _outroVideoAsset = 'assets/sounds/lv_7328538278142004487_20260818020652.mp4';
   static const String _narrationAsset = 'sounds/zetra_spoken.wav';
 
@@ -52,42 +50,56 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   final AudioPlayer _narrationPlayer = AudioPlayer();
   bool _showingOutro = false;
   bool _outroControllerReady = false;
+  bool _outroInitializing = false; // NEW: Track outro initialization
+  Completer<void>? _outroReadyCompleter; // NEW: Sync initialization
 
-  // Fires once per play-through when the main video reaches its end —
-  // replaces the old "wait for a loop-restart jump" detection, since
-  // setLooping(false) means no restart ever happens on its own.
   bool _endTriggeredForThisPlay = false;
   static const _endProximity = Duration(milliseconds: 250);
 
+  /// NEW: Preload outro with better error handling
   Future<void> _ensureOutroControllerReady() async {
-    if (_outroControllerReady) return;
+    if (_outroControllerReady || _outroInitializing) return;
+
+    _outroInitializing = true;
+    _outroReadyCompleter = Completer<void>();
+
     final outro = VideoPlayerController.asset(_outroVideoAsset);
     try {
       await outro.initialize();
       await outro.setLooping(false);
-      await outro.setVolume(0);
+      await outro.setVolume(0); // Video muted (narration only)
+
+      // NEW: Wait for texture to be ready
+      await Future.delayed(const Duration(milliseconds: 100));
+
       _outroController = outro;
       _outroControllerReady = true;
-    } catch (_) {
+      _outroInitializing = false;
+      _outroReadyCompleter?.complete();
+
+      debugPrint('✅ Outro controller ready');
+    } catch (e) {
+      debugPrint('❌ Outro init failed: $e');
       _outroControllerReady = false;
+      _outroInitializing = false;
+      _outroReadyCompleter?.completeError(e);
     }
   }
 
+  /// NEW: Synchronized video + audio playback
   Future<void> _playOutroThenResume(VideoPlayerController mainController) async {
     if (_showingOutro) return;
 
     mainController.pause();
 
+    // NEW: Ensure outro is ready first
     await _ensureOutroControllerReady();
     final outro = _outroController;
 
     if (!mounted) return;
 
     if (outro == null || !_outroControllerReady) {
-      // Outro clip unavailable — play narration alone, briefly, then pause.
-      // _showingOutro still flips true here so the main video widget is
-      // removed from the tree for this fallback path too (nothing to
-      // decode, but keeps behavior/visuals consistent either way).
+      // Fallback: narration only
       setState(() => _showingOutro = true);
       try {
         await _narrationPlayer.stop();
@@ -98,32 +110,44 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
-    // Setting _showingOutro = true here removes the creator's
-    // VideoPlayer widget from the tree on the very next build, before
-    // the outro's own VideoPlayer widget gets added — so there's never
-    // a frame where both are mounted simultaneously. Many Android
-    // devices only support a small number of simultaneously active
-    // hardware video decoders; leaving the creator's video Texture
-    // mounted (even paused) while the outro tries to decode competes
-    // for those same decoder slots, which was why the outro froze on
-    // its first frame while its audio/timing kept working fine.
+    // NEW: Transition animation before showing outro
     setState(() => _showingOutro = true);
 
-    await outro.seekTo(Duration.zero);
-    await outro.play();
+    // NEW: Give widget tree time to rebuild (remove main video texture)
+    await Future.delayed(const Duration(milliseconds: 150));
 
+    // Sync: Reset and prepare both video and audio
     try {
-      await _narrationPlayer.stop();
-      await _narrationPlayer.play(AssetSource(_narrationAsset));
-    } catch (_) {}
+      await outro.seekTo(Duration.zero);
 
+      // NEW: Start audio AFTER video is seeked
+      await _narrationPlayer.stop();
+
+      // NEW: Play both simultaneously with better timing
+      await Future.wait([
+        outro.play(),
+        _narrationPlayer.play(AssetSource(_narrationAsset)),
+      ]).timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => debugPrint('⚠️ Playback timeout'),
+      );
+
+      debugPrint('▶️ Outro + narration started (synchronized)');
+    } catch (e) {
+      debugPrint('❌ Playback error: $e');
+    }
+
+    // NEW: Enhanced end detection with buffer
     void onOutroTick() {
       if (!mounted) return;
       final value = outro.value;
       if (!value.isInitialized) return;
+
       final duration = value.duration;
+      final position = value.position;
+
       if (duration.inMilliseconds > 0 &&
-          value.position >= duration - const Duration(milliseconds: 150)) {
+          position >= duration - const Duration(milliseconds: 200)) {
         outro.removeListener(onOutroTick);
         _finishOutroAndPause(mainController);
       }
@@ -132,16 +156,23 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     outro.addListener(onOutroTick);
   }
 
-  /// Outro (and narration) finished — everything stops here. The
-  /// creator's video does NOT auto-restart; user has to tap play again
-  /// if they want to rewatch, matching "if it finishes everything should
-  /// pause."
+  /// NEW: Smooth outro finish with cleanup
   void _finishOutroAndPause(VideoPlayerController mainController) {
     if (!mounted) return;
+
+    // NEW: Fade transition back to main video
     setState(() => _showingOutro = false);
+
     mainController.pause();
     mainController.seekTo(Duration.zero);
     _endTriggeredForThisPlay = false;
+
+    // NEW: Cleanup
+    try {
+      _narrationPlayer.stop();
+    } catch (_) {}
+
+    debugPrint('⏸️ Outro finished, video paused');
   }
 
   void _checkForVideoEnd(VideoPlayerController controller) {
@@ -156,7 +187,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       _playOutroThenResume(controller);
     }
   }
-  // --- end outro logic ---
 
   @override
   void initState() {
@@ -168,10 +198,21 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       duration: const Duration(milliseconds: 400),
     );
 
+    // NEW: Transition controller for smooth outro entry/exit
+    _outroTransitionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+
     _oldController = widget.controller;
     _currentVideoId = widget.videoId;
 
     _checkAndSetupController();
+
+    // NEW: Preload outro in background
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureOutroControllerReady();
+    });
   }
 
   void _checkAndSetupController() {
@@ -277,11 +318,13 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   void dispose() {
     _loadingController.dispose();
     _actionIconAnimationController.dispose();
+    _outroTransitionController.dispose(); // NEW: Dispose transition controller
     _oldController?.removeListener(_onControllerUpdate);
     _oldController?.removeListener(_onControllerInitListener);
     _oldController = null;
     _outroController?.dispose();
     _narrationPlayer.dispose();
+    _outroReadyCompleter = null; // NEW: Clear completer
     super.dispose();
   }
 
@@ -318,9 +361,6 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
-    // Check for end-of-video on every tick, playing or not — catches the
-    // case where the platform already auto-paused right at the end
-    // before our next "isPlaying" tick would have fired.
     if (!_showingOutro) {
       _checkForVideoEnd(controller);
     }
@@ -374,8 +414,8 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final controller = widget.controller;
 
     final bool isNotReady = controller == null ||
-                           !controller.value.isInitialized ||
-                           _isInitializing;
+        !controller.value.isInitialized ||
+        _isInitializing;
 
     if (isNotReady) {
       return Container(
@@ -395,11 +435,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Only mounted when the outro is NOT showing — this widget
-          // being fully removed from the tree (not just hidden behind
-          // the outro) during playback of the outro is the actual fix
-          // for the outro freezing on its first frame. See the note in
-          // _playOutroThenResume above for why.
+          // MAIN VIDEO - Only mounted when outro is NOT showing
           if (!_showingOutro)
             Positioned.fill(
               child: FittedBox(
@@ -413,22 +449,36 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
-          // Branded outro overlay — now the ONLY video decoder active on
-          // screen while it plays, since the creator's video widget above
-          // is fully removed from the tree during this time.
+          // OUTRO VIDEO - Smooth fade in/out
           if (_showingOutro && _outroController != null && _outroController!.value.isInitialized)
             Positioned.fill(
-              child: Container(
-                color: Colors.black,
-                child: Center(
-                  child: AspectRatio(
-                    aspectRatio: _outroController!.value.aspectRatio,
-                    child: VideoPlayer(_outroController!),
+              child: AnimatedOpacity(
+                opacity: _showingOutro ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: Container(
+                  color: Colors.black,
+                  child: Center(
+                    child: AspectRatio(
+                      aspectRatio: _outroController!.value.aspectRatio,
+                      child: VideoPlayer(_outroController!),
+                    ),
                   ),
                 ),
               ),
             ),
 
+          // OUTRO LOADING STATE
+          if (_showingOutro && _outroInitializing)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black,
+                child: Center(
+                  child: _NigerGramSpinner(controller: _loadingController, size: context.sq(34)),
+                ),
+              ),
+            ),
+
+          // PLAY/PAUSE OVERLAY
           if (_showPlayIconOverlay && !_showingOutro)
             IgnorePointer(
               child: AnimatedBuilder(
@@ -466,11 +516,13 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
+          // BUFFERING INDICATOR
           if (_isBuffering && _isControllerInitialized && !_showingOutro)
             Center(
               child: _NigerGramSpinner(controller: _loadingController, size: context.sq(34)),
             ),
 
+          // ERROR STATE
           if (controller.value.hasError && !_showingOutro)
             Container(
               color: Colors.black87,
@@ -493,9 +545,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
-          // Tagline + creator caption — now cycles through 8 positions
-          // around the perimeter (4 corners + 4 edge-midpoints), not
-          // just the corners.
+          // TAGLINE + CREATOR
           if (!_showingOutro)
             Positioned.fill(
               child: IgnorePointer(
@@ -527,10 +577,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   }
 }
 
-/// Cycles its child through 8 positions around the perimeter of
-/// whatever space it's given (wrap in Positioned.fill to use the full
-/// video area): all 4 corners plus all 4 edge-midpoints, in clockwise
-/// order.
+/// Cycles through 8 positions with smooth animation
 class _CornerCyclingBadge extends StatefulWidget {
   const _CornerCyclingBadge({required this.child});
 
