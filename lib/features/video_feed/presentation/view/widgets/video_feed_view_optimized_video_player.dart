@@ -14,12 +14,17 @@ class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
     required this.controller,
     required this.videoId,
     this.creatorUsername,
+    this.onDoubleTapLike,
     super.key,
   });
 
   final VideoPlayerController? controller;
   final String videoId;
   final String? creatorUsername;
+
+  /// Callback invoked when the user double-taps to like the video.
+  /// Provided by parent to integrate backend/analytics.
+  final void Function(String videoId)? onDoubleTapLike;
 
   @override
   State<VideoFeedViewOptimizedVideoPlayer> createState() => _VideoFeedViewOptimizedVideoPlayerState();
@@ -29,6 +34,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   late AnimationController _loadingController;
   late AnimationController _actionIconAnimationController;
   late AnimationController _outroTransitionController; // NEW: Smooth transition
+
+  // DOUBLE-TAP HEART ANIMATION
+  late AnimationController _heartController;
+  Offset? _heartTapPosition;
 
   bool _isBuffering = false;
   VideoPlayerController? _oldController;
@@ -204,6 +213,9 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       duration: const Duration(milliseconds: 300),
     );
 
+    // Heart animation
+    _heartController = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+
     _oldController = widget.controller;
     _currentVideoId = widget.videoId;
 
@@ -319,6 +331,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     _loadingController.dispose();
     _actionIconAnimationController.dispose();
     _outroTransitionController.dispose(); // NEW: Dispose transition controller
+    _heartController.dispose();
     _oldController?.removeListener(_onControllerUpdate);
     _oldController?.removeListener(_onControllerInitListener);
     _oldController = null;
@@ -380,6 +393,9 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
         }
       });
     }
+
+    // Ensure UI updates for duration display
+    if (mounted) setState(() {});
   }
 
   void _handleSingleTapToggle() {
@@ -409,6 +425,28 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     });
   }
 
+  // NEW: Handle double-tap position and show heart
+  void _handleDoubleTapDown(TapDownDetails details) {
+    if (_showingOutro) return;
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    setState(() {
+      _heartTapPosition = renderBox.globalToLocal(details.globalPosition);
+    });
+
+    HapticFeedback.mediumImpact();
+
+    // trigger heart animation
+    _heartController.forward(from: 0.0);
+
+    // Callback for backend/analytics
+    try {
+      widget.onDoubleTapLike?.call(widget.videoId);
+    } catch (e) {
+      debugPrint('Double-tap like callback error: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -426,11 +464,20 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       );
     }
 
+    String _formatPosition(Duration? pos) {
+      if (pos == null) return '0:00';
+      final minutes = pos.inMinutes;
+      final seconds = pos.inSeconds % 60;
+      return '$minutes:${seconds.toString().padLeft(2, '0')}';
+    }
+
+    final currentPosition = controller.value.position;
+    final totalDuration = controller.value.duration;
+
     return GestureDetector(
       onTap: _handleSingleTapToggle,
-      onDoubleTap: () {
-        HapticFeedback.mediumImpact();
-      },
+      onDoubleTapDown: _handleDoubleTapDown,
+      onDoubleTap: () {},
       behavior: HitTestBehavior.opaque,
       child: Stack(
         alignment: Alignment.center,
@@ -571,6 +618,57 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
                 ),
               ),
             ),
+
+          // DOUBLE-TAP HEART ANIMATION
+          if (_heartTapPosition != null)
+            Positioned(
+              left: _heartTapPosition!.dx - 40,
+              top: _heartTapPosition!.dy - 40,
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _heartController,
+                  builder: (context, child) {
+                    final double progress = _heartController.value;
+                    final double scale = Tween<double>(begin: 0.6, end: 1.6).transform(Curves.easeOut.transform(progress));
+                    final double opacity = (1.0 - progress).clamp(0.0, 1.0);
+                    return Opacity(
+                      opacity: opacity,
+                      child: Transform.scale(
+                        scale: scale,
+                        child: Icon(
+                          Icons.favorite_rounded,
+                          color: Colors.redAccent.withOpacity(0.95),
+                          size: 80,
+                          shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+          // DURATION DISPLAY (bottom-right)
+          if (!_showingOutro)
+            Positioned(
+              bottom: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.45),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${_formatPosition(currentPosition)} / ${_formatPosition(totalDuration)}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: context.fontSize(12),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -665,19 +763,19 @@ class _BrandArcSpinnerPainter extends CustomPainter {
     final radius = size.width / 2 - 3;
 
     final trackPaint = Paint()
-      ..color = color.withOpacity(0.18)
+      ..color = color.withOpacity(0.12) // lighter track for better contrast
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.2;
+      ..strokeWidth = 3.0;
     canvas.drawCircle(center, radius, trackPaint);
 
     final arcPaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.2
+      ..strokeWidth = 3.0
       ..strokeCap = StrokeCap.round;
 
     const startAngle = -1.5707963268;
-    const sweepAngle = 4.18879020479;
+    const sweepAngle = 5.1;
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
@@ -686,6 +784,10 @@ class _BrandArcSpinnerPainter extends CustomPainter {
       false,
       arcPaint,
     );
+
+    // Center dot indicator
+    final dotPaint = Paint()..color = color.withOpacity(0.95);
+    canvas.drawCircle(center, 3.0, dotPaint);
   }
 
   @override
