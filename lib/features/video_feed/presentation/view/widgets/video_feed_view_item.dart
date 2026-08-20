@@ -7,9 +7,10 @@ import 'package:video_player/video_player.dart';
 import 'video_feed_view_optimized_video_player.dart';
 import 'video_feed_view_interaction_buttons.dart';
 import 'comments_viewer_bottom_sheet.dart';
+import 'video_feed_view_description_text.dart';
 import 'package:share_plus/share_plus.dart';
 
-class VideoFeedViewItem extends StatelessWidget {
+class VideoFeedViewItem extends StatefulWidget {
   final VideoEntity videoItem;
   final VideoPlayerController? controller;
 
@@ -19,16 +20,31 @@ class VideoFeedViewItem extends StatelessWidget {
     required this.controller,
   });
 
+  @override
+  State<VideoFeedViewItem> createState() => _VideoFeedViewItemState();
+}
+
+class _VideoFeedViewItemState extends State<VideoFeedViewItem> {
+  late bool _isLiked;
+  late int _likeCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _isLiked = widget.videoItem.isLiked ?? false;
+    _likeCount = widget.videoItem.likeCount ?? 0;
+  }
+
   /// 📥 THE REAL-TIME NIGERGRAM COMMENT ENGINE MODAL
   void _openCommentsModalSheet(BuildContext context) {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, 
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withOpacity(0.7),
       builder: (context) {
-        return CommentsViewerBottomSheet(videoId: videoItem.id);
+        return CommentsViewerBottomSheet(videoId: widget.videoItem.id);
       },
     );
   }
@@ -37,8 +53,8 @@ class VideoFeedViewItem extends StatelessWidget {
   Future<void> _executePlatformShareAction(BuildContext context) async {
     HapticFeedback.lightImpact();
 
-    final String? videoId = videoItem.id;
-    final String? creator = videoItem.username;
+    final String? videoId = widget.videoItem.id;
+    final String? creator = widget.videoItem.username;
     final String videoUrl = (videoId != null && videoId.isNotEmpty)
         ? 'https://nigergram.app/video/$videoId'
         : '';
@@ -61,6 +77,21 @@ class VideoFeedViewItem extends StatelessWidget {
     }
   }
 
+  void _handleDoubleTapLike(String videoId) {
+    HapticFeedback.selectionClick();
+
+    // Optimistically update UI
+    if (!_isLiked) {
+      setState(() {
+        _isLiked = true;
+        _likeCount = _likeCount + 1;
+      });
+    }
+
+    // TODO: Call backend like endpoint or analytics here.
+    debugPrint('Double-tap like triggered for video: $videoId');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -68,9 +99,10 @@ class VideoFeedViewItem extends StatelessWidget {
         // LAYER 1: Hardware Video Player Component Texture
         Positioned.fill(
           child: VideoFeedViewOptimizedVideoPlayer(
-            controller: controller,
-            videoId: videoItem.id,
-            creatorUsername: videoItem.username,
+            controller: widget.controller,
+            videoId: widget.videoItem.id,
+            creatorUsername: widget.videoItem.username,
+            onDoubleTapLike: (id) => _handleDoubleTapLike(id),
           ),
         ),
 
@@ -107,10 +139,10 @@ class VideoFeedViewItem extends StatelessWidget {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  context.push('/profile/${videoItem.creatorId}');
+                  context.push('/profile/${widget.videoItem.creatorId}');
                 },
                 child: Text(
-                  '@${videoItem.username}',
+                  '@${widget.videoItem.username}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -121,17 +153,9 @@ class VideoFeedViewItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                videoItem.description,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFFE4E6EB),
-                  fontSize: 14,
-                  height: 1.3,
-                  shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
-                ),
-              ),
+
+              // Use the enhanced description text widget that supports hashtags and mentions
+              VideoFeedViewDescriptionText(text: widget.videoItem.description),
             ],
           ),
         ),
@@ -141,18 +165,22 @@ class VideoFeedViewItem extends StatelessWidget {
           bottom: 40,
           right: 12,
           child: VideoFeedViewInteractionButtons(
-            videoId: videoItem.id,
-            isLiked: videoItem.isLiked ?? false,
-            likeCount: videoItem.likeCount,
-            commentCount: videoItem.commentCount,
-            shareCount: videoItem.shareCount,
-            isBookmarked: videoItem.isBookmarked ?? false,
-            creatorId: videoItem.creatorId,
-            creatorUsername: videoItem.username,
+            videoId: widget.videoItem.id,
+            isLiked: _isLiked,
+            likeCount: _likeCount,
+            commentCount: widget.videoItem.commentCount,
+            shareCount: widget.videoItem.shareCount,
+            isBookmarked: widget.videoItem.isBookmarked ?? false,
+            creatorId: widget.videoItem.creatorId,
+            creatorUsername: widget.videoItem.username,
             onCommentTapped: () => _openCommentsModalSheet(context),
             onShareTapped: () => _executePlatformShareAction(context),
             onBookmarkTapped: () {
               HapticFeedback.selectionClick();
+            },
+            onLikeTapped: () {
+              // Keep the interaction buttons functional if they also support liking
+              _handleDoubleTapLike(widget.videoItem.id ?? '');
             },
           ),
         ),
