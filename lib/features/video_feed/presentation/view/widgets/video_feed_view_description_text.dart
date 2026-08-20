@@ -1,5 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 
@@ -51,6 +53,13 @@ class _VideoFeedViewDescriptionTextState extends State<VideoFeedViewDescriptionT
     );
   }
 
+  /// Helper to strip trailing punctuation from tags/handles, e.g. "#tag," -> "tag"
+  String _sanitizeToken(String token) {
+    return token.replaceAll(RegExp(r'^[#@]+'), '') // remove leading #/@
+                .replaceAll(RegExp(r'[^A-Za-z0-9_\-]$'), '') // trim trailing punctuation
+                .trim();
+  }
+
   /// High-performance institutional parsing engine that isolates words,
   /// identifying and highlighting hashtags and user handles dynamically.
   List<InlineSpan> _parseDescriptionContent(String fullText, BuildContext context) {
@@ -58,27 +67,60 @@ class _VideoFeedViewDescriptionTextState extends State<VideoFeedViewDescriptionT
     final List<String> words = fullText.split(' ');
 
     for (int i = 0; i < words.length; i++) {
-      final String word = words[i];
-      final bool isTag = word.startsWith('#') || word.startsWith('@');
-      
+      final String raw = words[i];
+      final bool isTag = raw.startsWith('#') || raw.startsWith('@');
+
       // Append a trailing space to all words except the absolute final item
       final String spacing = (i == words.length - 1) ? '' : ' ';
 
-      spans.add(
-        TextSpan(
-          text: '$word$spacing',
-          style: TextStyle(
-            color: isTag ? const Color(0xFF58A6FF) : white, // Clean neon blue accent highlight for meta tags
-            fontWeight: isTag ? FontWeight.w600 : FontWeight.normal,
-            fontSize: context.fontSize(15),
-            height: 1.4,
+      if (isTag) {
+        final String sanitized = _sanitizeToken(raw);
+        final bool isMention = raw.startsWith('@');
+
+        spans.add(
+          TextSpan(
+            text: '$raw$spacing',
+            style: TextStyle(
+              color: const Color(0xFF58A6FF), // neon blue accent for meta tags
+              fontWeight: FontWeight.w600,
+              fontSize: context.fontSize(15),
+              height: 1.4,
+            ),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () {
+                // Provide tactile feedback
+                HapticFeedback.selectionClick();
+
+                if (sanitized.isEmpty) return;
+                try {
+                  if (isMention) {
+                    // navigate to profile
+                    context.push('/profile/$sanitized');
+                  } else {
+                    // navigate to discover with tag
+                    context.push('/discover?tag=$sanitized');
+                  }
+                } catch (e) {
+                  // In case navigation fails, log for diagnostics
+                  debugPrint('Navigation error for token "$raw": $e');
+                }
+              },
           ),
-          // Ready-to-use hooks for feature expansion (e.g., clicking a hashtag to open discovery search)
-          recognizer: isTag 
-              ? (TapGestureRecognizer()..onTap = () => debugPrint('NigerGram Log: Tapped tag token: $word'))
-              : null,
-        ),
-      );
+        );
+      } else {
+        spans.add(
+          TextSpan(
+            text: '$raw$spacing',
+            style: TextStyle(
+              color: white,
+              fontWeight: FontWeight.normal,
+              fontSize: context.fontSize(15),
+              height: 1.4,
+            ),
+            recognizer: null,
+          ),
+        );
+      }
     }
     return spans;
   }
