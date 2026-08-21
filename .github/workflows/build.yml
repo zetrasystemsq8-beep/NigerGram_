@@ -24,7 +24,7 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            console.log("Scanning repository storage for matching NigerGram-debug artifacts...");
+            console.log("Scanning repository storage for matching NigerGram artifacts...");
 
             const response = await github.rest.actions.listArtifactsForRepo({
               owner: owner,
@@ -34,7 +34,7 @@ jobs:
 
             const artifacts = response.data.artifacts;
             for (const artifact of artifacts) {
-              if (artifact.name === 'NigerGram-debug') {
+              if (artifact.name === 'NigerGram-APK') {
                 console.log(`Force deleting artifact: ${artifact.name} (ID: ${artifact.id}) to clear space`);
                 await github.rest.actions.deleteArtifact({
                   owner: owner,
@@ -80,6 +80,7 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
+
       - name: Copy audio assets
         run: |
           mkdir -p assets/sounds
@@ -87,18 +88,26 @@ jobs:
             cp assets/sounds/zetra_spoken.wav build/app/outputs/ || true
           fi
 
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
       - name: Build APK
-        run: flutter build apk --debug --no-tree-shake-icons
+        env:
+          KEYSTORE_PATH: release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NigerGram-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 1
+          name: NigerGram-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
           overwrite: true
 
-      # ADDED ONLY — creates a public download link
       - name: Create Public APK Download
         uses: softprops/action-gh-release@v2
         with:
@@ -107,6 +116,6 @@ jobs:
           body: |
             Download the latest NigerGram APK below.
           files: |
-            build/app/outputs/flutter-apk/app-debug.apk
+            build/app/outputs/flutter-apk/app-release.apk
           make_latest: true
           prerelease: false
