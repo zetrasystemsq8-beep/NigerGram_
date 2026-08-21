@@ -21,6 +21,7 @@ class VideoFeedViewInteractionButtons extends StatefulWidget {
     this.onCommentTapped, // Added explicit functional hook parameter
     this.onShareTapped,
     this.onBookmarkTapped,
+    this.onLikeTapped, // Fired after a like/unlike completes, so callers (e.g. double-tap overlay) can react
     this.creatorId,
     this.creatorUsername,
     super.key,
@@ -35,6 +36,7 @@ class VideoFeedViewInteractionButtons extends StatefulWidget {
   final VoidCallback? onCommentTapped; // Captured into class state
   final VoidCallback? onShareTapped;
   final VoidCallback? onBookmarkTapped;
+  final VoidCallback? onLikeTapped;
   final String? creatorId;
   final String? creatorUsername;
 
@@ -144,6 +146,8 @@ class _VideoFeedViewInteractionButtonsState extends State<VideoFeedViewInteracti
           }
         });
       }
+
+      widget.onLikeTapped?.call();
     } catch (e) {
       if (mounted) {
         setState(() {
