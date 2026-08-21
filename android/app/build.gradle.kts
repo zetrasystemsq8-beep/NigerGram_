@@ -57,19 +57,20 @@ android {
 }
 
 dependencies {
+    // Core desugaring
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
-    // ✅ Add Play Core for split install support
-    implementation "com.google.android.play:core:1.10.3"
+    // ✅ Play Core (needed for split install support)
+    implementation("com.google.android.play:core:1.10.3")
 
-    // ✅ Add ML Kit text recognition (Latin/English only)
-    implementation "com.google.mlkit:text-recognition:16.0.0"
+    // ✅ ML Kit text recognition (English/Latin only)
+    implementation("com.google.mlkit:text-recognition:16.0.0")
 
-    // Optional: add other languages if you ever need them
-    // implementation "com.google.mlkit:text-recognition-chinese:16.0.0"
-    // implementation "com.google.mlkit:text-recognition-japanese:16.0.0"
-    // implementation "com.google.mlkit:text-recognition-korean:16.0.0"
-    // implementation "com.google.mlkit:text-recognition-devanagari:16.0.0"
+    // Optional: add other languages if needed
+    // implementation("com.google.mlkit:text-recognition-chinese:16.0.0")
+    // implementation("com.google.mlkit:text-recognition-japanese:16.0.0")
+    // implementation("com.google.mlkit:text-recognition-korean:16.0.0")
+    // implementation("com.google.mlkit:text-recognition-devanagari:16.0.0")
 }
 
 flutter {
