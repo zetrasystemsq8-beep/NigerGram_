@@ -13,23 +13,35 @@ class GistService {
     return (doc.data()?['isCreator'] as bool?) ?? false;
   }
 
+  // .asBroadcastStream() added to every branch here — this is the real
+  // fix for "Bad state: Stream has already been listened to." The
+  // 'trending' branch in particular is built from an async* generator
+  // (_getTrendingStream), and Dart's async* generators always produce
+  // single-subscription streams regardless of how many times the outer
+  // method is called — a single-subscription stream permanently rejects
+  // any second .listen() call, from anywhere, forever. Wrapping every
+  // branch in .asBroadcastStream() here means no caller, anywhere in the
+  // app, now or in the future, can ever trigger this error again — it's
+  // fixed at the source instead of worked around at each call site.
   Stream<List<Map<String, dynamic>>> getGistFeedStream({required String filter}) {
     if (filter == 'trending') {
-      return _getTrendingStream();
+      return _getTrendingStream().asBroadcastStream();
     } else if (filter == 'polls') {
       return _firestore
           .collection('gist_posts')
           .where('type', isEqualTo: 'poll')
           .limit(50)
           .snapshots()
-          .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+          .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList())
+          .asBroadcastStream();
     } else {
       return _firestore
           .collection('gist_posts')
           .orderBy('createdAt', descending: true)
           .limit(50)
           .snapshots()
-          .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+          .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList())
+          .asBroadcastStream();
     }
   }
 
@@ -297,7 +309,8 @@ class GistService {
     return _firestore
         .collection('gist_comments')
         .where('postId', isEqualTo: postId)
-        .snapshots();
+        .snapshots()
+        .asBroadcastStream();
   }
 
   Future<void> addComment({
