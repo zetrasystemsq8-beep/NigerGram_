@@ -138,7 +138,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
         _narrationPlayer.play(AssetSource(_narrationAsset)),
       ]).timeout(
         const Duration(seconds: 2),
-        onTimeout: () => debugPrint('⚠️ Playback timeout'),
+        onTimeout: () {
+          debugPrint('⚠️ Playback timeout');
+          return <void>[];
+        },
       );
 
       debugPrint('▶️ Outro + narration started (synchronized)');
