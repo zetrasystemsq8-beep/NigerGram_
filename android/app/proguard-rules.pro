@@ -26,3 +26,15 @@
 -keep class * implements com.google.gson.TypeAdapterFactory
 -keep class * implements com.google.gson.JsonSerializer
 -keep class * implements com.google.gson.JsonDeserializer
+
+# ✅ Play Core (needed for split install)
+-keep class com.google.android.play.core.** { *; }
+-dontwarn com.google.android.play.core.**
+
+# ✅ ML Kit (text recognition + vision)
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+
+# ✅ Google Tasks (used by Play Core split installs)
+-keep class com.google.android.play.core.tasks.** { *; }
+-dontwarn com.google.android.play.core.tasks.**
