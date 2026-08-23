@@ -49,13 +49,15 @@ class AudioService {
         .asBroadcastStream();
   }
 
-  /// Videos (from the existing `videos` collection) that used this
-  /// audio, most recent first.
+  /// Innovation posts (from the `innovations` collection, where the
+  /// video-upload flow actually writes) that used this audio, most
+  /// recent first. Matches the 'innovations' collection name used by
+  /// ProfessionalUploadPage — not a separate 'videos' collection.
   Stream<List<Map<String, dynamic>>> getVideosUsingAudioStream(String audioId) {
     return _firestore
-        .collection('videos')
+        .collection('innovations')
         .where('audioId', isEqualTo: audioId)
-        .orderBy('createdAt', descending: true)
+        .orderBy('timestamp', descending: true)
         .limit(50)
         .snapshots()
         .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList())
