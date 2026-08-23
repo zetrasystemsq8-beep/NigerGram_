@@ -8,6 +8,7 @@ import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.d
 import 'package:nigergram/features/gist_hub/presentation/view/browse_communities_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/browse_bounties_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/browse_audio_view.dart';
+import 'package:nigergram/features/exchange/presentation/view/exchange_browse_view.dart';
 
 class GistHubView extends StatefulWidget {
   const GistHubView({super.key});
@@ -34,7 +35,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
 
     _trendingStream = _service.getGistFeedStream(filter: 'trending');
     _latestStream = _service.getGistFeedStream(filter: 'latest');
@@ -135,6 +136,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                 Tab(text: '👥 Communities'),
                 Tab(text: '🎯 Bounties'),
                 Tab(text: '🎙️ Audio'),
+                Tab(text: '💱 Exchange'),
               ],
             ),
           ),
@@ -149,14 +151,15 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
           const BrowseCommunitiesView(),
           const BrowseBountiesView(),
           const BrowseAudioView(),
+          const ExchangeBrowseView(),
         ],
       ),
       floatingActionButton: AnimatedBuilder(
         animation: _tabController,
         builder: (context, _) {
           // The generic "Drop Gist" FAB only makes sense on the first 3
-          // tabs — Communities, Bounties, and Audio each manage their
-          // own "+"/record button inside their own view instead.
+          // tabs — Communities, Bounties, Audio, and now Exchange each
+          // manage their own "+"/record button inside their own view instead.
           if (_tabController.index >= 3) return const SizedBox.shrink();
           return Padding(
             padding: const EdgeInsets.only(bottom: 100.0),
