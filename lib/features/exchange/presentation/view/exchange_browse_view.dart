@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/exchange/data/services/exchange_service.dart';
 import 'package:nigergram/features/exchange/presentation/view/exchange_create_view.dart';
+import 'package:nigergram/features/exchange/presentation/view/exchange_detail_view.dart';
 
 IconData categoryIcon(String? category) {
   switch (category) {
@@ -240,58 +241,71 @@ class _ExchangeBrowseViewState extends State<ExchangeBrowseView> {
                       final fundingGoal = item['funding_goal'];
                       final fundingRaised = item['funding_raised'];
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: NGColors.surface,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withOpacity(0.12), blurRadius: 6, offset: const Offset(0, 2)),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                _stageBadge(stage),
-                                const Spacer(),
-                                Text(_relativeTime(item['created_at'] as String?),
-                                    style: TextStyle(color: NGColors.textMuted, fontSize: 11)),
-                              ],
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ExchangeDetailView(listingId: item['id'] as String),
                             ),
-                            const SizedBox(height: 8),
-                            Text((item['title'] ?? '').toString(),
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                            if ((item['one_liner'] ?? '').toString().isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text((item['one_liner']).toString(),
-                                  style: TextStyle(color: NGColors.textSecondary, fontSize: 13)),
+                          );
+                          _reload();
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: NGColors.surface,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withOpacity(0.12), blurRadius: 6, offset: const Offset(0, 2)),
                             ],
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Icon(categoryIcon(category), size: 13, color: NGColors.textMuted),
-                                const SizedBox(width: 4),
-                                Text(categoryLabel(category),
-                                    style: TextStyle(color: NGColors.textMuted, fontSize: 11.5)),
-                                const Spacer(),
-                                if (stage == 'product' && price != null)
-                                  Text('₦${price.toString()}',
-                                      style: const TextStyle(
-                                          color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                if (stage == 'prototype' && fundingGoal != null)
-                                  Text('₦${fundingRaised ?? 0} / ₦$fundingGoal',
-                                      style: TextStyle(
-                                          color: NGColors.accent, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  _stageBadge(stage),
+                                  const Spacer(),
+                                  Text(_relativeTime(item['created_at'] as String?),
+                                      style: TextStyle(color: NGColors.textMuted, fontSize: 11)),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text((item['title'] ?? '').toString(),
+                                  style: const TextStyle(
+                                      color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                              if ((item['one_liner'] ?? '').toString().isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text((item['one_liner']).toString(),
+                                    style: TextStyle(color: NGColors.textSecondary, fontSize: 13)),
                               ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text('by @${(item['owner_name'] ?? 'user').toString()}',
-                                style: TextStyle(color: NGColors.textMuted, fontSize: 11)),
-                          ],
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Icon(categoryIcon(category), size: 13, color: NGColors.textMuted),
+                                  const SizedBox(width: 4),
+                                  Text(categoryLabel(category),
+                                      style: TextStyle(color: NGColors.textMuted, fontSize: 11.5)),
+                                  const Spacer(),
+                                  if (stage == 'product' && price != null)
+                                    Text('₦${price.toString()}',
+                                        style: const TextStyle(
+                                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                  if (stage == 'prototype' && fundingGoal != null)
+                                    Text('₦${fundingRaised ?? 0} / ₦$fundingGoal',
+                                        style: TextStyle(
+                                            color: NGColors.accent, fontWeight: FontWeight.bold, fontSize: 12)),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text('by @${(item['owner_name'] ?? 'user').toString()}',
+                                  style: TextStyle(color: NGColors.textMuted, fontSize: 11)),
+                            ],
+                          ),
                         ),
                       );
                     },
