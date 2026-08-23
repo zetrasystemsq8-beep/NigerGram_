@@ -16,7 +16,12 @@ import 'package:nigergram/features/gist_hub/presentation/view/audio_picker_sheet
 /// Professional Innovation Upload Page (LinkedIn-Style)
 /// For innovators to share breakthroughs, new laws, apps, processes, and services
 class ProfessionalUploadPage extends StatefulWidget {
-  const ProfessionalUploadPage({super.key});
+  const ProfessionalUploadPage({this.initialAudio, super.key});
+
+  /// Pre-attaches a NigerGram Audio post when arriving here via the
+  /// "Use Audio" button on an audio's detail page — skips the picker
+  /// sheet, the audio shows up already attached when this screen opens.
+  final AudioPostEntity? initialAudio;
 
   @override
   State<ProfessionalUploadPage> createState() => _ProfessionalUploadPageState();
@@ -82,6 +87,7 @@ class _ProfessionalUploadPageState extends State<ProfessionalUploadPage> {
   @override
   void initState() {
     super.initState();
+    _selectedAudio = widget.initialAudio;
     _startAutoSave();
   }
 
