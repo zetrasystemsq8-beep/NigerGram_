@@ -1,30 +1,37 @@
 // lib/features/video_feed/presentation/view/widgets/video_feed_view_optimized_video_player.dart
-import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/extensions/context_size_extensions.dart';
 import 'package:video_player/video_player.dart';
 
+/// Fixed default caption shown on every video — the "Day 1" style tag
+/// RedNote uses, reframed around the app's own brand word. Kept as a
+/// function (rather than a bare constant) so the caption logic in the
+/// widget below doesn't need to change if this ever becomes dynamic again.
 String taglineForVideo(String videoId) => '🤝 Connect';
+
+/// The spoken "Connect" voice clip, bundled as an asset. Played once each
+/// time a video completes a full playthrough, alongside the end-of-video
+/// overlay below — this is the app's own audio identity, the equivalent
+/// of RedNote's spoken tag or TikTok's between-video transition sound.
+const String kEndOfVideoAudioAsset = 'sounds/zetra_spoken.wav';
 
 class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
   const VideoFeedViewOptimizedVideoPlayer({
     required this.controller,
     required this.videoId,
     this.creatorUsername,
-    this.onDoubleTapLike,
     super.key,
   });
 
   final VideoPlayerController? controller;
   final String videoId;
-  final String? creatorUsername;
 
-  /// Callback invoked when the user double-taps to like the video.
-  /// Provided by parent to integrate backend/analytics.
-  final void Function(String videoId)? onDoubleTapLike;
+  /// Shown alongside the default tagline, e.g. "@zetra_dev".
+  /// Optional so this widget doesn't break if a caller doesn't pass it.
+  final String? creatorUsername;
 
   @override
   State<VideoFeedViewOptimizedVideoPlayer> createState() => _VideoFeedViewOptimizedVideoPlayerState();
@@ -33,203 +40,47 @@ class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
 class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimizedVideoPlayer> with TickerProviderStateMixin {
   late AnimationController _loadingController;
   late AnimationController _actionIconAnimationController;
-  late AnimationController _outroTransitionController; // NEW: Smooth transition
-
-  // DOUBLE-TAP HEART ANIMATION
-  late AnimationController _heartController;
-  Offset? _heartTapPosition;
+  late AudioPlayer _endOfVideoAudioPlayer;
 
   bool _isBuffering = false;
   VideoPlayerController? _oldController;
   String? _currentVideoId;
   bool _isPlaying = false;
   Key _playerKey = UniqueKey();
-
+  
   bool _showPlayIconOverlay = false;
   IconData _overlayIconData = Icons.play_arrow_rounded;
-
+  
+  // 🔥 FIX: Track initialization state separately
   bool _isControllerInitialized = false;
   bool _isInitializing = false;
 
-  // --- Branded outro shown once a video finishes ---
-  static const String _outroVideoAsset = 'assets/sounds/lv_7328538278142004487_20260818020652.mp4';
-  static const String _narrationAsset = 'sounds/zetra_spoken.wav';
-
-  VideoPlayerController? _outroController;
-  final AudioPlayer _narrationPlayer = AudioPlayer();
-  bool _showingOutro = false;
-  bool _outroControllerReady = false;
-  bool _outroInitializing = false; // NEW: Track outro initialization
-  Completer<void>? _outroReadyCompleter; // NEW: Sync initialization
-
-  bool _endTriggeredForThisPlay = false;
-  static const _endProximity = Duration(milliseconds: 250);
-
-  /// NEW: Preload outro with better error handling
-  Future<void> _ensureOutroControllerReady() async {
-    if (_outroControllerReady || _outroInitializing) return;
-
-    _outroInitializing = true;
-    _outroReadyCompleter = Completer<void>();
-
-    final outro = VideoPlayerController.asset(_outroVideoAsset);
-    try {
-      await outro.initialize();
-      await outro.setLooping(false);
-      await outro.setVolume(0); // Video muted (narration only)
-
-      // NEW: Wait for texture to be ready
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      _outroController = outro;
-      _outroControllerReady = true;
-      _outroInitializing = false;
-      _outroReadyCompleter?.complete();
-
-      debugPrint('✅ Outro controller ready');
-    } catch (e) {
-      debugPrint('❌ Outro init failed: $e');
-      _outroControllerReady = false;
-      _outroInitializing = false;
-      _outroReadyCompleter?.completeError(e);
-    }
-  }
-
-  /// NEW: Synchronized video + audio playback
-  Future<void> _playOutroThenResume(VideoPlayerController mainController) async {
-    if (_showingOutro) return;
-
-    mainController.pause();
-
-    // NEW: Ensure outro is ready first
-    await _ensureOutroControllerReady();
-    final outro = _outroController;
-
-    if (!mounted) return;
-
-    if (outro == null || !_outroControllerReady) {
-      // Fallback: narration only
-      setState(() => _showingOutro = true);
-      try {
-        await _narrationPlayer.stop();
-        await _narrationPlayer.play(AssetSource(_narrationAsset));
-      } catch (_) {}
-      await Future.delayed(const Duration(seconds: 3));
-      _finishOutroAndPause(mainController);
-      return;
-    }
-
-    // NEW: Transition animation before showing outro
-    setState(() => _showingOutro = true);
-
-    // NEW: Give widget tree time to rebuild (remove main video texture)
-    await Future.delayed(const Duration(milliseconds: 150));
-
-    // Sync: Reset and prepare both video and audio
-    try {
-      await outro.seekTo(Duration.zero);
-
-      // NEW: Start audio AFTER video is seeked
-      await _narrationPlayer.stop();
-
-      // NEW: Play both simultaneously with better timing
-      await Future.wait([
-        outro.play(),
-        _narrationPlayer.play(AssetSource(_narrationAsset)),
-      ]).timeout(
-        const Duration(seconds: 2),
-        onTimeout: () {
-          debugPrint('⚠️ Playback timeout');
-          return <void>[];
-        },
-      );
-
-      debugPrint('▶️ Outro + narration started (synchronized)');
-    } catch (e) {
-      debugPrint('❌ Playback error: $e');
-    }
-
-    // NEW: Enhanced end detection with buffer
-    void onOutroTick() {
-      if (!mounted) return;
-      final value = outro.value;
-      if (!value.isInitialized) return;
-
-      final duration = value.duration;
-      final position = value.position;
-
-      if (duration.inMilliseconds > 0 &&
-          position >= duration - const Duration(milliseconds: 200)) {
-        outro.removeListener(onOutroTick);
-        _finishOutroAndPause(mainController);
-      }
-    }
-
-    outro.addListener(onOutroTick);
-  }
-
-  /// NEW: Smooth outro finish with cleanup
-  void _finishOutroAndPause(VideoPlayerController mainController) {
-    if (!mounted) return;
-
-    // NEW: Fade transition back to main video
-    setState(() => _showingOutro = false);
-
-    mainController.pause();
-    mainController.seekTo(Duration.zero);
-    _endTriggeredForThisPlay = false;
-
-    // NEW: Cleanup
-    try {
-      _narrationPlayer.stop();
-    } catch (_) {}
-
-    debugPrint('⏸️ Outro finished, video paused');
-  }
-
-  void _checkForVideoEnd(VideoPlayerController controller) {
-    if (_showingOutro || _endTriggeredForThisPlay) return;
-
-    final duration = controller.value.duration;
-    final position = controller.value.position;
-    if (duration <= Duration.zero) return;
-
-    if (position >= duration - _endProximity) {
-      _endTriggeredForThisPlay = true;
-      _playOutroThenResume(controller);
-    }
-  }
+  // End-of-video branded overlay (logo + loading bar + Connect/username
+  // caption), shown briefly each time the video completes a loop —
+  // mirrors TikTok's between-video transition moment.
+  bool _showEndOfVideoOverlay = false;
+  Duration _lastKnownPosition = Duration.zero;
 
   @override
   void initState() {
     super.initState();
     _loadingController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
-
+    
     _actionIconAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
 
-    // NEW: Transition controller for smooth outro entry/exit
-    _outroTransitionController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-
-    // Heart animation
-    _heartController = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _endOfVideoAudioPlayer = AudioPlayer();
 
     _oldController = widget.controller;
     _currentVideoId = widget.videoId;
-
+    
+    // 🔥 FIX: Check if controller is already initialized
     _checkAndSetupController();
-
-    // NEW: Preload outro in background
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _ensureOutroControllerReady();
-    });
   }
 
+  // 🔥 FIX: New method to handle controller setup with proper state
   void _checkAndSetupController() {
     final controller = widget.controller;
     if (controller == null) {
@@ -240,21 +91,26 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
+    // If controller is already initialized, set up immediately
     if (controller.value.isInitialized) {
       _setupController(controller);
     } else {
+      // If not initialized, wait for it
       setState(() {
         _isInitializing = true;
         _isControllerInitialized = false;
       });
+      
+      // Add listener to catch when initialization completes
       controller.addListener(_onControllerInitListener);
     }
   }
 
+  // 🔥 FIX: Separate listener for initialization
   void _onControllerInitListener() {
     final controller = widget.controller;
     if (controller == null) return;
-
+    
     if (controller.value.isInitialized) {
       controller.removeListener(_onControllerInitListener);
       if (mounted) {
@@ -263,22 +119,23 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     }
   }
 
+  // 🔥 FIX: Setup controller once initialized
   void _setupController(VideoPlayerController controller) {
+    // Remove any old listeners
     _oldController?.removeListener(_onControllerUpdate);
     _oldController?.removeListener(_onControllerInitListener);
-
+    
     _oldController = controller;
     _isControllerInitialized = true;
     _isInitializing = false;
-
-    _showingOutro = false;
-    _endTriggeredForThisPlay = false;
-
+    _lastKnownPosition = Duration.zero;
+    
     _applyLowDataOptimization(controller);
     _addControllerListener(controller);
-
+    
+    // Play immediately
     _ensureAutoplay(controller);
-
+    
     if (mounted) {
       setState(() {});
     }
@@ -294,7 +151,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
   void _applyLowDataOptimization(VideoPlayerController controller) {
     if (controller.value.isInitialized) {
-      controller.setLooping(false);
+      controller.setLooping(true);
       controller.setVolume(1.0);
     }
   }
@@ -312,19 +169,18 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     final bool controllerChanged = widget.controller != _oldController;
 
     if (videoIdChanged || controllerChanged) {
+      // Clean up old controller listeners
       _oldController?.removeListener(_onControllerUpdate);
       _oldController?.removeListener(_onControllerInitListener);
-
+      
       _oldController = widget.controller;
       _currentVideoId = widget.videoId;
       _playerKey = UniqueKey();
       _isBuffering = false;
-
-      _outroController?.pause();
-      _narrationPlayer.stop();
-      _showingOutro = false;
-      _endTriggeredForThisPlay = false;
-
+      _showEndOfVideoOverlay = false;
+      _lastKnownPosition = Duration.zero;
+      
+      // 🔥 FIX: Re-check controller setup
       _checkAndSetupController();
     }
   }
@@ -333,14 +189,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   void dispose() {
     _loadingController.dispose();
     _actionIconAnimationController.dispose();
-    _outroTransitionController.dispose(); // NEW: Dispose transition controller
-    _heartController.dispose();
+    _endOfVideoAudioPlayer.dispose();
     _oldController?.removeListener(_onControllerUpdate);
     _oldController?.removeListener(_onControllerInitListener);
     _oldController = null;
-    _outroController?.dispose();
-    _narrationPlayer.dispose();
-    _outroReadyCompleter = null; // NEW: Clear completer
     super.dispose();
   }
 
@@ -351,6 +203,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     if (controller == null) return;
     if (widget.videoId != _currentVideoId) return;
 
+    // 🔥 FIX: Check for initialization
     if (!controller.value.isInitialized) {
       if (mounted) {
         setState(() {
@@ -361,6 +214,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
+    // Update initialized state if needed
     if (!_isControllerInitialized) {
       if (mounted) {
         setState(() {
@@ -377,13 +231,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       return;
     }
 
-    if (!_showingOutro) {
-      _checkForVideoEnd(controller);
-    }
-
     final isBuffering = controller.value.isBuffering;
     final isPlaying = controller.value.isPlaying;
 
+    // 🔥 FIX: Only show buffering if playing and buffer is loading
     bool shouldShowBuffering = isBuffering && isPlaying;
 
     if (_isBuffering != shouldShowBuffering || _isPlaying != isPlaying) {
@@ -397,12 +248,50 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       });
     }
 
-    // Ensure UI updates for duration display
-    if (mounted) setState(() {});
+    _checkForVideoEnd(controller);
+  }
+
+  /// Detects a completed playthrough the same way the parent feed's own
+  /// loop-tracking does — position crosses close to duration, then wraps
+  /// back down near zero on the next tick (since looping is enabled).
+  /// When that happens: fire the branded overlay + the spoken audio cue.
+  void _checkForVideoEnd(VideoPlayerController controller) {
+    if (!controller.value.isPlaying) return;
+
+    final pos = controller.value.position;
+    final duration = controller.value.duration;
+    if (duration.inMilliseconds <= 0) return;
+
+    final wasNearEnd = _lastKnownPosition >= duration - const Duration(milliseconds: 250);
+    final wrappedToStart = pos.inMilliseconds < 400;
+
+    if (wasNearEnd && wrappedToStart && !_showEndOfVideoOverlay) {
+      _triggerEndOfVideoMoment();
+    }
+
+    _lastKnownPosition = pos;
+  }
+
+  Future<void> _triggerEndOfVideoMoment() async {
+    if (!mounted) return;
+
+    setState(() => _showEndOfVideoOverlay = true);
+
+    try {
+      await _endOfVideoAudioPlayer.stop();
+      await _endOfVideoAudioPlayer.play(AssetSource(kEndOfVideoAudioAsset));
+    } catch (e) {
+      debugPrint('End-of-video audio failed to play: $e');
+    }
+
+    Future.delayed(const Duration(milliseconds: 1100), () {
+      if (mounted) {
+        setState(() => _showEndOfVideoOverlay = false);
+      }
+    });
   }
 
   void _handleSingleTapToggle() {
-    if (_showingOutro) return;
     final controller = widget.controller;
     if (controller == null || !controller.value.isInitialized) return;
 
@@ -428,35 +317,14 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     });
   }
 
-  // NEW: Handle double-tap position and show heart
-  void _handleDoubleTapDown(TapDownDetails details) {
-    if (_showingOutro) return;
-    final renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
-    setState(() {
-      _heartTapPosition = renderBox.globalToLocal(details.globalPosition);
-    });
-
-    HapticFeedback.mediumImpact();
-
-    // trigger heart animation
-    _heartController.forward(from: 0.0);
-
-    // Callback for backend/analytics
-    try {
-      widget.onDoubleTapLike?.call(widget.videoId);
-    } catch (e) {
-      debugPrint('Double-tap like callback error: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
 
-    final bool isNotReady = controller == null ||
-        !controller.value.isInitialized ||
-        _isInitializing;
+    // 🔥 FIX: More comprehensive initialization check
+    final bool isNotReady = controller == null || 
+                           !controller.value.isInitialized || 
+                           _isInitializing;
 
     if (isNotReady) {
       return Container(
@@ -467,69 +335,30 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
       );
     }
 
-    String _formatPosition(Duration? pos) {
-      if (pos == null) return '0:00';
-      final minutes = pos.inMinutes;
-      final seconds = pos.inSeconds % 60;
-      return '$minutes:${seconds.toString().padLeft(2, '0')}';
-    }
-
-    final currentPosition = controller.value.position;
-    final totalDuration = controller.value.duration;
-
     return GestureDetector(
       onTap: _handleSingleTapToggle,
-      onDoubleTapDown: _handleDoubleTapDown,
-      onDoubleTap: () {},
+      onDoubleTap: () {
+        HapticFeedback.mediumImpact();
+      },
       behavior: HitTestBehavior.opaque,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // MAIN VIDEO - Only mounted when outro is NOT showing
-          if (!_showingOutro)
-            Positioned.fill(
-              child: FittedBox(
-                key: _playerKey,
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: controller.value.size.width,
-                  height: controller.value.size.height,
-                  child: VideoPlayer(controller),
-                ),
+          // Hardware Accelerated Media View Box
+          Positioned.fill(
+            child: FittedBox(
+              key: _playerKey,
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: controller.value.size.width,
+                height: controller.value.size.height,
+                child: VideoPlayer(controller),
               ),
             ),
+          ),
 
-          // OUTRO VIDEO - Smooth fade in/out
-          if (_showingOutro && _outroController != null && _outroController!.value.isInitialized)
-            Positioned.fill(
-              child: AnimatedOpacity(
-                opacity: _showingOutro ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: Container(
-                  color: Colors.black,
-                  child: Center(
-                    child: AspectRatio(
-                      aspectRatio: _outroController!.value.aspectRatio,
-                      child: VideoPlayer(_outroController!),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // OUTRO LOADING STATE
-          if (_showingOutro && _outroInitializing)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black,
-                child: Center(
-                  child: _NigerGramSpinner(controller: _loadingController, size: context.sq(34)),
-                ),
-              ),
-            ),
-
-          // PLAY/PAUSE OVERLAY
-          if (_showPlayIconOverlay && !_showingOutro)
+          // Scale and Fade Animation Play/Pause Overlay Engine
+          if (_showPlayIconOverlay)
             IgnorePointer(
               child: AnimatedBuilder(
                 animation: _actionIconAnimationController,
@@ -566,14 +395,14 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
-          // BUFFERING INDICATOR
-          if (_isBuffering && _isControllerInitialized && !_showingOutro)
+          // Low-Data Buffering Spin Segment — now brand-styled instead of default
+          if (_isBuffering && _isControllerInitialized)
             Center(
               child: _NigerGramSpinner(controller: _loadingController, size: context.sq(34)),
             ),
-
-          // ERROR STATE
-          if (controller.value.hasError && !_showingOutro)
+            
+          // Connection Error State Layer
+          if (controller.value.hasError)
             Container(
               color: Colors.black87,
               child: Center(
@@ -595,143 +424,90 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
               ),
             ),
 
-          // TAGLINE + CREATOR
-          if (!_showingOutro)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: _CornerCyclingBadge(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.45),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      widget.creatorUsername != null && widget.creatorUsername!.isNotEmpty
-                          ? '${taglineForVideo(widget.videoId)}  ·  @${widget.creatorUsername}'
-                          : taglineForVideo(widget.videoId),
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.92),
-                        fontSize: context.fontSize(12),
-                        fontWeight: FontWeight.w600,
-                        shadows: const [Shadow(color: Colors.black87, blurRadius: 3, offset: Offset(0, 1))],
-                      ),
+          // Persistent tagline + creator caption — the "Day 1" style tag,
+          // reframed for a builder feed. Sits near the top so it never
+          // collides with the username/description block anchored at
+          // the bottom of VideoFeedViewItem.
+          Positioned(
+            top: context.h(12),
+            left: 16,
+            right: 16,
+            child: IgnorePointer(
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.45),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    widget.creatorUsername != null && widget.creatorUsername!.isNotEmpty
+                        ? '${taglineForVideo(widget.videoId)}  ·  @${widget.creatorUsername}'
+                        : taglineForVideo(widget.videoId),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.92),
+                      fontSize: context.fontSize(12),
+                      fontWeight: FontWeight.w600,
+                      shadows: const [Shadow(color: Colors.black87, blurRadius: 3, offset: Offset(0, 1))],
                     ),
                   ),
                 ),
               ),
             ),
+          ),
 
-          // DOUBLE-TAP HEART ANIMATION
-          if (_heartTapPosition != null)
-            Positioned(
-              left: _heartTapPosition!.dx - 40,
-              top: _heartTapPosition!.dy - 40,
-              child: IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: _heartController,
-                  builder: (context, child) {
-                    final double progress = _heartController.value;
-                    final double scale = Tween<double>(begin: 0.6, end: 1.6).transform(Curves.easeOut.transform(progress));
-                    final double opacity = (1.0 - progress).clamp(0.0, 1.0);
-                    return Opacity(
-                      opacity: opacity,
-                      child: Transform.scale(
-                        scale: scale,
-                        child: Icon(
-                          Icons.favorite_rounded,
-                          color: Colors.redAccent.withOpacity(0.95),
-                          size: 80,
-                          shadows: const [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))],
+          // End-of-video branded transition overlay — the TikTok-style
+          // "between videos" moment: wordmark + animated loading bar +
+          // the same Connect/username caption, shown briefly and faded
+          // out. Paired with the spoken audio cue triggered above.
+          IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: _showEndOfVideoOverlay ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 220),
+              child: Container(
+                color: Colors.black.withOpacity(0.88),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'NigerGram',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: context.fontSize(24),
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
                         ),
                       ),
-                    );
-                  },
-                ),
-              ),
-            ),
-
-          // DURATION DISPLAY (bottom-right)
-          if (!_showingOutro)
-            Positioned(
-              bottom: 10,
-              right: 10,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.45),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '${_formatPosition(currentPosition)} / ${_formatPosition(totalDuration)}',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: context.fontSize(12),
-                    fontWeight: FontWeight.w600,
+                      SizedBox(height: context.h(18)),
+                      _EndOfVideoLoadingBar(controller: _loadingController),
+                      SizedBox(height: context.h(18)),
+                      Text(
+                        widget.creatorUsername != null && widget.creatorUsername!.isNotEmpty
+                            ? '${taglineForVideo(widget.videoId)}  ·  @${widget.creatorUsername}'
+                            : taglineForVideo(widget.videoId),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: context.fontSize(13),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Cycles through 8 positions with smooth animation
-class _CornerCyclingBadge extends StatefulWidget {
-  const _CornerCyclingBadge({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_CornerCyclingBadge> createState() => _CornerCyclingBadgeState();
-}
-
-class _CornerCyclingBadgeState extends State<_CornerCyclingBadge> {
-  static const List<Alignment> _positions = [
-    Alignment.topLeft,
-    Alignment.topCenter,
-    Alignment.topRight,
-    Alignment.centerRight,
-    Alignment.bottomRight,
-    Alignment.bottomCenter,
-    Alignment.bottomLeft,
-    Alignment.centerLeft,
-  ];
-
-  int _positionIndex = 0;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (!mounted) return;
-      setState(() => _positionIndex = (_positionIndex + 1) % _positions.length);
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
-      child: AnimatedAlign(
-        alignment: _positions[_positionIndex],
-        duration: const Duration(milliseconds: 700),
-        curve: Curves.easeInOutCubic,
-        child: widget.child,
-      ),
-    );
-  }
-}
-
+/// Branded loading spinner — replaces the default Flutter spinner/loop icon
+/// with a NigerGram-accent-colored rotating arc, matching the story-ring
+/// visual language already used on the profile screen.
 class _NigerGramSpinner extends StatelessWidget {
   const _NigerGramSpinner({required this.controller, required this.size});
 
@@ -744,7 +520,7 @@ class _NigerGramSpinner extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         return Transform.rotate(
-          angle: controller.value * 6.28318530718,
+          angle: controller.value * 6.28318530718, // 2 * pi
           child: CustomPaint(
             size: Size(size, size),
             painter: _BrandArcSpinnerPainter(color: NGColors.accent),
@@ -766,19 +542,19 @@ class _BrandArcSpinnerPainter extends CustomPainter {
     final radius = size.width / 2 - 3;
 
     final trackPaint = Paint()
-      ..color = color.withOpacity(0.12) // lighter track for better contrast
+      ..color = color.withOpacity(0.18)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
+      ..strokeWidth = 3.2;
     canvas.drawCircle(center, radius, trackPaint);
 
     final arcPaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
+      ..strokeWidth = 3.2
       ..strokeCap = StrokeCap.round;
 
-    const startAngle = -1.5707963268;
-    const sweepAngle = 5.1;
+    const startAngle = -1.5707963268; // -90deg, start at top
+    const sweepAngle = 4.18879020479; // ~240deg arc
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
@@ -787,12 +563,63 @@ class _BrandArcSpinnerPainter extends CustomPainter {
       false,
       arcPaint,
     );
-
-    // Center dot indicator
-    final dotPaint = Paint()..color = color.withOpacity(0.95);
-    canvas.drawCircle(center, 3.0, dotPaint);
   }
 
   @override
   bool shouldRepaint(covariant _BrandArcSpinnerPainter oldDelegate) => oldDelegate.color != color;
+}
+
+/// The horizontal loading-bar animation shown inside the end-of-video
+/// overlay — a rounded track with a colored pill sweeping across it,
+/// styled with the same red/cyan pairing already used on the Dashboard's
+/// upload button, so the app's visual identity stays consistent.
+class _EndOfVideoLoadingBar extends StatelessWidget {
+  const _EndOfVideoLoadingBar({required this.controller});
+
+  final AnimationController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    const double trackWidth = 160;
+    const double pillWidth = 56;
+
+    return SizedBox(
+      width: trackWidth,
+      height: 10,
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          AnimatedBuilder(
+            animation: controller,
+            builder: (context, _) {
+              // Sweeps left-to-right and back, matching TikTok Lite's
+              // between-video bar rather than a one-shot progress fill.
+              final t = controller.value;
+              final progress = t < 0.5 ? (t * 2) : (2 - t * 2);
+              final left = progress * (trackWidth - pillWidth);
+
+              return Positioned(
+                left: left,
+                child: Container(
+                  width: pillWidth,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFE2C55), Color(0xFF23F6E4)],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }
