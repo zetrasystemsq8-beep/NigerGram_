@@ -7,6 +7,7 @@ import 'package:nigergram/features/gist_hub/domain/entities/gist_post_entity.dar
 import 'package:nigergram/features/gist_hub/presentation/view/gist_create_post.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/browse_communities_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/browse_bounties_view.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/browse_audio_view.dart';
 
 class GistHubView extends StatefulWidget {
   const GistHubView({super.key});
@@ -21,15 +22,11 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
   int _totalGists = 0;
 
   // Created exactly once per filter, in initState, and reused for the
-  // lifetime of this State object. Previously getGistFeedStream() was
-  // called fresh inline inside StreamBuilder's `stream:` parameter on
-  // every rebuild (pull-to-refresh, posting a gist, _loadGistCount, etc.
-  // all call setState here) — if the underlying stream from GistService
-  // isn't a broadcast stream, re-subscribing to what may be the same
-  // instance on a second call throws exactly the "Stream has already
-  // been listened to" error. Caching the Stream objects here guarantees
-  // each one is only ever listened to once, no matter how often this
-  // widget rebuilds.
+  // lifetime of this State object — prevents the "Stream has already
+  // been listened to" crash caused by re-creating these streams on
+  // every rebuild (see GistService.getGistFeedStream, which now also
+  // wraps everything in .asBroadcastStream() as a second layer of
+  // protection).
   late final Stream<List<Map<String, dynamic>>> _trendingStream;
   late final Stream<List<Map<String, dynamic>>> _latestStream;
   late final Stream<List<Map<String, dynamic>>> _pollsStream;
@@ -37,7 +34,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
 
     _trendingStream = _service.getGistFeedStream(filter: 'trending');
     _latestStream = _service.getGistFeedStream(filter: 'latest');
@@ -137,6 +134,7 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
                 Tab(text: '📊 Polls'),
                 Tab(text: '👥 Communities'),
                 Tab(text: '🎯 Bounties'),
+                Tab(text: '🎙️ Audio'),
               ],
             ),
           ),
@@ -150,13 +148,15 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
           _buildFeed('polls', _pollsStream),
           const BrowseCommunitiesView(),
           const BrowseBountiesView(),
+          const BrowseAudioView(),
         ],
       ),
       floatingActionButton: AnimatedBuilder(
         animation: _tabController,
         builder: (context, _) {
-          // Only show the "Drop Gist" FAB on the first 3 tabs — Communities
-          // and Bounties have their own "+" button in their own AppBar.
+          // The generic "Drop Gist" FAB only makes sense on the first 3
+          // tabs — Communities, Bounties, and Audio each manage their
+          // own "+"/record button inside their own view instead.
           if (_tabController.index >= 3) return const SizedBox.shrink();
           return Padding(
             padding: const EdgeInsets.only(bottom: 100.0),
