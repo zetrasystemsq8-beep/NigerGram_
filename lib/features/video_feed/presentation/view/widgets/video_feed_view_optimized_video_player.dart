@@ -23,6 +23,7 @@ class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
     required this.controller,
     required this.videoId,
     this.creatorUsername,
+    this.onDoubleTapLike,
     super.key,
   });
 
@@ -32,6 +33,11 @@ class VideoFeedViewOptimizedVideoPlayer extends StatefulWidget {
   /// Shown alongside the default tagline, e.g. "@zetra_dev".
   /// Optional so this widget doesn't break if a caller doesn't pass it.
   final String? creatorUsername;
+
+  /// Fired when the user double-taps the video — the caller (e.g.
+  /// VideoFeedViewItem) owns the actual like logic; this widget only
+  /// reports the gesture and shows the heart-burst animation locally.
+  final void Function(String videoId)? onDoubleTapLike;
 
   @override
   State<VideoFeedViewOptimizedVideoPlayer> createState() => _VideoFeedViewOptimizedVideoPlayerState();
@@ -50,6 +56,10 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
   
   bool _showPlayIconOverlay = false;
   IconData _overlayIconData = Icons.play_arrow_rounded;
+
+  // Heart-burst feedback shown on double-tap-to-like, separate from the
+  // play/pause icon overlay above so both can't visually collide.
+  bool _showLikeBurst = false;
   
   // 🔥 FIX: Track initialization state separately
   bool _isControllerInitialized = false;
@@ -317,6 +327,21 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
     });
   }
 
+  void _handleDoubleTap() {
+    HapticFeedback.mediumImpact();
+
+    widget.onDoubleTapLike?.call(widget.videoId);
+
+    setState(() => _showLikeBurst = true);
+    _actionIconAnimationController.forward(from: 0.0).then((_) {
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted) {
+          setState(() => _showLikeBurst = false);
+        }
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -337,9 +362,7 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
 
     return GestureDetector(
       onTap: _handleSingleTapToggle,
-      onDoubleTap: () {
-        HapticFeedback.mediumImpact();
-      },
+      onDoubleTap: _handleDoubleTap,
       behavior: HitTestBehavior.opaque,
       child: Stack(
         alignment: Alignment.center,
@@ -388,6 +411,38 @@ class _VideoFeedViewOptimizedVideoPlayerState extends State<VideoFeedViewOptimiz
                           color: Colors.white,
                           size: context.sq(50),
                         ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+          // Double-tap Like Heart-Burst Feedback
+          if (_showLikeBurst)
+            IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _actionIconAnimationController,
+                builder: (context, child) {
+                  final double scaleFactor = TweenSequence<double>([
+                    TweenSequenceItem(tween: Tween<double>(begin: 0.4, end: 1.3).chain(CurveTween(curve: Curves.easeOutBack)), weight: 70),
+                    TweenSequenceItem(tween: Tween<double>(begin: 1.3, end: 1.0), weight: 30),
+                  ]).evaluate(_actionIconAnimationController);
+
+                  final double opacityFactor = TweenSequence<double>([
+                    TweenSequenceItem(tween: Tween<double>(begin: 0.0, end: 0.9), weight: 40),
+                    TweenSequenceItem(tween: Tween<double>(begin: 0.9, end: 0.0).chain(CurveTween(curve: Curves.easeIn)), weight: 60),
+                  ]).evaluate(_actionIconAnimationController);
+
+                  return Opacity(
+                    opacity: opacityFactor,
+                    child: Transform.scale(
+                      scale: scaleFactor,
+                      child: Icon(
+                        Icons.favorite_rounded,
+                        color: const Color(0xFFFE2C55),
+                        size: context.sq(90),
+                        shadows: const [Shadow(color: Colors.black45, blurRadius: 12)],
                       ),
                     ),
                   );
