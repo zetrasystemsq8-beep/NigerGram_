@@ -10,6 +10,30 @@ import 'package:nigergram/features/gist_hub/presentation/view/browse_bounties_vi
 import 'package:nigergram/features/gist_hub/presentation/view/browse_audio_view.dart';
 import 'package:nigergram/features/exchange/presentation/view/exchange_browse_view.dart';
 
+/// Keeps a tab's screen and its live data connection alive permanently
+/// once built, instead of Flutter discarding and rebuilding it every time
+/// it's scrolled more than one tab away — this is what was causing feed
+/// tabs to spin forever instead of showing already-loaded data when
+/// revisited.
+class _KeepAliveWrapper extends StatefulWidget {
+  final Widget child;
+  const _KeepAliveWrapper({required this.child});
+
+  @override
+  State<_KeepAliveWrapper> createState() => _KeepAliveWrapperState();
+}
+
+class _KeepAliveWrapperState extends State<_KeepAliveWrapper> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
 class GistHubView extends StatefulWidget {
   const GistHubView({super.key});
 
@@ -145,20 +169,20 @@ class _GistHubViewState extends State<GistHubView> with SingleTickerProviderStat
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildFeed('trending', _trendingStream),
-          _buildFeed('latest', _latestStream),
-          _buildFeed('polls', _pollsStream),
-          const BrowseCommunitiesView(),
-          const BrowseBountiesView(),
-          const BrowseAudioView(),
-          const ExchangeBrowseView(),
+          _KeepAliveWrapper(child: _buildFeed('trending', _trendingStream)),
+          _KeepAliveWrapper(child: _buildFeed('latest', _latestStream)),
+          _KeepAliveWrapper(child: _buildFeed('polls', _pollsStream)),
+          const _KeepAliveWrapper(child: BrowseCommunitiesView()),
+          const _KeepAliveWrapper(child: BrowseBountiesView()),
+          const _KeepAliveWrapper(child: BrowseAudioView()),
+          const _KeepAliveWrapper(child: ExchangeBrowseView()),
         ],
       ),
       floatingActionButton: AnimatedBuilder(
         animation: _tabController,
         builder: (context, _) {
           // The generic "Drop Gist" FAB only makes sense on the first 3
-          // tabs — Communities, Bounties, Audio, and now Exchange each
+          // tabs — Communities, Bounties, Audio, and Exchange each
           // manage their own "+"/record button inside their own view instead.
           if (_tabController.index >= 3) return const SizedBox.shrink();
           return Padding(
