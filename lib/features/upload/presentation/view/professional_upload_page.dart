@@ -9,6 +9,9 @@ import 'package:nigergram/features/media/presentation/pages/advanced_video_edito
 import 'package:nigergram/features/media/presentation/pages/podcast_editor_page.dart';
 import 'package:nigergram/features/media/models/video_edit_model.dart';
 import 'package:nigergram/core/design_system/colors.dart';
+import 'package:nigergram/features/gist_hub/data/services/audio_service.dart';
+import 'package:nigergram/features/gist_hub/domain/entities/audio_post_entity.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/audio_picker_sheet.dart';
 
 /// Professional Innovation Upload Page (LinkedIn-Style)
 /// For innovators to share breakthroughs, new laws, apps, processes, and services
@@ -39,6 +42,14 @@ class _ProfessionalUploadPageState extends State<ProfessionalUploadPage> {
 
   VideoEditModel? _videoEditModel;
   VideoEditModel? _podcastEditModel;
+
+  // Existing "NigerGram Audio" post attached to this upload, if any —
+  // lets a creator narrate over their screen recording/video using a
+  // previously recorded voice track from The Forge's Audio tab, with
+  // attribution preserved automatically.
+  AudioPostEntity? _selectedAudio;
+
+  final AudioService _audioService = AudioService();
 
   // Professional Categories (Industry Sectors)
   final List<String> _categories = [
@@ -107,6 +118,7 @@ class _ProfessionalUploadPageState extends State<ProfessionalUploadPage> {
         'researchLink': _researchLinkController.text,
         'videoEdits': _videoEditModel?.toString(),
         'podcastEdits': _podcastEditModel?.toString(),
+        'audioId': _selectedAudio?.id,
         'savedAt': FieldValue.serverTimestamp(),
       });
 
@@ -203,6 +215,17 @@ class _ProfessionalUploadPageState extends State<ProfessionalUploadPage> {
     }
   }
 
+  Future<void> _openAudioPicker() async {
+    final picked = await AudioPickerSheet.show(context);
+    if (picked != null) {
+      setState(() => _selectedAudio = picked);
+    }
+  }
+
+  void _removeSelectedAudio() {
+    setState(() => _selectedAudio = null);
+  }
+
   Future<void> _uploadInnovation() async {
     if (_innovationTitleController.text.trim().isEmpty) {
       _showError('Please enter an innovation title');
@@ -229,6 +252,14 @@ class _ProfessionalUploadPageState extends State<ProfessionalUploadPage> {
       if (user == null) {
         _showError('User not authenticated');
         return;
+      }
+
+      // Re-verify the attached audio is still usable right before
+      // publishing (permissions could have changed since it was
+      // picked) and record the use. Throws if no longer allowed —
+      // caught below and surfaced as a normal error, publish aborted.
+      if (_selectedAudio != null) {
+        await _audioService.registerAudioUse(_selectedAudio!.id);
       }
 
       setState(() => _uploadProgress = 0.05);
@@ -295,6 +326,13 @@ class _ProfessionalUploadPageState extends State<ProfessionalUploadPage> {
             : null,
         'videoEdits': _videoEditModel != null ? _videoEditModel.toString() : null,
         'podcastEdits': _podcastEditModel != null ? _podcastEditModel.toString() : null,
+        // Attached "NigerGram Audio" (if any) — stores enough to render
+        // the "🎙️ Original audio by @username" attribution on this post
+        // without a second lookup, and the real audioId for the audio's
+        // own "used in X videos" page to find this post.
+        'audioId': _selectedAudio?.id,
+        'audioTitle': _selectedAudio?.title,
+        'audioCreatorUsername': _selectedAudio?.creatorUsername,
         'likeCount': 0,
         'commentCount': 0,
         'shareCount': 0,
@@ -641,6 +679,70 @@ class _ProfessionalUploadPageState extends State<ProfessionalUploadPage> {
                     '#innovation, #tech, #breakthrough',
                     icon: Icons.tag,
                   ),
+                  const SizedBox(height: 20),
+
+                  // NIGERGRAM AUDIO ATTACHMENT
+                  const Text(
+                    'Voice Narration (Optional)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Attach a NigerGram Audio recording — great for explaining a screen recording without appearing on camera.',
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  if (_selectedAudio != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade900,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: NGColors.accent),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.graphic_eq_rounded, color: NGColors.accent),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _selectedAudio!.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                                Text(
+                                  '🎙️ Original audio by @${_selectedAudio!.creatorUsername}',
+                                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close_rounded, color: Colors.grey.shade500, size: 18),
+                            onPressed: _removeSelectedAudio,
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    OutlinedButton.icon(
+                      onPressed: _openAudioPicker,
+                      icon: const Icon(Icons.mic_rounded, color: NGColors.accent, size: 18),
+                      label: const Text('Attach NigerGram Audio', style: TextStyle(color: NGColors.accent)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: NGColors.accent),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
                   const SizedBox(height: 20),
 
                   // MEDIA SECTION
