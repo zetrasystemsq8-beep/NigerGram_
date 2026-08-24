@@ -4,6 +4,7 @@ import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/data/services/audio_service.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/audio_post_entity.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/audio_record_view.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/audio_detail_view.dart';
 
 const List<Map<String, String>> audioDiscoveryFilters = [
   {'key': 'trending', 'label': '🔥 Trending'},
@@ -150,50 +151,58 @@ class _BrowseAudioViewState extends State<BrowseAudioView> {
                   itemCount: posts.length,
                   itemBuilder: (context, index) {
                     final post = posts[index];
-                    return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: NGColors.surface,
-                        borderRadius: BorderRadius.circular(16),
+                    // The whole card is now wrapped in a GestureDetector —
+                    // this was previously missing entirely, which is why
+                    // tapping did nothing.
+                    return GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => AudioDetailView(audioId: post.id)),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: NGColors.accent.withOpacity(0.15),
-                              shape: BoxShape.circle,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: NGColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: NGColors.accent.withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.graphic_eq_rounded, color: NGColors.accent),
                             ),
-                            child: Icon(Icons.graphic_eq_rounded, color: NGColors.accent),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  post.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: NGColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '🎙️ Original audio by @${post.creatorUsername} · Used in ${post.useCount} videos',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: NGColors.textMuted, fontSize: 12),
-                                ),
-                              ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    post.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: NGColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '🎙️ Original audio by @${post.creatorUsername} · Used in ${post.useCount} videos',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: NGColors.textMuted, fontSize: 12),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          Text(
-                            _formatDuration(post.durationSeconds),
-                            style: TextStyle(color: NGColors.textMuted, fontSize: 12),
-                          ),
-                        ],
+                            Text(
+                              _formatDuration(post.durationSeconds),
+                              style: TextStyle(color: NGColors.textMuted, fontSize: 12),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
