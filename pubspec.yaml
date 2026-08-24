@@ -91,4 +91,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/sounds/zetra_spoken.wav
+    - assets/sounds/ic_lancher.png
     - assets/sounds/lv_7328538278142004487_20260818020652.mp4
