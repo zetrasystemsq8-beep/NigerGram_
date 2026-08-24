@@ -4,7 +4,6 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/app_auth.dart';
@@ -101,21 +100,22 @@ class _AudioDetailViewState extends State<AudioDetailView> {
     );
   }
 
-  /// Downloads the raw audio file straight to the phone's Downloads
-  /// folder. Note: on Android 11+, writing directly into the public
-  /// Downloads folder without scoped-storage APIs can be blocked on
-  /// some devices/OEM skins depending on permission grants — if this
-  /// silently fails to appear in Downloads on a given phone, that's
-  /// the likely cause, and the proper long-term fix is a dedicated
-  /// downloads/media-store package rather than a raw file write.
+  /// Downloads the audio and hands it to the OS share sheet so the user
+  /// can save it wherever they want (Files, Downloads, Drive, WhatsApp,
+  /// etc). This deliberately does NOT write directly to the public
+  /// Downloads folder — on Android 11+ (API 30+), requestLegacyExternalStorage
+  /// in the manifest is ignored entirely regardless of what's declared
+  /// there, so a raw File write to /storage/emulated/0/Download silently
+  /// fails or throws on any modern phone. Writing to the app's own
+  /// private external storage instead needs zero permissions on any
+  /// Android version, and routing through the native share sheet is the
+  /// standard, reliable way to let the user actually save the result —
+  /// most Android file managers/share sheets include a "Save to
+  /// Downloads"/"Save to Files" target automatically.
   Future<void> _downloadAudio(AudioPostEntity post) async {
     setState(() => _isDownloading = true);
 
     try {
-      if (Platform.isAndroid) {
-        await Permission.storage.request();
-      }
-
       final dio = Dio();
       final response = await dio.get<List<int>>(
         post.audioUrl,
@@ -124,22 +124,19 @@ class _AudioDetailViewState extends State<AudioDetailView> {
       final bytes = response.data;
       if (bytes == null) throw Exception('No data received');
 
-      Directory saveDir;
-      final publicDownloads = Directory('/storage/emulated/0/Download');
-      if (Platform.isAndroid && await publicDownloads.exists()) {
-        saveDir = publicDownloads;
-      } else {
-        saveDir = await getApplicationDocumentsDirectory();
-      }
-
+      // App-private storage — writable with zero permissions on every
+      // Android version, no scoped-storage restrictions apply here.
+      final dir = await getTemporaryDirectory();
       final safeTitle = post.title.replaceAll(RegExp(r'[^\w\s-]'), '').trim();
-      final fileName = '${safeTitle.isEmpty ? 'nigergram_audio' : safeTitle}_${post.id}.m4a';
-      final file = File('${saveDir.path}/$fileName');
+      final fileName = '${safeTitle.isEmpty ? 'nigergram_audio' : safeTitle}.m4a';
+      final file = File('${dir.path}/$fileName');
       await file.writeAsBytes(bytes);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved as "$fileName"')),
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Save this NigerGram audio: "${post.title}"',
       );
     } catch (e) {
       if (!mounted) return;
@@ -198,8 +195,6 @@ class _AudioDetailViewState extends State<AudioDetailView> {
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              // Zetra logo cover art — replaces what used to be a blank
-              // area with no visual identity for the audio.
               Center(
                 child: Container(
                   width: 160,
