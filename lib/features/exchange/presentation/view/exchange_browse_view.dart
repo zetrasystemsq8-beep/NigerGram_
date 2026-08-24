@@ -160,18 +160,21 @@ class _ExchangeBrowseViewState extends State<ExchangeBrowseView> {
         backgroundColor: NGColors.surface,
         title: const Text('Exchange', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: NGColors.accent,
-        icon: const Icon(Icons.add),
-        label: const Text('Create'),
-        onPressed: () async {
-          final created = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ExchangeCreateView()),
-          );
-          if (created == true) _reload();
-        },
-      ),
+      floatingActionButton: Padding(
+  padding: const EdgeInsets.only(bottom: 80.0),
+  child: FloatingActionButton.extended(
+    backgroundColor: NGColors.accent,
+    icon: const Icon(Icons.add),
+    label: const Text('Create'),
+    onPressed: () async {
+      final created = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ExchangeCreateView()),
+      );
+      if (created == true) _reload();
+    },
+  ),
+),
       body: Column(
         children: [
           Padding(
