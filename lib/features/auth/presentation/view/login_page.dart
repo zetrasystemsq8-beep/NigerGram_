@@ -6,6 +6,7 @@ import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/constants/enums/router_enum.dart';
 import 'package:nigergram/core/utils/error_handler.dart';
 import 'package:nigergram/features/auth/presentation/bloc/auth_cubit.dart';
+import 'package:nigergram/features/auth/presentation/view/username_auth_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -474,6 +475,26 @@ class _LoginPageState extends State<LoginPage> {
                                     color: NGColors.textMuted,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const UsernameAuthPage()),
+                                );
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Text(
+                                  'Log in with Username instead',
+                                  style: TextStyle(
+                                    color: NGColors.accent,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
