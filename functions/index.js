@@ -1,9 +1,21 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const cors = require('cors')({ origin: true });
+const { createClient } = require('@supabase/supabase-js');
 
 admin.initializeApp();
 const db = admin.firestore();
+
+// Initialize Supabase admin client if env vars present
+const SUPABASE_URL = process.env.SUPABASE_URL || functions.config().supabase?.url;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || functions.config().supabase?.service_key;
+let supabase = null;
+if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
+  console.log('Supabase client initialized');
+} else {
+  console.log('Supabase not configured; will fallback to Firestore crediting');
+}
 
 // Helper: verify Firebase ID token from Authorization header
 async function verifyToken(req) {
@@ -80,6 +92,39 @@ exports.createTopup = functions.https.onRequest((req, res) => {
   });
 });
 
+// Helper: credit Supabase app_currency_balances (idempotent guard handled by request status locking)
+async function creditSupabaseBalance(userId, centAmount, requestId) {
+  if (!supabase) throw new Error('Supabase not configured');
+
+  // Try to get existing row
+  const { data: existing, error: selErr } = await supabase
+    .from('app_currency_balances')
+    .select('balance')
+    .eq('user_id', userId)
+    .eq('app_id', 'nigergram')
+    .maybeSingle();
+
+  if (selErr) throw selErr;
+
+  if (existing && existing.balance != null) {
+    const newBalance = Number(existing.balance) + Number(centAmount);
+    const { error: updErr } = await supabase
+      .from('app_currency_balances')
+      .update({ balance: newBalance })
+      .eq('user_id', userId)
+      .eq('app_id', 'nigergram');
+
+    if (updErr) throw updErr;
+    return { previous: Number(existing.balance), newBalance };
+  } else {
+    const { error: insErr } = await supabase
+      .from('app_currency_balances')
+      .insert([{ user_id: userId, app_id: 'nigergram', balance: Number(centAmount) }]);
+    if (insErr) throw insErr;
+    return { previous: 0, newBalance: Number(centAmount) };
+  }
+}
+
 // ApproveTopup: admin-only endpoint to approve or reject a topup
 exports.approveTopup = functions.https.onRequest((req, res) => {
   return cors(req, res, async () => {
@@ -109,6 +154,7 @@ exports.approveTopup = functions.https.onRequest((req, res) => {
     const reqRef = db.collection('topup_requests').doc(requestId);
 
     try {
+      // First step: lock and validate the request by setting status -> 'processing' atomically.
       await db.runTransaction(async (tx) => {
         const snap = await tx.get(reqRef);
         if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Topup request not found');
@@ -116,10 +162,18 @@ exports.approveTopup = functions.https.onRequest((req, res) => {
         if (!data) throw new functions.https.HttpsError('failed-precondition', 'Invalid data');
 
         // Prevent double-approval
-        if (data.status === 'approved') return;
-        if (data.status === 'rejected' && action === 'reject') return;
+        if (data.status === 'approved') throw new functions.https.HttpsError('already-exists', 'Already approved');
+        if (data.status === 'processing') throw new functions.https.HttpsError('already-exists', 'Already being processed');
 
-        if (action === 'reject') {
+        // Allow owner or admin to reject/approve; here we just set processing for approve flow
+        if (action === 'approve') {
+          tx.update(reqRef, {
+            status: 'processing',
+            adminId: adminId,
+            adminNote: adminNote,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else if (action === 'reject') {
           tx.update(reqRef, {
             status: 'rejected',
             adminId: adminId,
@@ -127,18 +181,45 @@ exports.approveTopup = functions.https.onRequest((req, res) => {
             approvedAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
-          return;
         }
+      });
 
-        // Approve flow: credit the user's wallet (server-side). This uses Firestore as the authoritative ledger if you
-        // do not have direct admin access to ZTC. If you do have a ZTC/Supabase admin API, prefer crediting there
-        // so the ZtcWalletBridge mirrors the change.
-        const userId = data.userId;
-        const centAmount = Number(data.centAmount || 0);
-        if (!Number.isInteger(centAmount) || centAmount <= 0) {
-          throw new functions.https.HttpsError('invalid-argument', 'Invalid centAmount');
+      if (action === 'reject') {
+        return res.status(200).send({ success: true, status: 'rejected' });
+      }
+
+      // Load the request data (fresh)
+      const snap = await reqRef.get();
+      const data = snap.data();
+      if (!data) throw new Error('Request missing after lock');
+
+      const userId = data.userId;
+      const centAmount = Number(data.centAmount || 0);
+      if (!Number.isInteger(centAmount) || centAmount <= 0) {
+        // revert processing -> pending
+        await reqRef.update({ status: 'pending', updatedAt: admin.firestore.FieldValue.serverTimestamp(), adminNote: 'Invalid centAmount' });
+        throw new Error('Invalid centAmount');
+      }
+
+      // If Supabase available, prefer to credit the ZTC canonical ledger there. Otherwise, fall back to Firestore.
+      if (supabase) {
+        try {
+          await creditSupabaseBalance(userId, centAmount, requestId);
+
+          // Mark request approved; ZtcWalletBridge will mirror the change into Firestore (wallets/*) and create a deposit tx.
+          await reqRef.update({ status: 'approved', approvedAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+          return res.status(200).send({ success: true, status: 'approved', method: 'supabase' });
+        } catch (supErr) {
+          console.error('Supabase credit failed', supErr);
+          // revert processing -> pending with note
+          await reqRef.update({ status: 'pending', updatedAt: admin.firestore.FieldValue.serverTimestamp(), adminNote: `Supabase error: ${supErr.message || supErr}` });
+          return res.status(500).send({ error: 'Failed to credit Supabase', details: String(supErr) });
         }
+      }
 
+      // Fallback: credit Firestore directly (existing behavior)
+      await db.runTransaction(async (tx) => {
         const walletRef = db.collection('wallets').doc(userId);
         const walletSnap = await tx.get(walletRef);
         const prevCents = (walletSnap.exists && walletSnap.data() && walletSnap.data().balanceCents) ? Number(walletSnap.data().balanceCents) : 0;
@@ -158,7 +239,7 @@ exports.approveTopup = functions.https.onRequest((req, res) => {
           amountCents: centAmount,
           previousBalanceCents: prevCents,
           newBalanceCents: newCents,
-          source: 'manual_admin_topup',
+          source: 'manual_admin_topup_firestore_fallback',
           requestId: requestId,
           timestamp: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -172,10 +253,13 @@ exports.approveTopup = functions.https.onRequest((req, res) => {
         });
       });
 
-      return res.status(200).send({ success: true });
+      return res.status(200).send({ success: true, status: 'approved', method: 'firestore' });
     } catch (err) {
       console.error('approveTopup error', err);
-      return res.status(500).send({ error: 'Failed to process approval' });
+      if (err instanceof functions.https.HttpsError) {
+        return res.status(400).send({ error: err.message });
+      }
+      return res.status(500).send({ error: 'Failed to process approval', details: String(err) });
     }
   });
 });
