@@ -14,7 +14,7 @@ if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
   supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
   console.log('Supabase client initialized');
 } else {
-  console.log('Supabase not configured; will fallback to Firestore crediting');
+  console.log('Supabase not configured; approveTopup requires Supabase to be set up');
 }
 
 // Helper: verify Firebase ID token from Authorization header
@@ -92,40 +92,31 @@ exports.createTopup = functions.https.onRequest((req, res) => {
   });
 });
 
-// Helper: credit Supabase app_currency_balances (idempotent guard handled by request status locking)
-async function creditSupabaseBalance(userId, centAmount, requestId) {
+// Helper: credit Supabase app_currency_balances by calling the idempotent RPC/stored-proc created in Postgres.
+async function creditSupabaseBalance(userId, centAmount, requestId, adminId) {
   if (!supabase) throw new Error('Supabase not configured');
 
-  // Try to get existing row
-  const { data: existing, error: selErr } = await supabase
-    .from('app_currency_balances')
-    .select('balance')
-    .eq('user_id', userId)
-    .eq('app_id', 'nigergram')
-    .maybeSingle();
+  // Call the Postgres stored procedure we asked you to create: credit_app_balance
+  // It is expected to be idempotent (unique audit on request_id) and to perform the upsert in a single transaction.
+  const params = {
+    p_user_id: userId,
+    p_app_id: 'nigergram',
+    p_cent_amount: Number(centAmount),
+    p_request_id: requestId,
+    p_admin_id: adminId || null,
+  };
 
-  if (selErr) throw selErr;
-
-  if (existing && existing.balance != null) {
-    const newBalance = Number(existing.balance) + Number(centAmount);
-    const { error: updErr } = await supabase
-      .from('app_currency_balances')
-      .update({ balance: newBalance })
-      .eq('user_id', userId)
-      .eq('app_id', 'nigergram');
-
-    if (updErr) throw updErr;
-    return { previous: Number(existing.balance), newBalance };
-  } else {
-    const { error: insErr } = await supabase
-      .from('app_currency_balances')
-      .insert([{ user_id: userId, app_id: 'nigergram', balance: Number(centAmount) }]);
-    if (insErr) throw insErr;
-    return { previous: 0, newBalance: Number(centAmount) };
+  const { data, error } = await supabase.rpc('credit_app_balance', params);
+  if (error) {
+    throw error;
   }
+  // data typically contains rows returned by the function. We'll return it for auditing.
+  return data;
 }
 
 // ApproveTopup: admin-only endpoint to approve or reject a topup
+// IMPORTANT: This function now requires Supabase to be configured and the credit_app_balance RPC to exist.
+// There is NO Firestore fallback for normal operation by your instruction.
 exports.approveTopup = functions.https.onRequest((req, res) => {
   return cors(req, res, async () => {
     if (req.method !== 'POST') return res.status(405).send({ error: 'Method not allowed' });
@@ -201,59 +192,26 @@ exports.approveTopup = functions.https.onRequest((req, res) => {
         throw new Error('Invalid centAmount');
       }
 
-      // If Supabase available, prefer to credit the ZTC canonical ledger there. Otherwise, fall back to Firestore.
-      if (supabase) {
-        try {
-          await creditSupabaseBalance(userId, centAmount, requestId);
-
-          // Mark request approved; ZtcWalletBridge will mirror the change into Firestore (wallets/*) and create a deposit tx.
-          await reqRef.update({ status: 'approved', approvedAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-
-          return res.status(200).send({ success: true, status: 'approved', method: 'supabase' });
-        } catch (supErr) {
-          console.error('Supabase credit failed', supErr);
-          // revert processing -> pending with note
-          await reqRef.update({ status: 'pending', updatedAt: admin.firestore.FieldValue.serverTimestamp(), adminNote: `Supabase error: ${supErr.message || supErr}` });
-          return res.status(500).send({ error: 'Failed to credit Supabase', details: String(supErr) });
-        }
+      if (!supabase) {
+        // Explicit failure: Supabase must be configured for approveTopup to work in canonical mode.
+        await reqRef.update({ status: 'pending', updatedAt: admin.firestore.FieldValue.serverTimestamp(), adminNote: 'Supabase not configured' });
+        return res.status(500).send({ error: 'Supabase not configured. ApproveTopup requires Supabase and the credit_app_balance RPC.' });
       }
 
-      // Fallback: credit Firestore directly (existing behavior)
-      await db.runTransaction(async (tx) => {
-        const walletRef = db.collection('wallets').doc(userId);
-        const walletSnap = await tx.get(walletRef);
-        const prevCents = (walletSnap.exists && walletSnap.data() && walletSnap.data().balanceCents) ? Number(walletSnap.data().balanceCents) : 0;
-        const newCents = prevCents + centAmount;
+      // Call the RPC to credit the canonical ZTC ledger. This RPC must be idempotent (we provided SQL for that).
+      try {
+        const rpcResult = await creditSupabaseBalance(userId, centAmount, requestId, adminId);
 
-        tx.set(walletRef, {
-          userId: userId,
-          balanceCents: newCents,
-          coinBalance: Math.floor(newCents / 1000),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+        // Mark request approved; ZtcWalletBridge will mirror the change into Firestore (wallets/*) and create a deposit tx.
+        await reqRef.update({ status: 'approved', approvedAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp(), adminNote: adminNote });
 
-        const txRef = db.collection('wallet_transactions').doc();
-        tx.set(txRef, {
-          type: 'deposit',
-          toUserId: userId,
-          amountCents: centAmount,
-          previousBalanceCents: prevCents,
-          newBalanceCents: newCents,
-          source: 'manual_admin_topup_firestore_fallback',
-          requestId: requestId,
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        tx.update(reqRef, {
-          status: 'approved',
-          adminId: adminId,
-          adminNote: adminNote,
-          approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      });
-
-      return res.status(200).send({ success: true, status: 'approved', method: 'firestore' });
+        return res.status(200).send({ success: true, status: 'approved', method: 'supabase', rpcResult });
+      } catch (supErr) {
+        console.error('Supabase RPC credit failed', supErr);
+        // revert processing -> pending and record note
+        await reqRef.update({ status: 'pending', updatedAt: admin.firestore.FieldValue.serverTimestamp(), adminNote: `Supabase RPC error: ${supErr.message || supErr}` });
+        return res.status(500).send({ error: 'Failed to credit Supabase via RPC', details: String(supErr) });
+      }
     } catch (err) {
       console.error('approveTopup error', err);
       if (err instanceof functions.https.HttpsError) {
