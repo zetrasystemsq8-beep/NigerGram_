@@ -54,8 +54,10 @@ class _BuyCentViewState extends State<BuyCentView> {
 
   Future<String> _idToken() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw 'Not authenticated';
-    return await user.getIdToken(true);
+    if (user == null) throw Exception('Not authenticated');
+    final token = await user.getIdToken(true);
+    if (token == null) throw Exception('Failed to obtain ID token');
+    return token;
   }
 
   String _formatNairaAmount(int cents) {
@@ -97,7 +99,7 @@ class _BuyCentViewState extends State<BuyCentView> {
     if (_requestId == null) return;
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) throw 'Not authenticated';
+      if (uid == null) throw Exception('Not authenticated');
 
       final docRef = FirebaseFirestore.instance.collection('topup_requests').doc(_requestId);
       await docRef.update({
