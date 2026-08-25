@@ -30,7 +30,7 @@ jobs:
 
       - name: Install functions dependencies
         working-directory: functions
-        run: npm ci
+        run: npm install
 
       - name: Deploy functions and Firestore rules
         run: firebase deploy --only functions,firestore:rules --non-interactive
