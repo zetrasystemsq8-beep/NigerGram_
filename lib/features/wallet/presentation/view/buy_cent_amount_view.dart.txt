@@ -1,0 +1,311 @@
+// lib/features/wallet/presentation/view/buy_cent_amount_view.dart
+//
+// Step 1 of the top-up flow: pick or enter an amount, then create the
+// topup request and move to BuyCentPaymentView for payment details.
+import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'buy_cent_payment_view.dart';
+
+class BuyCentAmountView extends StatefulWidget {
+  const BuyCentAmountView({super.key});
+
+  @override
+  State<BuyCentAmountView> createState() => _BuyCentAmountViewState();
+}
+
+class _BuyCentAmountViewState extends State<BuyCentAmountView> {
+  // Cloud Functions base URL for the "nigergram" Firebase project.
+  static const String functionsBase = 'https://us-central1-nigergram.cloudfunctions.net';
+  static const List<int> _presets = [500, 1000, 2500, 5000, 10000];
+
+  final _customController = TextEditingController();
+  int? _selectedPreset;
+  bool _isCustom = false;
+  bool _isLoading = false;
+
+  String? _accountNumber;
+  String? _accountName;
+  String? _paymentProvider;
+  int _nairaPerCent = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTopupConfig();
+  }
+
+  Future<void> _loadTopupConfig() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('config').doc('topup').get();
+      final data = doc.data();
+      if (data != null && mounted) {
+        setState(() {
+          _accountNumber = data['accountNumber'] as String?;
+          _accountName = data['accountName'] as String?;
+          _paymentProvider = data['provider'] as String?;
+          _nairaPerCent = (data['nairaPerCent'] is int)
+              ? data['nairaPerCent'] as int
+              : int.tryParse('${data['nairaPerCent']}') ?? 1;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load topup config: $e');
+    }
+  }
+
+  int get _selectedCents {
+    if (_isCustom) return int.tryParse(_customController.text) ?? 0;
+    return _selectedPreset ?? 0;
+  }
+
+  Future<String> _idToken() async {
+    try {
+      final supaToken = Supabase.instance.client.auth.currentSession?.accessToken;
+      if (supaToken != null && supaToken.isNotEmpty) return supaToken;
+    } catch (_) {
+      // ignore and fall back
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final token = await user.getIdToken(true);
+      if (token != null && token.isNotEmpty) return token;
+    }
+
+    throw Exception('Not authenticated');
+  }
+
+  Future<void> _continue() async {
+    final cents = _selectedCents;
+    if (cents <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose or enter an amount first')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final idToken = await _idToken();
+      final resp = await http.post(
+        Uri.parse('$functionsBase/createTopup'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode({'centAmount': cents}),
+      );
+
+      if (resp.statusCode != 201 && resp.statusCode != 200) {
+        throw 'Server error: ${resp.body}';
+      }
+
+      final body = jsonDecode(resp.body);
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BuyCentPaymentView(
+            requestId: body['id'] as String,
+            paymentCode: body['paymentCode'] as String,
+            centAmount: cents,
+            nairaPerCent: _nairaPerCent,
+            accountName: _accountName,
+            accountNumber: _accountNumber,
+            paymentProvider: _paymentProvider,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatCp(int cp) {
+    return cp.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+  }
+
+  @override
+  void dispose() {
+    _customController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final naira = _selectedCents * _nairaPerCent;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F14),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Fund Wallet',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'How much CP?',
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Pick an amount or enter your own',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+              ),
+              const SizedBox(height: 24),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final preset in _presets)
+                    _PresetChip(
+                      label: '${_formatCp(preset)} CP',
+                      selected: !_isCustom && _selectedPreset == preset,
+                      onTap: () => setState(() {
+                        _isCustom = false;
+                        _selectedPreset = preset;
+                        _customController.clear();
+                      }),
+                    ),
+                  _PresetChip(
+                    label: 'Other',
+                    selected: _isCustom,
+                    onTap: () => setState(() {
+                      _isCustom = true;
+                      _selectedPreset = null;
+                    }),
+                  ),
+                ],
+              ),
+              if (_isCustom) ...[
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _customController,
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                  decoration: InputDecoration(
+                    hintText: 'Enter cent amount',
+                    hintStyle: TextStyle(color: Colors.grey.shade600),
+                    filled: true,
+                    fillColor: const Color(0xFF1A1A24),
+                    suffixText: 'CP',
+                    suffixStyle: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ],
+              const Spacer(),
+              if (_selectedCents > 0)
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF0050), Color(0xFF7B0033)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${_formatCp(_selectedCents)} CP',
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '≈ ₦${_formatCp(naira)}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _continue,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF0050),
+                  disabledBackgroundColor: const Color(0xFFFF0050).withOpacity(0.4),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.4),
+                      )
+                    : const Text(
+                        'Continue',
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PresetChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PresetChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: selected
+              ? const LinearGradient(colors: [Color(0xFFFF0050), Color(0xFF7B0033)])
+              : null,
+          color: selected ? null : const Color(0xFF1A1A24),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? Colors.transparent : Colors.grey.shade800,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.grey.shade300,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+}
