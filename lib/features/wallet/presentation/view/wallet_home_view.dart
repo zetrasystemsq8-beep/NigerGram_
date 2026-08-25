@@ -5,9 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_state.dart';
-import 'package:nigergram/features/wallet/presentation/view/fund_wallet_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
-import 'package:nigergram/features/wallet/presentation/view/buy_cent_view.dart';
+import 'package:nigergram/features/wallet/presentation/view/fund_wallet_chooser_view.dart';
 
 class WalletHomeView extends StatefulWidget {
   const WalletHomeView({super.key});
@@ -218,11 +217,11 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () {
-                                  // OPEN the existing Buy Cent / Top-up flow
+                                  // OPEN the wallet-funding chooser (ZTC or Bank Transfer)
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const BuyCentView(),
+                                      builder: (context) => const FundWalletChooserView(),
                                     ),
                                   ).then((_) => _walletCubit.refresh());
                                 },
