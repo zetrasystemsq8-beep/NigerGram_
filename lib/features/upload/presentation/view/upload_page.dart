@@ -5,8 +5,6 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/media/repository/media_repository.dart';
-import 'package:nigergram/features/media/presentation/pages/advanced_video_editor_page.dart';
-import 'package:nigergram/features/media/models/video_edit_model.dart';
 import 'package:nigergram/features/gist_hub/data/services/audio_service.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/audio_post_entity.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/audio_picker_sheet.dart';
@@ -41,10 +39,6 @@ class _UploadPageState extends State<UploadPage> {
   // over their screen recording/video without appearing on camera.
   AudioPostEntity? _selectedAudio;
 
-  // Edits made in the video editor (trim/filters/etc), if the user
-  // opened it. Stored alongside the post so we know what was applied.
-  VideoEditModel? _videoEditModel;
-
   double _qualitySlider = 1.0; // 0=Low,1=Medium,2=High
 
   @override
@@ -67,37 +61,7 @@ class _UploadPageState extends State<UploadPage> {
       maxDuration: const Duration(minutes: 3),
     );
     if (picked != null) {
-      setState(() {
-        _videoFile = File(picked.path);
-        _videoEditModel = null; // reset edits for the newly picked video
-      });
-    }
-  }
-
-  Future<void> _openVideoEditor() async {
-    if (_videoFile == null) return;
-
-    final result = await Navigator.push<VideoEditModel>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AdvancedVideoEditorPage(
-          videoPath: _videoFile!.path,
-          initialEdit: _videoEditModel,
-        ),
-      ),
-    );
-
-    if (result != null) {
-      setState(() => _videoEditModel = result);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Video edited successfully'),
-            duration: Duration(seconds: 1),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      setState(() => _videoFile = File(picked.path));
     }
   }
 
@@ -187,7 +151,6 @@ class _UploadPageState extends State<UploadPage> {
         'shareCount': 0,
         'category': _selectedCategory,
         'tags': tags,
-        'videoEdits': _videoEditModel != null ? _videoEditModel.toString() : null,
         // Attached "NigerGram Audio" (if any) — stores enough to render
         // "🎙️ Original audio by @username" without a second lookup, and
         // the real audioId for the audio's own "used in X videos" page.
@@ -280,25 +243,6 @@ class _UploadPageState extends State<UploadPage> {
                     ),
                   ),
                   _buildVideoSelector(),
-                  if (_videoFile != null) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _openVideoEditor,
-                        icon: const Icon(Icons.edit, color: Colors.red, size: 18),
-                        label: Text(
-                          _videoEditModel == null ? 'Edit Video' : 'Edit Video ✓',
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.red),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 12),
                   Text('Compression quality', style: TextStyle(color: Colors.white, fontSize: 13)),
                   Slider(
@@ -474,10 +418,7 @@ class _UploadPageState extends State<UploadPage> {
             ),
             const SizedBox(height: 12),
             TextButton(
-              onPressed: () => setState(() {
-                _videoFile = null;
-                _videoEditModel = null;
-              }),
+              onPressed: () => setState(() => _videoFile = null),
               child: const Text('Change video',
                   style: TextStyle(color: Colors.red)),
             ),
