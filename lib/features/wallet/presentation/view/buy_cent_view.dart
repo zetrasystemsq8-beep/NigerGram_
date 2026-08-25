@@ -22,10 +22,45 @@ class _BuyCentViewState extends State<BuyCentView> {
   // TODO: Replace with your Cloud Functions region+domain if different
   static const String functionsBase = 'https://us-central1-<YOUR_PROJECT>.cloudfunctions.net';
 
+  // top-up config loaded from Firestore: collection 'config', doc 'topup'
+  String? _accountNumber;
+  String? _accountName;
+  String? _paymentProvider;
+  int _nairaPerCent = 1; // default conversion rate (1 Naira per cent)
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTopupConfig();
+  }
+
+  Future<void> _loadTopupConfig() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('config').doc('topup').get();
+      final data = doc.data();
+      if (data != null) {
+        setState(() {
+          _accountNumber = data['accountNumber'] as String?;
+          _accountName = data['accountName'] as String?;
+          _paymentProvider = data['provider'] as String?;
+          _nairaPerCent = (data['nairaPerCent'] is int) ? data['nairaPerCent'] as int : int.tryParse('${data['nairaPerCent']}') ?? 1;
+        });
+      }
+    } catch (e) {
+      // Non-fatal: UI will still show but without account details
+      debugPrint('Failed to load topup config: $e');
+    }
+  }
+
   Future<String> _idToken() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw 'Not authenticated';
     return await user.getIdToken(true);
+  }
+
+  String _formatNairaAmount(int cents) {
+    final naira = cents * _nairaPerCent;
+    return '₦$naira';
   }
 
   Future<void> _createTopup() async {
@@ -88,31 +123,79 @@ class _BuyCentViewState extends State<BuyCentView> {
       appBar: AppBar(title: const Text('Buy Cent')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Cent amount (e.g. 500)'),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _createTopup,
-              child: _isLoading ? const CircularProgressIndicator() : const Text('Create Payment'),
-            ),
-            const SizedBox(height: 16),
-            if (_paymentCode != null) ...[
-              SelectableText('Payment code: $_paymentCode', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Send the exact Naira amount to the Zetra account shown in Fund Wallet and include the payment code in the transfer description.'),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Cent amount (e.g. 500)'),
+              ),
               const SizedBox(height: 12),
               ElevatedButton(
-                onPressed: _markAsPaid,
-                child: const Text("I've Paid (mark for review)"),
+                onPressed: _isLoading ? null : _createTopup,
+                child: _isLoading ? const CircularProgressIndicator() : const Text('Create Payment'),
               ),
-            ]
-          ],
+              const SizedBox(height: 16),
+              if (_paymentCode != null) ...[
+                const Text('Payment details', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Card(
+                  color: const Color(0xFF0F0F14),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_paymentProvider != null)
+                          Text('Provider: $_paymentProvider', style: const TextStyle(color: Colors.white)),
+                        if (_accountName != null)
+                          Text('Account name: $_accountName', style: const TextStyle(color: Colors.white)),
+                        if (_accountNumber != null)
+                          SelectableText('Account number: $_accountNumber', style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 8),
+                        if (_amountController.text.isNotEmpty)
+                          Text('Amount to pay: ${_formatNairaAmount(int.tryParse(_amountController.text) ?? 0)}', style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 8),
+                        SelectableText('Payment code: $_paymentCode', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                        const SizedBox(height: 12),
+                        const Text('Send the exact amount to the account above and include the payment code in the transfer description.', style: TextStyle(color: Colors.white70)),
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: _markAsPaid,
+                          child: const Text("I've Paid (mark for review)"),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else ...[
+                // If paymentCode not created yet, show preview of account details so user knows where to pay
+                const Text('Payment details', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Card(
+                  color: const Color(0xFF0F0F14),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_paymentProvider != null)
+                          Text('Provider: $_paymentProvider', style: const TextStyle(color: Colors.white)),
+                        if (_accountName != null)
+                          Text('Account name: $_accountName', style: const TextStyle(color: Colors.white)),
+                        if (_accountNumber != null)
+                          SelectableText('Account number: $_accountNumber', style: const TextStyle(color: Colors.white)),
+                        const SizedBox(height: 8),
+                        Text('Payment code will be generated when you tap "Create Payment".', style: const TextStyle(color: Colors.white70)),
+                      ],
+                    ),
+                  ),
+                ),
+              ]
+            ],
+          ),
         ),
       ),
     );
