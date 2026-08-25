@@ -27,10 +27,10 @@ jobs:
       - name: Install Functions dependencies
         working-directory: functions
         run: |
-          if [ -f functions/package-lock.json ]; then
-            cd functions && npm ci
+          if [ -f package-lock.json ]; then
+            npm ci
           else
-            cd functions && npm install
+            npm install
           fi
 
       - name: Install firebase-tools (local)
