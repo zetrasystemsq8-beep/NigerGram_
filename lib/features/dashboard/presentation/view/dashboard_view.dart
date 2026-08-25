@@ -9,7 +9,6 @@ import 'package:nigergram/features/video_feed/presentation/view/video_feed_view.
 import 'package:nigergram/features/profile/presentation/view/profile_view.dart';
 import 'package:nigergram/features/gist_hub/presentation/view/gist_hub_view.dart';
 import 'package:nigergram/features/inbox/presentation/view/inbox_view.dart'; // ✅ ADD THIS
-import 'package:nigergram/features/wallet/presentation/view/wallet_home_view.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -85,7 +84,6 @@ class _DashboardViewState extends State<DashboardView> with WidgetsBindingObserv
                 const SizedBox(),
                 const InboxView(),
                 const ProfileView(),
-                const WalletHomeView(),
               ],
             ),
           ),
@@ -182,11 +180,6 @@ class _DashboardViewState extends State<DashboardView> with WidgetsBindingObserv
                           index: 4,
                           icon: Icons.person_outline_rounded,
                           label: 'Me',
-                        ),
-                        _buildNavigationTabItem(
-                          index: 5,
-                          icon: Icons.account_balance_wallet_outlined,
-                          label: 'Wallet',
                         ),
                       ],
                     ),
