@@ -1,7 +1,14 @@
 // lib/features/wallet/presentation/view/buy_cent_amount_view.dart
 //
-// Step 1 of the top-up flow: pick or enter an amount, then create the
+// Step 1 of the top-up flow: pick or enter a CP amount, then create the
 // topup request and move to BuyCentPaymentView for payment details.
+//
+// UNIT NOTE: the user picks an amount in CP (the display currency), but
+// the backend (createTopup) and the wallet's source of truth
+// (wallets/{uid}.balanceCents, see ZtcWalletBridge) both work in RAW
+// CENTS, where 1000 raw cents = 1 CP. Every value sent to the server —
+// centAmount in the request body, and the naira price preview — must be
+// in raw cents, not CP. Only on-screen labels show CP.
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -22,7 +29,9 @@ class BuyCentAmountView extends StatefulWidget {
 class _BuyCentAmountViewState extends State<BuyCentAmountView> {
   // Cloud Functions base URL for the "nigergram" Firebase project.
   static const String functionsBase = 'https://us-central1-nigergram.cloudfunctions.net';
-  static const List<int> _presets = [500, 1000, 2500, 5000, 10000];
+  static const List<int> _presets = [500, 1000, 2500, 5000, 10000]; // in CP
+  // Must match ZtcWalletBridge._centsPerUnit — 1000 raw cents = 1 CP.
+  static const int _centsPerUnit = 1000;
 
   final _customController = TextEditingController();
   int? _selectedPreset;
@@ -59,10 +68,15 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
     }
   }
 
-  int get _selectedCents {
+  /// The CP amount the user picked/typed — this is what's shown on screen.
+  int get _selectedCp {
     if (_isCustom) return int.tryParse(_customController.text) ?? 0;
     return _selectedPreset ?? 0;
   }
+
+  /// The raw-cent equivalent — this is what actually goes to the server
+  /// (createTopup's centAmount, and the naira price calculation).
+  int get _selectedRawCents => _selectedCp * _centsPerUnit;
 
   Future<String> _idToken() async {
     try {
@@ -82,8 +96,8 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
   }
 
   Future<void> _continue() async {
-    final cents = _selectedCents;
-    if (cents <= 0) {
+    final cp = _selectedCp;
+    if (cp <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Choose or enter an amount first')),
       );
@@ -99,7 +113,9 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $idToken',
         },
-        body: jsonEncode({'centAmount': cents}),
+        // Raw cents, NOT the CP amount shown on screen — matches the
+        // backend's centAmount unit (1000 raw cents = 1 CP).
+        body: jsonEncode({'centAmount': _selectedRawCents}),
       );
 
       if (resp.statusCode != 201 && resp.statusCode != 200) {
@@ -115,7 +131,7 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
           builder: (context) => BuyCentPaymentView(
             requestId: body['id'] as String,
             paymentCode: body['paymentCode'] as String,
-            centAmount: cents,
+            cpAmount: cp,
             nairaPerCent: _nairaPerCent,
             accountName: _accountName,
             accountNumber: _accountNumber,
@@ -143,7 +159,9 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
 
   @override
   Widget build(BuildContext context) {
-    final naira = _selectedCents * _nairaPerCent;
+    // Naira preview mirrors the backend's default pricing (nairaAmount
+    // defaults to centAmount * nairaPerCent, both in raw cents).
+    final naira = _selectedRawCents * _nairaPerCent;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F14),
@@ -204,7 +222,7 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
                   autofocus: true,
                   style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                   decoration: InputDecoration(
-                    hintText: 'Enter cent amount',
+                    hintText: 'Enter CP amount',
                     hintStyle: TextStyle(color: Colors.grey.shade600),
                     filled: true,
                     fillColor: const Color(0xFF1A1A24),
@@ -219,7 +237,7 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
                 ),
               ],
               const Spacer(),
-              if (_selectedCents > 0)
+              if (_selectedCp > 0)
                 Container(
                   padding: const EdgeInsets.all(18),
                   margin: const EdgeInsets.only(bottom: 16),
@@ -235,7 +253,7 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${_formatCp(_selectedCents)} CP',
+                        '${_formatCp(_selectedCp)} CP',
                         style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       Text(

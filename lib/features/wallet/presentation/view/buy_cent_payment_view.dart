@@ -4,6 +4,11 @@
 // reference code to include, let the user mark it paid, and reflect
 // live status (pending -> paid -> processing -> approved/rejected)
 // straight from the topup_requests document.
+//
+// UNIT NOTE: cpAmount is the display unit (CP). The naira price
+// preview must be computed from the RAW-CENT equivalent (1000 raw
+// cents = 1 CP, see ZtcWalletBridge), matching what the backend
+// actually charged when it created this request.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,7 +17,7 @@ import 'package:nigergram/core/utils/app_auth.dart';
 class BuyCentPaymentView extends StatefulWidget {
   final String requestId;
   final String paymentCode;
-  final int centAmount;
+  final int cpAmount;
   final int nairaPerCent;
   final String? accountName;
   final String? accountNumber;
@@ -22,7 +27,7 @@ class BuyCentPaymentView extends StatefulWidget {
     super.key,
     required this.requestId,
     required this.paymentCode,
-    required this.centAmount,
+    required this.cpAmount,
     required this.nairaPerCent,
     this.accountName,
     this.accountNumber,
@@ -34,6 +39,9 @@ class BuyCentPaymentView extends StatefulWidget {
 }
 
 class _BuyCentPaymentViewState extends State<BuyCentPaymentView> {
+  // Must match ZtcWalletBridge._centsPerUnit — 1000 raw cents = 1 CP.
+  static const int _centsPerUnit = 1000;
+
   bool _isMarking = false;
 
   Future<void> _markAsPaid() async {
@@ -88,7 +96,10 @@ class _BuyCentPaymentViewState extends State<BuyCentPaymentView> {
 
   @override
   Widget build(BuildContext context) {
-    final naira = widget.centAmount * widget.nairaPerCent;
+    // Naira price is charged on the raw-cent equivalent, not the CP
+    // amount shown to the user — matches createTopup's default pricing.
+    final rawCents = widget.cpAmount * _centsPerUnit;
+    final naira = rawCents * widget.nairaPerCent;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F14),
@@ -141,7 +152,7 @@ class _BuyCentPaymentViewState extends State<BuyCentPaymentView> {
                   _ReferenceTicket(
                     code: widget.paymentCode,
                     onCopy: _copyCode,
-                    amountLabel: '${_formatCp(widget.centAmount)} CP',
+                    amountLabel: '${_formatCp(widget.cpAmount)} CP',
                     nairaLabel: '₦${_formatCp(naira)}',
                   ),
 
