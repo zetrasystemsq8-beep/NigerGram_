@@ -31,5 +31,31 @@ jobs:
         working-directory: functions
         run: npm install
 
+      - name: Locate firebase.json (if any) and set deploy directory
+        id: find-firebase
+        run: |
+          # Try to find firebase.json in the repository
+          set -e
+          file=$(git ls-files -- "firebase.json" || true)
+          if [ -n "$file" ]; then
+            dir=$(dirname "$file")
+            echo "Found firebase.json at: $file (deploy dir: $dir)"
+            echo "FIREBASE_DIR=$dir" >> $GITHUB_ENV
+          else
+            echo "No firebase.json found in repository — Firebase configuration may be missing. Defaulting deploy directory to 'functions'." >&2
+            echo "FIREBASE_DIR=functions" >> $GITHUB_ENV
+          fi
+
       - name: Deploy Firebase Functions and Firestore Rules
-        run: firebase deploy --only functions,firestore:rules --non-interactive
+        env:
+          FIREBASE_DIR: ${{ env.FIREBASE_DIR }}
+        run: |
+          echo "Deploying from directory: ${FIREBASE_DIR:-.}"
+          if [ -d "${FIREBASE_DIR}" ]; then
+            cd "${FIREBASE_DIR}"
+          else
+            echo "WARNING: Deploy directory ${FIREBASE_DIR} does not exist; continuing from repository root" >&2
+          fi
+
+          # Run firebase deploy from the chosen directory
+          firebase deploy --only functions,firestore:rules --non-interactive
