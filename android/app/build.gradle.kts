@@ -7,6 +7,7 @@ plugins {
 
 configurations.all {
     exclude(group = "com.google.firebase", module = "firebase-iid")
+    exclude(group = "com.google.android.play", module = "core")
 }
 
 android {
@@ -59,9 +60,6 @@ android {
 dependencies {
     // Core desugaring
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-
-    // ✅ Play Core (needed for split install support)
-    implementation("com.google.android.play:core:1.10.3")
 
     // ✅ ML Kit text recognition (English/Latin only)
     implementation("com.google.mlkit:text-recognition:16.0.0")
