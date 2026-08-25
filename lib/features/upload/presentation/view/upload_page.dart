@@ -5,9 +5,16 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/media/repository/media_repository.dart';
+import 'package:nigergram/features/gist_hub/data/services/audio_service.dart';
+import 'package:nigergram/features/gist_hub/domain/entities/audio_post_entity.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/audio_picker_sheet.dart';
 
 class UploadPage extends StatefulWidget {
-  const UploadPage({super.key});
+  const UploadPage({this.initialAudio, super.key});
+
+  /// Pre-attaches a NigerGram Audio post when arriving here via the
+  /// "Use Audio" button on an audio's detail page.
+  final AudioPostEntity? initialAudio;
 
   @override
   State<UploadPage> createState() => _UploadPageState();
@@ -26,8 +33,19 @@ class _UploadPageState extends State<UploadPage> {
   ];
 
   final MediaRepository _mediaRepository = MediaRepository();
+  final AudioService _audioService = AudioService();
+
+  // Attached "NigerGram Audio" post, if any — lets a creator narrate
+  // over their screen recording/video without appearing on camera.
+  AudioPostEntity? _selectedAudio;
 
   double _qualitySlider = 1.0; // 0=Low,1=Medium,2=High
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedAudio = widget.initialAudio;
+  }
 
   @override
   void dispose() {
@@ -45,6 +63,17 @@ class _UploadPageState extends State<UploadPage> {
     if (picked != null) {
       setState(() => _videoFile = File(picked.path));
     }
+  }
+
+  Future<void> _openAudioPicker() async {
+    final picked = await AudioPickerSheet.show(context);
+    if (picked != null) {
+      setState(() => _selectedAudio = picked);
+    }
+  }
+
+  void _removeSelectedAudio() {
+    setState(() => _selectedAudio = null);
   }
 
   Future<void> _uploadVideo() async {
@@ -67,6 +96,14 @@ class _UploadPageState extends State<UploadPage> {
     try {
       final user = AppAuth.currentUser;
       if (user == null) return;
+
+      // Re-verify the attached audio is still usable right before
+      // publishing (permissions could have changed since it was
+      // picked) and record the use. Throws if no longer allowed —
+      // caught below, publish aborted.
+      if (_selectedAudio != null) {
+        await _audioService.registerAudioUse(_selectedAudio!.id);
+      }
 
       setState(() => _uploadProgress = 0.05);
 
@@ -114,6 +151,12 @@ class _UploadPageState extends State<UploadPage> {
         'shareCount': 0,
         'category': _selectedCategory,
         'tags': tags,
+        // Attached "NigerGram Audio" (if any) — stores enough to render
+        // "🎙️ Original audio by @username" without a second lookup, and
+        // the real audioId for the audio's own "used in X videos" page.
+        'audioId': _selectedAudio?.id,
+        'audioTitle': _selectedAudio?.title,
+        'audioCreatorUsername': _selectedAudio?.creatorUsername,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -216,6 +259,8 @@ class _UploadPageState extends State<UploadPage> {
                   _buildTagsField(),
                   const SizedBox(height: 16),
                   _buildCategorySelector(),
+                  const SizedBox(height: 20),
+                  _buildAudioSection(),
                   const SizedBox(height: 32),
                   _buildPostButton(),
                   const SizedBox(height: 32),
@@ -234,6 +279,71 @@ class _UploadPageState extends State<UploadPage> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildAudioSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Voice Narration (Optional)',
+          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Attach a NigerGram Audio recording — great for explaining a screen recording without appearing on camera.',
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+        ),
+        const SizedBox(height: 10),
+        if (_selectedAudio != null)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade900,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.graphic_eq_rounded, color: Colors.red),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedAudio!.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                      Text(
+                        '🎙️ Original audio by @${_selectedAudio!.creatorUsername}',
+                        style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close_rounded, color: Colors.grey.shade500, size: 18),
+                  onPressed: _removeSelectedAudio,
+                ),
+              ],
+            ),
+          )
+        else
+          OutlinedButton.icon(
+            onPressed: _openAudioPicker,
+            icon: const Icon(Icons.mic_rounded, color: Colors.red, size: 18),
+            label: const Text('Attach NigerGram Audio', style: TextStyle(color: Colors.red)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.red),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+      ],
     );
   }
 
