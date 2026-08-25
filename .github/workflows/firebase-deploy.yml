@@ -1,43 +1,31 @@
-name: Firebase Deploy
+name: Deploy Firestore Rules
 
 on:
   workflow_dispatch:
 
 jobs:
   deploy:
-    name: Deploy Firebase Functions and Firestore Rules
+    name: Deploy Firestore Rules
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node.js 24
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      - name: Configure Google service account credentials
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Configure Google credentials
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: |
-          echo "$GCP_SA_KEY" > "$GITHUB_WORKSPACE/firebase-service-account.json"
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$GITHUB_WORKSPACE/firebase-service-account.json" >> "$GITHUB_ENV"
+          echo "$GCP_SA_KEY" > "$RUNNER_TEMP/firebase-key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-key.json" >> "$GITHUB_ENV"
 
-      - name: Install Functions dependencies
-        working-directory: functions
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
-
-      - name: Install firebase-tools (local)
-        run: npm install firebase-tools --no-save
-
-      - name: Deploy Firebase Functions and Firestore Rules
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
-        run: npx firebase-tools deploy --only functions,firestore:rules --non-interactive
+      - name: Deploy Firestore Rules
+        run: firebase deploy --only firestore:rules --project nigergram --non-interactive
