@@ -21,6 +21,7 @@ class _UsernameAuthPageState extends State<UsernameAuthPage> {
   bool _isSignUpMode = true;
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   String? _errorText;
 
   @override
@@ -60,6 +61,23 @@ class _UsernameAuthPageState extends State<UsernameAuthPage> {
       setState(() => _errorText = '$e'.replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _submitGoogle() async {
+    setState(() {
+      _errorText = null;
+      _isGoogleLoading = true;
+    });
+    try {
+      await _service.signInWithGoogle();
+      if (mounted) {
+        context.go(RouterEnum.dashboardView.routeName);
+      }
+    } catch (e) {
+      setState(() => _errorText = '$e'.replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
 
@@ -109,7 +127,43 @@ class _UsernameAuthPageState extends State<UsernameAuthPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
+
+                // Google button — works for both sign up and log in,
+                // same flow either way.
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: _isGoogleLoading ? null : _submitGoogle,
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    icon: _isGoogleLoading
+                        ? const SizedBox(
+                            width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.g_mobiledata_rounded, color: Colors.black87, size: 26),
+                    label: Text(
+                      _isGoogleLoading ? 'Signing in...' : 'Continue with Google',
+                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('or', style: TextStyle(color: NGColors.textMuted, fontSize: 12)),
+                    ),
+                    Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
+                  ],
+                ),
+                const SizedBox(height: 20),
 
                 // Mode toggle
                 Container(
@@ -169,7 +223,7 @@ class _UsernameAuthPageState extends State<UsernameAuthPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
 
                 Expanded(
                   child: SingleChildScrollView(
@@ -232,10 +286,6 @@ class _UsernameAuthPageState extends State<UsernameAuthPage> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        Text(
-                          'Gmail sign-in coming soon',
-                          style: TextStyle(color: NGColors.textMuted, fontSize: 12),
-                        ),
                       ],
                     ),
                   ),
