@@ -1,3 +1,4 @@
+// lib/features/wallet/presentation/view/wallet_home_view.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +7,7 @@ import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_state.dart';
 import 'package:nigergram/features/wallet/presentation/view/fund_wallet_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
+import 'package:nigergram/features/wallet/presentation/view/buy_cent_view.dart';
 
 class WalletHomeView extends StatefulWidget {
   const WalletHomeView({super.key});
@@ -32,7 +34,7 @@ class _WalletHomeViewState extends State<WalletHomeView> {
   }
 
   String _formatCp(int cp) {
-    return cp.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+    return cp.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+\$)'), (m) => '${m[1]},');
   }
 
   String _formatCent(int cent) {
@@ -216,10 +218,11 @@ class _WalletHomeViewState extends State<WalletHomeView> {
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () {
+                                  // OPEN the existing Buy Cent / Top-up flow
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const FundWalletView(),
+                                      builder: (context) => const BuyCentView(),
                                     ),
                                   ).then((_) => _walletCubit.refresh());
                                 },
