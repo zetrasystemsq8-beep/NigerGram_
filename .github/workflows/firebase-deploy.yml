@@ -1,11 +1,11 @@
-name: Firebase Deploy
+name: Firebase Deploy (ADC)
 
 on:
   workflow_dispatch:
 
 jobs:
   deploy:
-    name: Deploy Firebase functions and Firestore rules
+    name: Deploy Firebase functions and Firestore rules (ADC)
     runs-on: ubuntu-latest
 
     steps:
@@ -20,11 +20,17 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools@latest
 
+      - name: Configure Google service account credentials
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          # write the JSON key to a file and expose it as ADC for subsequent steps
+          echo "$GCP_SA_KEY" > $GITHUB_WORKSPACE/firebase-service-account.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$GITHUB_WORKSPACE/firebase-service-account.json" >> $GITHUB_ENV
+
       - name: Install functions dependencies
         working-directory: functions
         run: npm ci
 
       - name: Deploy functions and Firestore rules
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: firebase deploy --only functions,firestore:rules --non-interactive
