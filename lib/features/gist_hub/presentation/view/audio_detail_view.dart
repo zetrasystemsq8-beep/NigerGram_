@@ -10,7 +10,7 @@ import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/gist_hub/data/services/audio_service.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/audio_post_entity.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/report_audio_sheet.dart';
-import 'package:nigergram/features/media/presentation/pages/professional_upload_page.dart';
+import 'package:nigergram/features/upload/presentation/view/upload_page.dart';
 
 /// Each audio's own page — Zetra logo cover art, title, creator
 /// attribution, use count, preview playback, Use/Save/Share/Download
@@ -72,10 +72,10 @@ class _AudioDetailViewState extends State<AudioDetailView> {
     }
 
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ProfessionalUploadPage(initialAudio: post),
-      ),
-    );
+  MaterialPageRoute(
+    builder: (_) => UploadPage(initialAudio: post),
+  ),
+);
   }
 
   Future<void> _saveAudio(AudioPostEntity post) async {
