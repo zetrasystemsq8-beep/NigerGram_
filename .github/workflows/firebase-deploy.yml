@@ -12,13 +12,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Use Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools@latest
+          node-version: '24'
 
       - name: Configure Google service account credentials
         env:
@@ -29,33 +26,18 @@ jobs:
 
       - name: Install Functions dependencies
         working-directory: functions
-        run: npm install
-
-      - name: Locate firebase.json (if any) and set deploy directory
-        id: find-firebase
         run: |
-          # Try to find firebase.json in the repository
-          set -e
-          file=$(git ls-files -- "firebase.json" || true)
-          if [ -n "$file" ]; then
-            dir=$(dirname "$file")
-            echo "Found firebase.json at: $file (deploy dir: $dir)"
-            echo "FIREBASE_DIR=$dir" >> $GITHUB_ENV
+          if [ -f functions/package-lock.json ]; then
+            cd functions && npm ci
           else
-            echo "No firebase.json found in repository — Firebase configuration may be missing. Defaulting deploy directory to 'functions'." >&2
-            echo "FIREBASE_DIR=functions" >> $GITHUB_ENV
+            cd functions && npm install
           fi
+
+      - name: Install firebase-tools (local)
+        run: npm install firebase-tools --no-save
 
       - name: Deploy Firebase Functions and Firestore Rules
         env:
-          FIREBASE_DIR: ${{ env.FIREBASE_DIR }}
-        run: |
-          echo "Deploying from directory: ${FIREBASE_DIR:-.}"
-          if [ -d "${FIREBASE_DIR}" ]; then
-            cd "${FIREBASE_DIR}"
-          else
-            echo "WARNING: Deploy directory ${FIREBASE_DIR} does not exist; continuing from repository root" >&2
-          fi
-
-          # Run firebase deploy from the chosen directory
-          firebase deploy --only functions,firestore:rules --non-interactive
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
+        run: npx firebase-tools deploy --only functions,firestore:rules --non-interactive
