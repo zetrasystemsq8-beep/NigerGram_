@@ -32,9 +32,9 @@ class _WalletHomeViewState extends State<WalletHomeView> {
     setState(() => _isRefreshing = false);
   }
 
-  String _formatCp(int cp) {
-    return cp.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+\$)'), (m) => '${m[1]},');
-  }
+String _formatCp(int cp) {
+  return cp.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+}
 
   String _formatCent(int cent) {
     return cent.toString().padLeft(3, '0');
