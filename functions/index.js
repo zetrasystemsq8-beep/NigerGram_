@@ -22,10 +22,35 @@ async function verifyToken(req) {
   const auth = req.get('Authorization') || req.get('authorization');
   if (!auth || !auth.startsWith('Bearer ')) throw { status: 401, message: 'Missing Authorization' };
   const idToken = auth.split('Bearer ')[1];
+  // First try Firebase token verification
   try {
     return await admin.auth().verifyIdToken(idToken);
   } catch (e) {
-    throw { status: 401, message: 'Invalid token' };
+    // If Firebase verification fails, try Supabase token (access token) if configured
+    if (!supabase) {
+      throw { status: 401, message: 'Invalid token' };
+    }
+    try {
+      // supabase.auth.getUser expects an access token
+      const result = await supabase.auth.getUser(idToken);
+      if (result.error) {
+        throw result.error;
+      }
+      const user = result.data?.user;
+      if (!user) throw new Error('Supabase user not found');
+
+      // Map Supabase user to a token-like object expected by callers
+      const mapped = {
+        uid: user.id,
+        // Attempt to detect an admin flag in common metadata locations
+        admin: (user.user_metadata && (user.user_metadata.admin === true || user.user_metadata.isAdmin === true)) 
+                || (user.app_metadata && (user.app_metadata.admin === true || user.app_metadata.role === 'admin'))
+      };
+      return mapped;
+    } catch (supErr) {
+      console.error('Token verification failed:', supErr);
+      throw { status: 401, message: 'Invalid token' };
+    }
   }
 }
 
