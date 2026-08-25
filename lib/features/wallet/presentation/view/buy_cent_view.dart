@@ -21,8 +21,9 @@ class _BuyCentViewState extends State<BuyCentView> {
   String? _paymentCode;
   String? _requestId;
 
-  // TODO: Replace with your Cloud Functions region+domain if different
-  static const String functionsBase = 'https://us-central1-<YOUR_PROJECT>.cloudfunctions.net';
+  // Cloud Functions base URL for the "nigergram" Firebase project
+  // (region: us-central1 — matches functions deployment region).
+  static const String functionsBase = 'https://us-central1-nigergram.cloudfunctions.net';
 
   // top-up config loaded from Firestore: collection 'config', doc 'topup'
   String? _accountNumber;
