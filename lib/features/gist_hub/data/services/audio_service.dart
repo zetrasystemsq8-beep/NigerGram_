@@ -9,10 +9,6 @@ class AudioService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  /// Categories for the discovery tab: 'trending', 'rising', 'idea',
-  /// 'educational', 'motivation', 'original'. 'trending' and 'rising'
-  /// both pull from the whole collection sorted differently; the rest
-  /// filter by the `category` field.
   Stream<List<AudioPostEntity>> getAudioFeedStream({required String filter}) {
     Query<Map<String, dynamic>> query = _firestore.collection('audio_posts');
 
@@ -49,10 +45,6 @@ class AudioService {
         .asBroadcastStream();
   }
 
-  /// Innovation posts (from the `innovations` collection, where the
-  /// video-upload flow actually writes) that used this audio, most
-  /// recent first. Matches the 'innovations' collection name used by
-  /// ProfessionalUploadPage — not a separate 'videos' collection.
   Stream<List<Map<String, dynamic>>> getVideosUsingAudioStream(String audioId) {
     return _firestore
         .collection('innovations')
@@ -116,9 +108,6 @@ class AudioService {
     return AudioPostEntity.fromMap(snap.data()!, snap.id);
   }
 
-  /// Called right before a user attaches this audio to a new video post.
-  /// Throws if they're not allowed to use it. On success, increments
-  /// useCount and trendingScore so popular audio surfaces in discovery.
   Future<void> registerAudioUse(String audioId) async {
     final userId = AppAuth.uid;
     if (userId.isEmpty) throw Exception('Not logged in');
@@ -174,5 +163,16 @@ class AudioService {
       'createdAt': FieldValue.serverTimestamp(),
       'status': 'pending',
     });
+  }
+
+  /// Saves an audio post to the current user's personal library —
+  /// used by the "Save" button on the audio detail page.
+  Future<void> saveAudioForCurrentUser(String audioId) async {
+    final userId = AppAuth.uid;
+    if (userId.isEmpty) throw Exception('Not logged in');
+
+    await _firestore.collection('users').doc(userId).set({
+      'savedAudioIds': FieldValue.arrayUnion([audioId]),
+    }, SetOptions(merge: true));
   }
 }
