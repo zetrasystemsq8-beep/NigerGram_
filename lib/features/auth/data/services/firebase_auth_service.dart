@@ -9,10 +9,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// CP ledger, and Crucible/Tribunal — everything already built on
 /// Supabase's auth.uid() — keep working unchanged). AppAuth keeps
 /// reading from Supabase exactly as before; nothing downstream needs to
-/// change. The Google bridge needs zero Supabase Console configuration —
-/// it's a plain email+password shadow account, created and signed into
-/// purely in code, using the Firebase UID as an internal-only password
-/// the user never sees or types.
+/// change.
+///
+/// IMPORTANT: the shared Supabase project has an on_auth_user_created
+/// trigger (handle_new_user) that fires on every new auth.users row
+/// across the whole Zetra ecosystem, not just ZetraMail — it builds a
+/// zetramail-style profile row and requires raw_user_meta_data->>'username'
+/// to be present. Every signUp call here MUST pass `data: {'username': ...}`
+/// or that trigger throws and the entire signup transaction rolls back
+/// (including the wallet-creation trigger that runs alongside it).
 class FirebaseAuthService {
   final fb.FirebaseAuth _firebaseAuth = fb.FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
@@ -36,6 +41,7 @@ class FirebaseAuthService {
     if (password.length < 6) throw Exception('Password must be at least 6 characters');
 
     final email = _syntheticEmail(cleanUsername);
+    final resolvedDisplayName = displayName?.trim().isNotEmpty == true ? displayName!.trim() : cleanUsername;
 
     final fbCredential = await _firebaseAuth.createUserWithEmailAndPassword(
       email: email,
@@ -43,7 +49,14 @@ class FirebaseAuthService {
     );
 
     try {
-      final supabaseResponse = await _supabase.auth.signUp(email: email, password: password);
+      final supabaseResponse = await _supabase.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'username': cleanUsername,
+          'full_name': resolvedDisplayName,
+        },
+      );
       final supabaseUid = supabaseResponse.user?.id;
 
       if (supabaseUid == null) {
@@ -52,7 +65,7 @@ class FirebaseAuthService {
 
       await _firestore.collection('users').doc(fbCredential.user!.uid).set({
         'username': cleanUsername,
-        'displayName': displayName?.trim().isNotEmpty == true ? displayName!.trim() : cleanUsername,
+        'displayName': resolvedDisplayName,
         'profilePicUrl': '',
         'authMethod': 'username_password',
         'supabaseUid': supabaseUid,
@@ -117,22 +130,38 @@ class FirebaseAuthService {
     final bridgePassword = fbUser.uid;
     final email = fbUser.email!;
 
+    // Figure out up front whether this is a brand-new NigerGram user and,
+    // if so, what username to use — we need this BEFORE the Supabase
+    // signUp call, since it has to go in as metadata for the trigger.
+    final userDoc = _firestore.collection('users').doc(fbUser.uid);
+    final existing = await userDoc.get();
+    final isNewUser = !existing.exists;
+
+    String? usernameForNewAccount;
+    if (isNewUser) {
+      usernameForNewAccount = await _uniqueUsernameFromEmail(email);
+    }
+
     try {
       await _supabase.auth.signInWithPassword(email: email, password: bridgePassword);
     } catch (_) {
       // No shadow account yet — first time this Google account has
-      // signed into NigerGram. Create it.
-      await _supabase.auth.signUp(email: email, password: bridgePassword);
+      // signed into NigerGram. Create it, with the username metadata
+      // the shared profile-creation trigger requires.
+      await _supabase.auth.signUp(
+        email: email,
+        password: bridgePassword,
+        data: {
+          'username': usernameForNewAccount ?? email.split('@').first,
+          'full_name': fbUser.displayName,
+        },
+      );
     }
 
-    final userDoc = _firestore.collection('users').doc(fbUser.uid);
-    final existing = await userDoc.get();
-
-    if (!existing.exists) {
-      final suggestedUsername = await _uniqueUsernameFromEmail(email);
+    if (isNewUser) {
       await userDoc.set({
-        'username': suggestedUsername,
-        'displayName': fbUser.displayName ?? suggestedUsername,
+        'username': usernameForNewAccount,
+        'displayName': fbUser.displayName ?? usernameForNewAccount,
         'profilePicUrl': fbUser.photoURL ?? '',
         'authMethod': 'google',
         'supabaseUid': _supabase.auth.currentUser?.id,
