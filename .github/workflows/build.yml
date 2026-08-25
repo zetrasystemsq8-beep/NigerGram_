@@ -92,17 +92,6 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
 
-      - name: Print SHA-1 and SHA-256 fingerprints (for Firebase Google Sign-In setup)
-        continue-on-error: true
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          echo "===== COPY THE SHA1 AND SHA256 LINES BELOW INTO FIREBASE CONSOLE ====="
-          keytool -list -v -keystore android/app/release.keystore -alias "$KEY_ALIAS" -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" | grep -E "SHA1:|SHA256:"
-          echo "========================================================================"
-
       - name: Build APK
         env:
           KEYSTORE_PATH: release.keystore
