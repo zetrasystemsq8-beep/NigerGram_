@@ -205,10 +205,12 @@ class _AudioDetailViewState extends State<AudioDetailView> {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: NGColors.accent.withOpacity(0.2)),
                   ),
-                  child: Image.asset(
-                    _logoAsset,
-                    fit: BoxFit.contain,
+                  child: Padding(
                     padding: const EdgeInsets.all(16),
+                    child: Image.asset(
+                      _logoAsset,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ),
