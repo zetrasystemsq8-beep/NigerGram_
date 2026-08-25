@@ -1,15 +1,12 @@
 name: one-time-create-topup-config
-on:
-  push:
-    paths:
-      - .github/workflows/one-time-topup.yml
 
-permissions:
-  contents: write
+on:
+  workflow_dispatch:
 
 jobs:
   create-topup-config:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,15 +16,20 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ] || [ -f package.json ]; then
-            npm ci
-          fi
-
-      - name: Run create_topup_config
+      - name: Configure Google credentials
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-          PROJECT_ID: nigergram
         run: |
-          node scripts/create_topup_config.js
+          echo "$GCP_SA_KEY" > "$RUNNER_TEMP/firebase-key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-key.json" >> "$GITHUB_ENV"
+
+      - name: Install Firebase Admin SDK
+        run: npm install firebase-admin --no-save --no-package-lock
+
+      - name: Verify Firebase Admin SDK
+        run: node -e "console.log(require.resolve('firebase-admin'))"
+
+      - name: Create /config/topup
+        env:
+          PROJECT_ID: nigergram
+        run: node scripts/create_topup_config.js
