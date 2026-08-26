@@ -76,17 +76,17 @@ class _AudioDetailViewState extends State<AudioDetailView> {
     super.dispose();
   }
 
-  Future<void> _togglePlayback(String audioUrl) async {
+  Future<void> _togglePlayback(AudioPostEntity post) async {
     if (_isPlaying) {
       await _previewPlayer.pause();
       setState(() => _isPlaying = false);
     } else {
-      if (_position == Duration.zero) {
-        await _previewPlayer.play(UrlSource(audioUrl));
-        await _previewPlayer.setPlaybackRate(_speed);
-      } else {
-        await _previewPlayer.resume();
+      final atStart = _position <= post.trimStart || _position >= post.trimEnd;
+      await _previewPlayer.play(UrlSource(post.audioUrl));
+      if (atStart) {
+        await _previewPlayer.seek(post.trimStart);
       }
+      await _previewPlayer.setPlaybackRate(_speed);
       setState(() => _isPlaying = true);
     }
   }
