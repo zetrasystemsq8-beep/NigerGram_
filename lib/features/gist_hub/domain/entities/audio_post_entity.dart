@@ -1,5 +1,5 @@
 // lib/features/gist_hub/domain/entities/audio_post_entity.dart
-
+import 'package:flutter/material.dart';
 enum AudioPermission { private, approvedUsers, public }
 
 enum AudioCategory { educational, idea, motivation, story, original }
@@ -23,6 +23,35 @@ String audioPermissionToString(AudioPermission permission) {
       return 'public';
     case AudioPermission.private:
       return 'private';
+  }
+}
+Color audioCategoryColor(AudioCategory category) {
+  switch (category) {
+    case AudioCategory.idea:
+      return const Color(0xFFFFC107);
+    case AudioCategory.motivation:
+      return const Color(0xFFFF5252);
+    case AudioCategory.story:
+      return const Color(0xFF9C27B0);
+    case AudioCategory.original:
+      return const Color(0xFF00C853);
+    case AudioCategory.educational:
+      return const Color(0xFF2196F3);
+  }
+}
+
+String audioCategoryEmoji(AudioCategory category) {
+  switch (category) {
+    case AudioCategory.idea:
+      return '💡';
+    case AudioCategory.motivation:
+      return '🔥';
+    case AudioCategory.story:
+      return '📖';
+    case AudioCategory.original:
+      return '🎙️';
+    case AudioCategory.educational:
+      return '📚';
   }
 }
 
