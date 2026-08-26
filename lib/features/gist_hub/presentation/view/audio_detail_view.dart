@@ -1,4 +1,5 @@
 // lib/features/gist_hub/presentation/view/audio_detail_view.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:dio/dio.dart';
@@ -12,9 +13,11 @@ import 'package:nigergram/features/gist_hub/domain/entities/audio_post_entity.da
 import 'package:nigergram/features/gist_hub/presentation/widgets/report_audio_sheet.dart';
 import 'package:nigergram/features/upload/presentation/view/upload_page.dart';
 
+const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
 /// Each audio's own page — Zetra logo cover art, title, creator
-/// attribution, use count, preview playback, Use/Save/Share/Download
-/// actions, and the list of innovation posts that used this audio.
+/// attribution, use count, full playback controls (seek + speed),
+/// Use/Save/Share/Download actions, and videos that used this audio.
 class AudioDetailView extends StatefulWidget {
   const AudioDetailView({required this.audioId, super.key});
 
@@ -32,6 +35,15 @@ class _AudioDetailViewState extends State<AudioDetailView> {
   bool _isPlaying = false;
   bool _isDownloading = false;
 
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+  double _speed = 1.0;
+  bool _isSeeking = false;
+
+  StreamSubscription<Duration>? _durationSub;
+  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<void>? _completeSub;
+
   late final Stream<AudioPostEntity?> _postStream;
   late final Stream<List<Map<String, dynamic>>> _usedInStream;
 
@@ -41,25 +53,52 @@ class _AudioDetailViewState extends State<AudioDetailView> {
     _postStream = _service.getAudioPostStream(widget.audioId);
     _usedInStream = _service.getVideosUsingAudioStream(widget.audioId);
 
-    _previewPlayer.onPlayerComplete.listen((_) {
-      if (mounted) setState(() => _isPlaying = false);
+    _durationSub = _previewPlayer.onDurationChanged.listen((d) {
+      if (mounted) setState(() => _duration = d);
+    });
+    _positionSub = _previewPlayer.onPositionChanged.listen((p) {
+      if (mounted && !_isSeeking) setState(() => _position = p);
+    });
+    _completeSub = _previewPlayer.onPlayerComplete.listen((_) {
+      if (mounted) setState(() {
+        _isPlaying = false;
+        _position = Duration.zero;
+      });
     });
   }
 
   @override
   void dispose() {
+    _durationSub?.cancel();
+    _positionSub?.cancel();
+    _completeSub?.cancel();
     _previewPlayer.dispose();
     super.dispose();
   }
 
-  Future<void> _togglePreview(String audioUrl) async {
+  Future<void> _togglePlayback(String audioUrl) async {
     if (_isPlaying) {
       await _previewPlayer.pause();
       setState(() => _isPlaying = false);
     } else {
-      await _previewPlayer.play(UrlSource(audioUrl));
+      if (_position == Duration.zero) {
+        await _previewPlayer.play(UrlSource(audioUrl));
+        await _previewPlayer.setPlaybackRate(_speed);
+      } else {
+        await _previewPlayer.resume();
+      }
       setState(() => _isPlaying = true);
     }
+  }
+
+  Future<void> _seekTo(Duration target) async {
+    await _previewPlayer.seek(target);
+    setState(() => _position = target);
+  }
+
+  Future<void> _changeSpeed(double speed) async {
+    setState(() => _speed = speed);
+    await _previewPlayer.setPlaybackRate(speed);
   }
 
   Future<void> _useAudio(AudioPostEntity post) async {
@@ -72,10 +111,10 @@ class _AudioDetailViewState extends State<AudioDetailView> {
     }
 
     Navigator.of(context).push(
-  MaterialPageRoute(
-    builder: (_) => UploadPage(initialAudio: post),
-  ),
-);
+      MaterialPageRoute(
+        builder: (_) => UploadPage(initialAudio: post),
+      ),
+    );
   }
 
   Future<void> _saveAudio(AudioPostEntity post) async {
@@ -100,18 +139,6 @@ class _AudioDetailViewState extends State<AudioDetailView> {
     );
   }
 
-  /// Downloads the audio and hands it to the OS share sheet so the user
-  /// can save it wherever they want (Files, Downloads, Drive, WhatsApp,
-  /// etc). This deliberately does NOT write directly to the public
-  /// Downloads folder — on Android 11+ (API 30+), requestLegacyExternalStorage
-  /// in the manifest is ignored entirely regardless of what's declared
-  /// there, so a raw File write to /storage/emulated/0/Download silently
-  /// fails or throws on any modern phone. Writing to the app's own
-  /// private external storage instead needs zero permissions on any
-  /// Android version, and routing through the native share sheet is the
-  /// standard, reliable way to let the user actually save the result —
-  /// most Android file managers/share sheets include a "Save to
-  /// Downloads"/"Save to Files" target automatically.
   Future<void> _downloadAudio(AudioPostEntity post) async {
     setState(() => _isDownloading = true);
 
@@ -124,8 +151,6 @@ class _AudioDetailViewState extends State<AudioDetailView> {
       final bytes = response.data;
       if (bytes == null) throw Exception('No data received');
 
-      // App-private storage — writable with zero permissions on every
-      // Android version, no scoped-storage restrictions apply here.
       final dir = await getTemporaryDirectory();
       final safeTitle = post.title.replaceAll(RegExp(r'[^\w\s-]'), '').trim();
       final fileName = '${safeTitle.isEmpty ? 'nigergram_audio' : safeTitle}.m4a';
@@ -157,9 +182,9 @@ class _AudioDetailViewState extends State<AudioDetailView> {
     }
   }
 
-  String _formatDuration(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
@@ -192,6 +217,11 @@ class _AudioDetailViewState extends State<AudioDetailView> {
             );
           }
 
+          final totalMs = _duration.inMilliseconds > 0 ? _duration.inMilliseconds : post.durationSeconds * 1000;
+          final sliderMax = totalMs > 0 ? totalMs.toDouble() : 1.0;
+          final sliderValue = _position.inMilliseconds.clamp(0, totalMs).toDouble();
+          final color = audioCategoryColor(post.category);
+
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
@@ -203,33 +233,11 @@ class _AudioDetailViewState extends State<AudioDetailView> {
                   decoration: BoxDecoration(
                     color: NGColors.surface,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: NGColors.accent.withOpacity(0.2)),
+                    border: Border.all(color: color.withOpacity(0.3)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Image.asset(
-                      _logoAsset,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Center(
-                child: GestureDetector(
-                  onTap: () => _togglePreview(post.audioUrl),
-                  child: Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: NGColors.accent.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      color: NGColors.accent,
-                      size: 34,
-                    ),
+                    child: Image.asset(_logoAsset, fit: BoxFit.contain),
                   ),
                 ),
               ),
@@ -247,11 +255,93 @@ class _AudioDetailViewState extends State<AudioDetailView> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Used in ${post.useCount} videos · ${_formatDuration(post.durationSeconds)}',
+                'Used in ${post.useCount} videos',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: NGColors.textMuted, fontSize: 12),
               ),
+              const SizedBox(height: 20),
+
+              // Playback controls: play/pause + seek bar
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => _togglePlayback(post.audioUrl),
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(color: color.withOpacity(0.15), shape: BoxShape.circle),
+                      child: Icon(
+                        _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        color: color,
+                        size: 30,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: color,
+                        inactiveTrackColor: NGColors.surface,
+                        thumbColor: color,
+                        overlayColor: color.withOpacity(0.2),
+                        trackHeight: 3,
+                      ),
+                      child: Slider(
+                        value: sliderValue.clamp(0.0, sliderMax),
+                        max: sliderMax,
+                        onChangeStart: (_) => setState(() => _isSeeking = true),
+                        onChanged: (v) => setState(() => _position = Duration(milliseconds: v.toInt())),
+                        onChangeEnd: (v) async {
+                          await _seekTo(Duration(milliseconds: v.toInt()));
+                          setState(() => _isSeeking = false);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 64, right: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(_formatDuration(_position), style: TextStyle(color: NGColors.textMuted, fontSize: 11)),
+                    Text(_formatDuration(_duration), style: TextStyle(color: NGColors.textMuted, fontSize: 11)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Speed control
+              Center(
+                child: Wrap(
+                  spacing: 8,
+                  children: _speedOptions.map((speed) {
+                    final selected = speed == _speed;
+                    return GestureDetector(
+                      onTap: () => _changeSpeed(speed),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: selected ? color : NGColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          '${speed}x',
+                          style: TextStyle(
+                            color: selected ? Colors.white : NGColors.textMuted,
+                            fontSize: 12,
+                            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
               const SizedBox(height: 24),
+
               Row(
                 children: [
                   Expanded(
