@@ -1,20 +1,17 @@
 // lib/features/wallet/presentation/view/buy_cent_amount_view.dart
 //
 // Step 1 of the top-up flow: pick or enter a CP amount, then create the
-// topup request and move to BuyCentPaymentView for payment details.
+// topup request via Supabase and move to BuyCentPaymentView for payment
+// details.
 //
 // UNIT NOTE: the user picks an amount in CP (the display currency), but
-// the backend (createTopup) and the wallet's source of truth
+// the backend RPC and the wallet's source of truth
 // (wallets/{uid}.balanceCents, see ZtcWalletBridge) both work in RAW
 // CENTS, where 1000 raw cents = 1 CP. Every value sent to the server —
-// centAmount in the request body, and the naira price preview — must be
+// p_cent_amount in the RPC call, and the naira price preview — must be
 // in raw cents, not CP. Only on-screen labels show CP.
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'buy_cent_payment_view.dart';
@@ -27,8 +24,6 @@ class BuyCentAmountView extends StatefulWidget {
 }
 
 class _BuyCentAmountViewState extends State<BuyCentAmountView> {
-  // Cloud Functions base URL for the "nigergram" Firebase project.
-  static const String functionsBase = 'https://us-central1-nigergram.cloudfunctions.net';
   static const List<int> _presets = [500, 1000, 2500, 5000, 10000]; // in CP
   // Must match ZtcWalletBridge._centsPerUnit — 1000 raw cents = 1 CP.
   static const int _centsPerUnit = 1000;
@@ -75,25 +70,8 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
   }
 
   /// The raw-cent equivalent — this is what actually goes to the server
-  /// (createTopup's centAmount, and the naira price calculation).
+  /// (the RPC's p_cent_amount, and the naira price calculation).
   int get _selectedRawCents => _selectedCp * _centsPerUnit;
-
-  Future<String> _idToken() async {
-    try {
-      final supaToken = Supabase.instance.client.auth.currentSession?.accessToken;
-      if (supaToken != null && supaToken.isNotEmpty) return supaToken;
-    } catch (_) {
-      // ignore and fall back
-    }
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final token = await user.getIdToken(true);
-      if (token != null && token.isNotEmpty) return token;
-    }
-
-    throw Exception('Not authenticated');
-  }
 
   Future<void> _continue() async {
     final cp = _selectedCp;
@@ -106,31 +84,23 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
 
     setState(() => _isLoading = true);
     try {
-      final idToken = await _idToken();
-      final resp = await http.post(
-        Uri.parse('$functionsBase/createTopup'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $idToken',
-        },
-        // Raw cents, NOT the CP amount shown on screen — matches the
-        // backend's centAmount unit (1000 raw cents = 1 CP).
-        body: jsonEncode({'centAmount': _selectedRawCents}),
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) throw 'Not authenticated';
+
+      final result = await Supabase.instance.client.rpc(
+        'create_nigergram_cent_purchase',
+        params: {'p_cent_amount': _selectedRawCents},
       );
 
-      if (resp.statusCode != 201 && resp.statusCode != 200) {
-        throw 'Server error: ${resp.body}';
-      }
-
-      final body = jsonDecode(resp.body);
+      final row = (result as List).first;
       if (!mounted) return;
 
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => BuyCentPaymentView(
-            requestId: body['id'] as String,
-            paymentCode: body['paymentCode'] as String,
+            requestId: row['id'].toString(),
+            paymentCode: row['reference'] as String,
             cpAmount: cp,
             nairaPerCent: _nairaPerCent,
             accountName: _accountName,
