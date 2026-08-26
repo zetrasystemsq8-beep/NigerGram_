@@ -4,6 +4,8 @@ import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/gist_hub/data/services/community_service.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/community_entity.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/community_home_tab.dart';
+import 'package:nigergram/features/gist_hub/presentation/view/community_activities_tab.dart';
 
 class CommunityDetailView extends StatefulWidget {
   final String communityId;
@@ -13,16 +15,25 @@ class CommunityDetailView extends StatefulWidget {
   State<CommunityDetailView> createState() => _CommunityDetailViewState();
 }
 
-class _CommunityDetailViewState extends State<CommunityDetailView> {
+class _CommunityDetailViewState extends State<CommunityDetailView> with SingleTickerProviderStateMixin {
   final _service = CommunityService();
   final _postController = TextEditingController();
+  late TabController _tabController;
   String? _myRole;
   bool _isPosting = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
     _loadRole();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _postController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadRole() async {
@@ -125,10 +136,8 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
           color: const Color(0xFFFFD54F).withOpacity(0.18),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: const Text(
-          'OWNER',
-          style: TextStyle(color: Color(0xFFFFD54F), fontSize: 9, fontWeight: FontWeight.bold),
-        ),
+        child: const Text('OWNER',
+            style: TextStyle(color: Color(0xFFFFD54F), fontSize: 9, fontWeight: FontWeight.bold)),
       );
     }
     if (role == 'moderator') {
@@ -139,10 +148,7 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
           color: NGColors.accent.withOpacity(0.18),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Text(
-          'MOD',
-          style: TextStyle(color: NGColors.accent, fontSize: 9, fontWeight: FontWeight.bold),
-        ),
+        child: Text('MOD', style: TextStyle(color: NGColors.accent, fontSize: 9, fontWeight: FontWeight.bold)),
       );
     }
     return const SizedBox.shrink();
@@ -156,15 +162,11 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: fillColor != null ? Colors.transparent : NGColors.divider),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: textColor ?? NGColors.textMuted),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(color: textColor ?? NGColors.textMuted, fontSize: 12, fontWeight: FontWeight.w600)),
-        ],
-      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 13, color: textColor ?? NGColors.textMuted),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(color: textColor ?? NGColors.textMuted, fontSize: 12, fontWeight: FontWeight.w600)),
+      ]),
     );
   }
 
@@ -187,20 +189,14 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
           color: active ? activeColor.withOpacity(0.14) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(active ? filledIcon : icon, size: 16, color: active ? activeColor : NGColors.textMuted),
-            if (users.isNotEmpty) ...[
-              const SizedBox(width: 4),
-              Text('${users.length}',
-                  style: TextStyle(
-                      color: active ? activeColor : NGColors.textMuted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-            ],
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(active ? filledIcon : icon, size: 16, color: active ? activeColor : NGColors.textMuted),
+          if (users.isNotEmpty) ...[
+            const SizedBox(width: 4),
+            Text('${users.length}',
+                style: TextStyle(color: active ? activeColor : NGColors.textMuted, fontSize: 12, fontWeight: FontWeight.w600)),
           ],
-        ),
+        ]),
       ),
     );
   }
@@ -211,135 +207,89 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
       isScrollControlled: true,
       backgroundColor: NGColors.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _RepliesSheet(
-        communityId: widget.communityId,
-        postId: postId,
-        canReply: canReply,
+      builder: (_) => _RepliesSheet(communityId: widget.communityId, postId: postId, canReply: canReply),
+    );
+  }
+
+  Widget _buildHeader(CommunityEntity community, bool isMember) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(community.name,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 19)),
+                const SizedBox(height: 2),
+                Text('${community.memberCount} members',
+                    style: TextStyle(color: NGColors.textMuted, fontSize: 12.5)),
+              ],
+            ),
+          ),
+          if (isMember && _myRole != 'owner')
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.redAccent, size: 20),
+              tooltip: 'Leave community',
+              onPressed: _leave,
+            ),
+        ],
       ),
     );
   }
 
-  void _openMembers() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: NGColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _MembersSheet(communityId: widget.communityId),
-    );
-  }
+  Widget _buildChatTab(CommunityEntity community, String? pinnedPostId, bool isMember, bool canPost) {
+    final showComposeBar = isMember && (canPost || community.type == CommunityType.group);
 
-  @override
-  Widget build(BuildContext context) {
-    final isMember = _myRole != null;
-    final canPost = _myRole == 'owner' || _myRole == 'moderator';
-
-    return Scaffold(
-      backgroundColor: NGColors.background,
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('communities').doc(widget.communityId).snapshots(),
-        builder: (context, communitySnap) {
-          if (!communitySnap.hasData || !communitySnap.data!.exists) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final rawCommunityData = communitySnap.data!.data() as Map<String, dynamic>;
-          final community = CommunityEntity.fromMap(rawCommunityData, communitySnap.data!.id);
-          final pinnedPostId = rawCommunityData['pinnedPostId'] as String?;
-
-          return CustomScrollView(
+    return Column(
+      children: [
+        Expanded(
+          child: CustomScrollView(
             slivers: [
-              SliverAppBar(
-                backgroundColor: NGColors.surface,
-                elevation: 0,
-                pinned: true,
-                title: Text(community.name,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.groups_outlined, color: Colors.white),
-                    tooltip: 'Members',
-                    onPressed: _openMembers,
-                  ),
-                  if (isMember && _myRole != 'owner')
-                    IconButton(
-                      icon: const Icon(Icons.logout, color: Colors.redAccent),
-                      tooltip: 'Leave community',
-                      onPressed: _leave,
-                    ),
-                ],
-              ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: NGColors.surface,
                       borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 10, offset: const Offset(0, 4)),
-                      ],
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 10, offset: const Offset(0, 4))],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(community.description,
-                            style: TextStyle(color: NGColors.textMuted, fontSize: 13.5, height: 1.4)),
+                        Text(community.description, style: TextStyle(color: NGColors.textMuted, fontSize: 13.5, height: 1.4)),
                         const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _statChip(
-                              community.type == CommunityType.channel
-                                  ? Icons.campaign_outlined
-                                  : Icons.groups_outlined,
-                              '${community.memberCount} members',
-                            ),
-                            _statChip(
-                              Icons.category_outlined,
-                              community.type == CommunityType.channel ? 'Channel' : 'Group',
-                            ),
-                            if (_myRole != null)
-                              _statChip(
-                                Icons.badge_outlined,
-                                _myRole!.toUpperCase(),
-                                fillColor: NGColors.accent.withOpacity(0.16),
-                                textColor: NGColors.accent,
-                              ),
-                          ],
-                        ),
+                        Wrap(spacing: 8, runSpacing: 8, children: [
+                          _statChip(
+                            community.type == CommunityType.channel ? Icons.campaign_outlined : Icons.groups_outlined,
+                            community.type == CommunityType.channel ? 'Channel' : 'Group',
+                          ),
+                          if (_myRole != null)
+                            _statChip(Icons.badge_outlined, _myRole!.toUpperCase(),
+                                fillColor: NGColors.accent.withOpacity(0.16), textColor: NGColors.accent),
+                        ]),
                         if (community.rules.isNotEmpty) ...[
                           const SizedBox(height: 18),
-                          Row(
-                            children: [
-                              Icon(Icons.rule_outlined, size: 15, color: NGColors.accent),
-                              const SizedBox(width: 6),
-                              const Text('Community rules',
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                            ],
-                          ),
+                          Row(children: [
+                            Icon(Icons.rule_outlined, size: 15, color: NGColors.accent),
+                            const SizedBox(width: 6),
+                            const Text('Community rules', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                          ]),
                           const SizedBox(height: 8),
                           ...community.rules.map((r) => Padding(
                                 padding: const EdgeInsets.only(bottom: 6),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 5),
-                                      child: Container(
-                                        width: 4,
-                                        height: 4,
-                                        decoration: BoxDecoration(color: NGColors.textMuted, shape: BoxShape.circle),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(r,
-                                          style: TextStyle(color: NGColors.textMuted, fontSize: 13, height: 1.3)),
-                                    ),
-                                  ],
-                                ),
+                                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 5),
+                                    child: Container(width: 4, height: 4, decoration: BoxDecoration(color: NGColors.textMuted, shape: BoxShape.circle)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text(r, style: TextStyle(color: NGColors.textMuted, fontSize: 13, height: 1.3))),
+                                ]),
                               )),
                         ],
                       ],
@@ -354,71 +304,29 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
                     child: _PinnedPostBanner(communityId: widget.communityId, postId: pinnedPostId),
                   ),
                 ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                  child: !isMember
-                      ? SizedBox(
-                          width: double.infinity,
-                          height: 46,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              await _service.joinCommunity(widget.communityId);
-                              _loadRole();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: NGColors.accent,
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                            ),
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('Join Community', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        )
-                      : (canPost || community.type == CommunityType.group)
-                          ? Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: NGColors.surface,
-                                borderRadius: BorderRadius.circular(26),
-                                border: Border.all(color: NGColors.divider),
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _postController,
-                                      enabled: canPost || community.type == CommunityType.group,
-                                      style: const TextStyle(color: Colors.white),
-                                      decoration: InputDecoration(
-                                        hintText: canPost || community.type == CommunityType.group
-                                            ? 'Post something...'
-                                            : 'Only moderators can post here',
-                                        hintStyle: TextStyle(color: NGColors.textMuted),
-                                        border: InputBorder.none,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                      ),
-                                    ),
-                                  ),
-                                  Container(
-                                    decoration: BoxDecoration(color: NGColors.accent, shape: BoxShape.circle),
-                                    child: IconButton(
-                                      icon: _isPosting
-                                          ? const SizedBox(
-                                              width: 16,
-                                              height: 16,
-                                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                            )
-                                          : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 18),
-                                      onPressed: _isPosting ? null : _post,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : const SizedBox.shrink(),
+              if (!isMember)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          await _service.joinCommunity(widget.communityId);
+                          _loadRole();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: NGColors.accent,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        ),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Join Community', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('communities')
@@ -428,23 +336,18 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
                     .limit(50)
                     .snapshots(),
                 builder: (context, postsSnap) {
-                  if (!postsSnap.hasData) {
-                    return const SliverToBoxAdapter(child: SizedBox.shrink());
-                  }
+                  if (!postsSnap.hasData) return const SliverToBoxAdapter(child: SizedBox.shrink());
                   final posts = postsSnap.data!.docs;
                   if (posts.isEmpty) {
                     return SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 48),
                         child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.forum_outlined, size: 40, color: NGColors.textMuted.withOpacity(0.6)),
-                              const SizedBox(height: 10),
-                              Text('No posts yet', style: TextStyle(color: NGColors.textMuted)),
-                            ],
-                          ),
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.forum_outlined, size: 40, color: NGColors.textMuted.withOpacity(0.6)),
+                            const SizedBox(height: 10),
+                            Text('No posts yet', style: TextStyle(color: NGColors.textMuted)),
+                          ]),
                         ),
                       ),
                     );
@@ -469,120 +372,85 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
                           decoration: BoxDecoration(
                             color: NGColors.surface,
                             borderRadius: BorderRadius.circular(14),
-                            border: isOwnerPost
-                                ? Border.all(color: const Color(0xFFFFD54F).withOpacity(0.35), width: 1)
-                                : null,
-                            boxShadow: [
-                              BoxShadow(
-                                  color: Colors.black.withOpacity(0.12), blurRadius: 6, offset: const Offset(0, 2)),
-                            ],
+                            border: isOwnerPost ? Border.all(color: const Color(0xFFFFD54F).withOpacity(0.35), width: 1) : null,
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 6, offset: const Offset(0, 2))],
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 15,
-                                    backgroundColor: avatarColor,
-                                    child: Text(
-                                      username.isNotEmpty ? username[0].toUpperCase() : '?',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                              Row(children: [
+                                CircleAvatar(
+                                  radius: 15,
+                                  backgroundColor: avatarColor,
+                                  child: Text(username.isNotEmpty ? username[0].toUpperCase() : '?',
+                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Row(children: [
+                                    Flexible(
+                                      child: Text('@$username',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5)),
+                                    ),
+                                    _roleBadge(role),
+                                  ]),
+                                ),
+                                Text(_relativeTime(data['createdAt'] as Timestamp?), style: TextStyle(color: NGColors.textMuted, fontSize: 11)),
+                                if (canPost) ...[
+                                  const SizedBox(width: 2),
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () => _togglePin(doc.id, isPinned),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(4),
+                                      child: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                                          size: 16, color: isPinned ? const Color(0xFFFFD54F) : NGColors.textMuted),
                                     ),
                                   ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text('@$username',
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5)),
-                                        ),
-                                        _roleBadge(role),
-                                      ],
-                                    ),
-                                  ),
-                                  Text(
-                                    _relativeTime(data['createdAt'] as Timestamp?),
-                                    style: TextStyle(color: NGColors.textMuted, fontSize: 11),
-                                  ),
-                                  if (canPost) ...[
-                                    const SizedBox(width: 2),
-                                    InkWell(
-                                      borderRadius: BorderRadius.circular(20),
-                                      onTap: () => _togglePin(doc.id, isPinned),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(4),
-                                        child: Icon(
-                                          isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                                          size: 16,
-                                          color: isPinned ? const Color(0xFFFFD54F) : NGColors.textMuted,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
                                 ],
-                              ),
+                              ]),
                               const SizedBox(height: 10),
                               Padding(
                                 padding: const EdgeInsets.only(left: 38),
-                                child: Text(data['text'] ?? '',
-                                    style: TextStyle(color: NGColors.textSecondary, fontSize: 13.5, height: 1.4)),
+                                child: Text(data['text'] ?? '', style: TextStyle(color: NGColors.textSecondary, fontSize: 13.5, height: 1.4)),
                               ),
                               const SizedBox(height: 10),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 32),
-                                child: Divider(color: NGColors.divider, height: 1),
-                              ),
+                              Padding(padding: const EdgeInsets.only(left: 32), child: Divider(color: NGColors.divider, height: 1)),
                               const SizedBox(height: 4),
                               Padding(
                                 padding: const EdgeInsets.only(left: 26),
-                                child: Row(
-                                  children: [
-                                    _reactionChip(
-                                      icon: Icons.thumb_up_alt_outlined,
-                                      filledIcon: Icons.thumb_up_alt,
-                                      activeColor: NGColors.accent,
-                                      users: likeUsers,
-                                      ref: doc.reference,
-                                      reactionKey: 'like',
+                                child: Row(children: [
+                                  _reactionChip(
+                                    icon: Icons.thumb_up_alt_outlined,
+                                    filledIcon: Icons.thumb_up_alt,
+                                    activeColor: NGColors.accent,
+                                    users: likeUsers,
+                                    ref: doc.reference,
+                                    reactionKey: 'like',
+                                  ),
+                                  _reactionChip(
+                                    icon: Icons.favorite_border,
+                                    filledIcon: Icons.favorite,
+                                    activeColor: Colors.redAccent,
+                                    users: heartUsers,
+                                    ref: doc.reference,
+                                    reactionKey: 'heart',
+                                  ),
+                                  const Spacer(),
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () => _openReplies(doc.id, isMember),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                        Icon(Icons.chat_bubble_outline, size: 15, color: NGColors.textMuted),
+                                        const SizedBox(width: 4),
+                                        Text('Reply', style: TextStyle(color: NGColors.textMuted, fontSize: 12, fontWeight: FontWeight.w600)),
+                                      ]),
                                     ),
-                                    _reactionChip(
-                                      icon: Icons.favorite_border,
-                                      filledIcon: Icons.favorite,
-                                      activeColor: Colors.redAccent,
-                                      users: heartUsers,
-                                      ref: doc.reference,
-                                      reactionKey: 'heart',
-                                    ),
-                                    const Spacer(),
-                                    InkWell(
-                                      borderRadius: BorderRadius.circular(20),
-                                      onTap: () => _openReplies(doc.id, isMember),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.chat_bubble_outline, size: 15, color: NGColors.textMuted),
-                                            const SizedBox(width: 4),
-                                            Text('Reply',
-                                                style: TextStyle(
-                                                    color: NGColors.textMuted,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w600)),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ]),
                               ),
                             ],
                           ),
@@ -593,7 +461,103 @@ class _CommunityDetailViewState extends State<CommunityDetailView> {
                   );
                 },
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            ],
+          ),
+        ),
+        // Fixed compose bar — always at the bottom of Chat, not embedded
+        // in the scrolling content.
+        if (showComposeBar)
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                decoration: BoxDecoration(
+                  color: NGColors.surface,
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(color: NGColors.divider),
+                ),
+                child: Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _postController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: canPost || community.type == CommunityType.group ? 'Post something...' : 'Only moderators can post here',
+                        hintStyle: TextStyle(color: NGColors.textMuted),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(color: NGColors.accent, shape: BoxShape.circle),
+                    child: IconButton(
+                      icon: _isPosting
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 18),
+                      onPressed: _isPosting ? null : _post,
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: NGColors.background,
+      appBar: AppBar(backgroundColor: NGColors.surface, elevation: 0),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('communities').doc(widget.communityId).snapshots(),
+        builder: (context, communitySnap) {
+          if (!communitySnap.hasData || !communitySnap.data!.exists) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final rawCommunityData = communitySnap.data!.data() as Map<String, dynamic>;
+          final community = CommunityEntity.fromMap(rawCommunityData, communitySnap.data!.id);
+          final pinnedPostId = rawCommunityData['pinnedPostId'] as String?;
+          final isMember = _myRole != null;
+          final canPost = _myRole == 'owner' || _myRole == 'moderator';
+
+          return Column(
+            children: [
+              _buildHeader(community, isMember),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(color: NGColors.surface, borderRadius: BorderRadius.circular(14)),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: NGColors.accent,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: NGColors.textMuted,
+                  labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                  tabs: const [
+                    Tab(text: '🏠 Home'),
+                    Tab(text: '💬 Chat'),
+                    Tab(text: '⚡ Activities'),
+                    Tab(text: '👥 People'),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    CommunityHomeTab(communityId: widget.communityId),
+                    _buildChatTab(community, pinnedPostId, isMember, canPost),
+                    CommunityActivitiesTab(communityId: widget.communityId),
+                    _PeopleTab(communityId: widget.communityId),
+                  ],
+                ),
+              ),
             ],
           );
         },
@@ -611,12 +575,7 @@ class _PinnedPostBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('communities')
-          .doc(communityId)
-          .collection('posts')
-          .doc(postId)
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('communities').doc(communityId).collection('posts').doc(postId).snapshots(),
       builder: (context, snap) {
         if (!snap.hasData || !snap.data!.exists) return const SizedBox.shrink();
         final data = snap.data!.data() as Map<String, dynamic>;
@@ -631,21 +590,15 @@ class _PinnedPostBanner extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFFFD54F).withOpacity(0.35)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.push_pin, size: 14, color: Color(0xFFFFD54F)),
-                  const SizedBox(width: 6),
-                  Text('Pinned • @$username',
-                      style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 12, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(text, style: TextStyle(color: NGColors.textSecondary, fontSize: 13.5, height: 1.4)),
-            ],
-          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.push_pin, size: 14, color: Color(0xFFFFD54F)),
+              const SizedBox(width: 6),
+              Text('Pinned • @$username', style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 12, fontWeight: FontWeight.bold)),
+            ]),
+            const SizedBox(height: 8),
+            Text(text, style: TextStyle(color: NGColors.textSecondary, fontSize: 13.5, height: 1.4)),
+          ]),
         );
       },
     );
@@ -657,11 +610,7 @@ class _RepliesSheet extends StatefulWidget {
   final String postId;
   final bool canReply;
 
-  const _RepliesSheet({
-    required this.communityId,
-    required this.postId,
-    required this.canReply,
-  });
+  const _RepliesSheet({required this.communityId, required this.postId, required this.canReply});
 
   @override
   State<_RepliesSheet> createState() => _RepliesSheetState();
@@ -690,9 +639,7 @@ class _RepliesSheetState extends State<_RepliesSheet> {
       });
       _replyController.clear();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -710,137 +657,97 @@ class _RepliesSheetState extends State<_RepliesSheet> {
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.7,
-        child: Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 10),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(color: NGColors.textMuted, borderRadius: BorderRadius.circular(2)),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.chat_bubble_outline, size: 15, color: NGColors.accent),
-                const SizedBox(width: 6),
-                const Text('Replies',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Divider(color: NGColors.divider, height: 1),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('communities')
-                    .doc(widget.communityId)
-                    .collection('posts')
-                    .doc(widget.postId)
-                    .collection('replies')
-                    .orderBy('createdAt', descending: false)
-                    .snapshots(),
-                builder: (context, snap) {
-                  if (!snap.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final replies = snap.data!.docs;
-                  if (replies.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.mode_comment_outlined, size: 32, color: NGColors.textMuted.withOpacity(0.6)),
-                          const SizedBox(height: 8),
-                          Text('No replies yet', style: TextStyle(color: NGColors.textMuted)),
-                        ],
-                      ),
-                    );
-                  }
-                  return ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: replies.length,
-                    separatorBuilder: (_, __) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Divider(color: NGColors.divider, height: 1),
-                    ),
-                    itemBuilder: (context, index) {
-                      final data = replies[index].data() as Map<String, dynamic>;
-                      final username = (data['username'] ?? 'user').toString();
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('@$username',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                          const SizedBox(height: 4),
-                          Text(data['text'] ?? '',
-                              style: TextStyle(color: NGColors.textSecondary, fontSize: 13, height: 1.3)),
-                        ],
-                      );
-                    },
+        child: Column(children: [
+          Container(margin: const EdgeInsets.symmetric(vertical: 10), width: 40, height: 4, decoration: BoxDecoration(color: NGColors.textMuted, borderRadius: BorderRadius.circular(2))),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.chat_bubble_outline, size: 15, color: NGColors.accent),
+            const SizedBox(width: 6),
+            const Text('Replies', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+          ]),
+          const SizedBox(height: 8),
+          const Divider(color: NGColors.divider, height: 1),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('communities')
+                  .doc(widget.communityId)
+                  .collection('posts')
+                  .doc(widget.postId)
+                  .collection('replies')
+                  .orderBy('createdAt', descending: false)
+                  .snapshots(),
+              builder: (context, snap) {
+                if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+                final replies = snap.data!.docs;
+                if (replies.isEmpty) {
+                  return Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.mode_comment_outlined, size: 32, color: NGColors.textMuted.withOpacity(0.6)),
+                      const SizedBox(height: 8),
+                      Text('No replies yet', style: TextStyle(color: NGColors.textMuted)),
+                    ]),
                   );
-                },
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: replies.length,
+                  separatorBuilder: (_, __) => Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Divider(color: NGColors.divider, height: 1)),
+                  itemBuilder: (context, index) {
+                    final data = replies[index].data() as Map<String, dynamic>;
+                    final username = (data['username'] ?? 'user').toString();
+                    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('@$username', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                      const SizedBox(height: 4),
+                      Text(data['text'] ?? '', style: TextStyle(color: NGColors.textSecondary, fontSize: 13, height: 1.3)),
+                    ]);
+                  },
+                );
+              },
+            ),
+          ),
+          if (widget.canReply)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                decoration: BoxDecoration(color: NGColors.background, borderRadius: BorderRadius.circular(24), border: Border.all(color: NGColors.divider)),
+                child: Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _replyController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Write a reply...',
+                        hintStyle: TextStyle(color: NGColors.textMuted),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(color: NGColors.accent, shape: BoxShape.circle),
+                    child: IconButton(
+                      icon: _isSending
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 16),
+                      onPressed: _isSending ? null : _sendReply,
+                    ),
+                  ),
+                ]),
               ),
             ),
-            if (widget.canReply)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: NGColors.background,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: NGColors.divider),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _replyController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: 'Write a reply...',
-                            hintStyle: TextStyle(color: NGColors.textMuted),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        decoration: BoxDecoration(color: NGColors.accent, shape: BoxShape.circle),
-                        child: IconButton(
-                          icon: _isSending
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 16),
-                          onPressed: _isSending ? null : _sendReply,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
+        ]),
       ),
     );
   }
 }
 
-class _MembersSheet extends StatelessWidget {
+class _PeopleTab extends StatelessWidget {
   final String communityId;
-
-  const _MembersSheet({required this.communityId});
+  const _PeopleTab({required this.communityId});
 
   static const List<Color> _avatarPalette = [
-    Color(0xFFE57373),
-    Color(0xFF64B5F6),
-    Color(0xFF81C784),
-    Color(0xFFFFB74D),
-    Color(0xFFBA68C8),
-    Color(0xFF4DB6AC),
+    Color(0xFFE57373), Color(0xFF64B5F6), Color(0xFF81C784), Color(0xFFFFB74D), Color(0xFFBA68C8), Color(0xFF4DB6AC),
   ];
 
   Color _colorForUsername(String username) {
@@ -857,89 +764,48 @@ class _MembersSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.7,
-      child: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(color: NGColors.textMuted, borderRadius: BorderRadius.circular(2)),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.groups_outlined, size: 15, color: NGColors.accent),
-              const SizedBox(width: 6),
-              const Text('Members', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Divider(color: NGColors.divider, height: 1),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('communities')
-                  .doc(communityId)
-                  .collection('members')
-                  .orderBy('joinedAt', descending: false)
-                  .limit(200)
-                  .snapshots(),
-              builder: (context, snap) {
-                if (!snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final docs = List.of(snap.data!.docs);
-                docs.sort((a, b) {
-                  final roleA = ((a.data() as Map<String, dynamic>)['role'] ?? 'member').toString();
-                  final roleB = ((b.data() as Map<String, dynamic>)['role'] ?? 'member').toString();
-                  return _rolePriority(roleA).compareTo(_rolePriority(roleB));
-                });
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('communities').doc(communityId).collection('members').orderBy('joinedAt', descending: false).limit(200).snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        final docs = List.of(snap.data!.docs);
+        docs.sort((a, b) {
+          final roleA = ((a.data() as Map<String, dynamic>)['role'] ?? 'member').toString();
+          final roleB = ((b.data() as Map<String, dynamic>)['role'] ?? 'member').toString();
+          return _rolePriority(roleA).compareTo(_rolePriority(roleB));
+        });
 
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Text('No members yet', style: TextStyle(color: NGColors.textMuted)),
-                  );
-                }
+        if (docs.isEmpty) {
+          return Center(child: Text('No members yet', style: TextStyle(color: NGColors.textMuted)));
+        }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  itemCount: docs.length,
-                  separatorBuilder: (_, __) => Divider(color: NGColors.divider, height: 1),
-                  itemBuilder: (context, index) {
-                    final data = docs[index].data() as Map<String, dynamic>;
-                    final username = (data['username'] ?? 'member').toString();
-                    final role = (data['role'] ?? 'member').toString();
-                    final avatarColor = _colorForUsername(username);
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          itemCount: docs.length,
+          separatorBuilder: (_, __) => Divider(color: NGColors.divider, height: 1),
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final username = (data['username'] ?? 'member').toString();
+            final role = (data['role'] ?? 'member').toString();
+            final avatarColor = _colorForUsername(username);
 
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: avatarColor,
-                        child: Text(
-                          username.isNotEmpty ? username[0].toUpperCase() : '?',
-                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      title: Text('@$username',
-                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                      trailing: role == 'owner'
-                          ? const Text('OWNER',
-                              style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.bold))
-                          : role == 'moderator'
-                              ? Text('MOD',
-                                  style: TextStyle(color: NGColors.accent, fontSize: 10, fontWeight: FontWeight.bold))
-                              : null,
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                radius: 18,
+                backgroundColor: avatarColor,
+                child: Text(username.isNotEmpty ? username[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+              ),
+              title: Text('@$username', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              trailing: role == 'owner'
+                  ? const Text('OWNER', style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.bold))
+                  : role == 'moderator'
+                      ? Text('MOD', style: TextStyle(color: NGColors.accent, fontSize: 10, fontWeight: FontWeight.bold))
+                      : null,
+            );
+          },
+        );
+      },
     );
   }
 }
