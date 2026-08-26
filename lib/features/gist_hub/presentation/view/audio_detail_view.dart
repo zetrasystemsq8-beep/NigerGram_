@@ -56,8 +56,9 @@ class _AudioDetailViewState extends State<AudioDetailView> {
     _durationSub = _previewPlayer.onDurationChanged.listen((d) {
       if (mounted) setState(() => _duration = d);
     });
-    _positionSub = _previewPlayer.onPositionChanged.listen((p) {
-      if (mounted && !_isSeeking) setState(() => _position = p);
+    _positionSub = _previewPlayer.onPositionChanged.listen((p) async {
+      if (!mounted || _isSeeking) return;
+      setState(() => _position = p);
     });
     _completeSub = _previewPlayer.onPlayerComplete.listen((_) {
       if (mounted) setState(() {
