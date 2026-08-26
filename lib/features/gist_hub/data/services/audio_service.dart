@@ -62,6 +62,8 @@ class AudioService {
     required AudioCategory category,
     required AudioPermission permission,
     required int durationSeconds,
+    int trimStartMs = 0,
+    int? trimEndMs,
   }) async {
     final userId = AppAuth.uid;
     if (userId.isEmpty) throw Exception('Not logged in');
@@ -102,6 +104,11 @@ class AudioService {
       'useCount': 0,
       'trendingScore': 0,
       'createdAt': FieldValue.serverTimestamp(),
+      // Non-destructive trim — the underlying file is always the full
+      // original recording; every playback surface starts at
+      // trimStartMs and stops at trimEndMs.
+      'trimStartMs': trimStartMs,
+      'trimEndMs': trimEndMs ?? durationSeconds * 1000,
     });
 
     final snap = await docRef.get();
@@ -165,8 +172,6 @@ class AudioService {
     });
   }
 
-  /// Saves an audio post to the current user's personal library —
-  /// used by the "Save" button on the audio detail page.
   Future<void> saveAudioForCurrentUser(String audioId) async {
     final userId = AppAuth.uid;
     if (userId.isEmpty) throw Exception('Not logged in');
