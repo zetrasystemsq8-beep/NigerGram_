@@ -24,6 +24,7 @@ class BrowseAudioView extends StatefulWidget {
 
 class _BrowseAudioViewState extends State<BrowseAudioView> {
   final AudioService _service = AudioService();
+  final TextEditingController _searchController = TextEditingController();
   String _selectedFilter = 'trending';
   late Stream<List<AudioPostEntity>> _stream;
 
@@ -31,6 +32,12 @@ class _BrowseAudioViewState extends State<BrowseAudioView> {
   void initState() {
     super.initState();
     _stream = _service.getAudioFeedStream(filter: _selectedFilter);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _changeFilter(String key) {
@@ -72,6 +79,23 @@ class _BrowseAudioViewState extends State<BrowseAudioView> {
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              style: TextStyle(color: NGColors.textPrimary),
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: 'Search audio by title or creator',
+                hintStyle: TextStyle(color: NGColors.textMuted),
+                prefixIcon: Icon(Icons.search_rounded, color: NGColors.textMuted),
+                filled: true,
+                fillColor: NGColors.surface,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
           SizedBox(
             height: 44,
             child: ListView.builder(
@@ -106,16 +130,14 @@ class _BrowseAudioViewState extends State<BrowseAudioView> {
               },
             ),
           ),
+          const SizedBox(height: 4),
           Expanded(
             child: StreamBuilder<List<AudioPostEntity>>(
               stream: _stream,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
-                    child: Text(
-                      'Can\'t load audio right now',
-                      style: TextStyle(color: NGColors.textSecondary),
-                    ),
+                    child: Text('Can\'t load audio right now', style: TextStyle(color: NGColors.textSecondary)),
                   );
                 }
 
@@ -123,7 +145,13 @@ class _BrowseAudioViewState extends State<BrowseAudioView> {
                   return const Center(child: CircularProgressIndicator(color: NGColors.accent));
                 }
 
-                final posts = snapshot.data!;
+                var posts = snapshot.data!;
+                final query = _searchController.text.trim().toLowerCase();
+                if (query.isNotEmpty) {
+                  posts = posts
+                      .where((p) => p.title.toLowerCase().contains(query) || p.creatorUsername.toLowerCase().contains(query))
+                      .toList();
+                }
 
                 if (posts.isEmpty) {
                   return Center(
@@ -133,12 +161,12 @@ class _BrowseAudioViewState extends State<BrowseAudioView> {
                         Icon(Icons.mic_none_rounded, color: NGColors.textMuted, size: 56),
                         const SizedBox(height: 16),
                         Text(
-                          'No audio here yet',
+                          query.isNotEmpty ? 'No audio matches "$query"' : 'No audio here yet',
                           style: TextStyle(color: NGColors.textSecondary, fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Be the first to record something',
+                          query.isNotEmpty ? 'Try a different search' : 'Be the first to record something',
                           style: TextStyle(color: NGColors.textMuted, fontSize: 13),
                         ),
                       ],
@@ -146,60 +174,81 @@ class _BrowseAudioViewState extends State<BrowseAudioView> {
                   );
                 }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.only(top: 8, bottom: 100),
+                return GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.82,
+                  ),
                   itemCount: posts.length,
                   itemBuilder: (context, index) {
                     final post = posts[index];
-                    // The whole card is now wrapped in a GestureDetector —
-                    // this was previously missing entirely, which is why
-                    // tapping did nothing.
+                    final color = audioCategoryColor(post.category);
+
                     return GestureDetector(
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => AudioDetailView(audioId: post.id)),
                       ),
                       child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: NGColors.surface,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: color.withOpacity(0.25)),
                         ),
-                        child: Row(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: NGColors.accent.withOpacity(0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Icons.graphic_eq_rounded, color: NGColors.accent),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    post.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(color: NGColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(color: color.withOpacity(0.18), shape: BoxShape.circle),
+                                  child: Center(
+                                    child: Text(audioCategoryEmoji(post.category), style: const TextStyle(fontSize: 20)),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '🎙️ Original audio by @${post.creatorUsername} · Used in ${post.useCount} videos',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(color: NGColors.textMuted, fontSize: 12),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: NGColors.background,
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                ],
-                              ),
+                                  child: Text(
+                                    _formatDuration(post.durationSeconds),
+                                    style: TextStyle(color: NGColors.textMuted, fontSize: 11, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
                             ),
+                            const Spacer(),
                             Text(
-                              _formatDuration(post.durationSeconds),
+                              post.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: NGColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14, height: 1.2),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '@${post.creatorUsername}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(color: NGColors.textMuted, fontSize: 12),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.graphic_eq_rounded, size: 13, color: color),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${post.useCount} used',
+                                  style: TextStyle(color: NGColors.textMuted, fontSize: 11),
+                                ),
+                              ],
                             ),
                           ],
                         ),
