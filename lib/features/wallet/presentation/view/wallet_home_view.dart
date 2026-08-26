@@ -2,11 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_cubit.dart';
 import 'package:nigergram/features/wallet/presentation/bloc/wallet_state.dart';
 import 'package:nigergram/features/wallet/presentation/view/withdraw_view.dart';
 import 'package:nigergram/features/wallet/presentation/view/fund_wallet_chooser_view.dart';
+import 'package:nigergram/features/admin/presentation/view/admin_gate_view.dart';
 
 class WalletHomeView extends StatefulWidget {
   const WalletHomeView({super.key});
@@ -18,12 +20,23 @@ class WalletHomeView extends StatefulWidget {
 class _WalletHomeViewState extends State<WalletHomeView> {
   late final WalletCubit _walletCubit;
   bool _isRefreshing = false;
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
     _walletCubit = getIt<WalletCubit>();
     _walletCubit.refresh();
+    _checkAdmin();
+  }
+
+  Future<void> _checkAdmin() async {
+    try {
+      final result = await Supabase.instance.client.rpc('is_admin');
+      if (mounted) setState(() => _isAdmin = result == true);
+    } catch (_) {
+      // Not an admin, or not logged in — stays false, icon stays hidden.
+    }
   }
 
   Future<void> _refresh() async {
@@ -32,9 +45,9 @@ class _WalletHomeViewState extends State<WalletHomeView> {
     setState(() => _isRefreshing = false);
   }
 
-String _formatCp(int cp) {
-  return cp.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
-}
+  String _formatCp(int cp) {
+    return cp.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+  }
 
   String _formatCent(int cent) {
     return cent.toString().padLeft(3, '0');
@@ -56,7 +69,7 @@ String _formatCp(int cp) {
     final date = timestamp.toDate();
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays > 0) {
       return '${difference.inDays}d ago';
     } else if (difference.inHours > 0) {
@@ -85,6 +98,18 @@ String _formatCp(int cp) {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          if (_isAdmin)
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings_rounded),
+              color: Colors.white,
+              tooltip: 'Admin',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AdminGateView()),
+                );
+              },
+            ),
           IconButton(
             icon: _isRefreshing
                 ? const SizedBox(
@@ -371,13 +396,13 @@ String _formatCp(int cp) {
                                 width: 44,
                                 height: 44,
                                 decoration: BoxDecoration(
-                                  color: isCredit 
+                                  color: isCredit
                                       ? Colors.green.withOpacity(0.15)
                                       : Colors.red.withOpacity(0.15),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
-                                  isCredit 
+                                  isCredit
                                       ? Icons.arrow_downward_rounded
                                       : Icons.arrow_upward_rounded,
                                   color: isCredit ? Colors.green : Colors.red,
