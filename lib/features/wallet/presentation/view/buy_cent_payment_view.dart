@@ -3,16 +3,15 @@
 // Step 2 of the top-up flow: show where to send the money and the
 // reference code to include, let the user mark it paid, and reflect
 // live status (pending -> paid -> processing -> approved/rejected)
-// straight from the topup_requests document.
+// straight from the cent_purchase_requests row in Supabase.
 //
 // UNIT NOTE: cpAmount is the display unit (CP). The naira price
 // preview must be computed from the RAW-CENT equivalent (1000 raw
 // cents = 1 CP, see ZtcWalletBridge), matching what the backend
 // actually charged when it created this request.
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:nigergram/core/utils/app_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class BuyCentPaymentView extends StatefulWidget {
   final String requestId;
@@ -43,20 +42,33 @@ class _BuyCentPaymentViewState extends State<BuyCentPaymentView> {
   static const int _centsPerUnit = 1000;
 
   bool _isMarking = false;
+  late final Stream<List<Map<String, dynamic>>> _requestStream;
+
+  @override
+  void initState() {
+    super.initState();
+    // Realtime stream on the single row for this request. requestId is
+    // the bigint primary key from cent_purchase_requests, so we cast it
+    // for the eq() filter below.
+    _requestStream = Supabase.instance.client
+        .from('cent_purchase_requests')
+        .stream(primaryKey: ['id'])
+        .eq('id', int.parse(widget.requestId));
+  }
 
   Future<void> _markAsPaid() async {
     setState(() => _isMarking = true);
     try {
-      final uid = AppAuth.uid;
-      if (uid.isEmpty) throw Exception('Not authenticated');
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) throw Exception('Not authenticated');
 
-      await FirebaseFirestore.instance
-          .collection('topup_requests')
-          .doc(widget.requestId)
+      await Supabase.instance.client
+          .from('cent_purchase_requests')
           .update({
-        'status': 'paid',
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+            'status': 'paid',
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', int.parse(widget.requestId));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -97,7 +109,7 @@ class _BuyCentPaymentViewState extends State<BuyCentPaymentView> {
   @override
   Widget build(BuildContext context) {
     // Naira price is charged on the raw-cent equivalent, not the CP
-    // amount shown to the user — matches createTopup's default pricing.
+    // amount shown to the user — matches the RPC's default pricing.
     final rawCents = widget.cpAmount * _centsPerUnit;
     final naira = rawCents * widget.nairaPerCent;
 
@@ -110,13 +122,13 @@ class _BuyCentPaymentViewState extends State<BuyCentPaymentView> {
         title: const Text('Complete Payment', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
-        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('topup_requests')
-              .doc(widget.requestId)
-              .snapshots(),
+        child: StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _requestStream,
           builder: (context, snapshot) {
-            final status = snapshot.data?.data()?['status'] as String? ?? 'pending';
+            final rows = snapshot.data;
+            final status = (rows != null && rows.isNotEmpty)
+                ? (rows.first['status'] as String? ?? 'pending')
+                : 'pending';
             final info = _statusInfo(status);
             final isFinal = status == 'approved' || status == 'rejected';
 
