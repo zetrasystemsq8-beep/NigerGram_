@@ -11,13 +11,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// reading from Supabase exactly as before; nothing downstream needs to
 /// change.
 ///
-/// IMPORTANT: the shared Supabase project has an on_auth_user_created
+/// IMPORTANT #1: the shared Supabase project has an on_auth_user_created
 /// trigger (handle_new_user) that fires on every new auth.users row
-/// across the whole Zetra ecosystem, not just ZetraMail — it builds a
-/// zetramail-style profile row and requires raw_user_meta_data->>'username'
-/// to be present. Every signUp call here MUST pass `data: {'username': ...}`
-/// or that trigger throws and the entire signup transaction rolls back
-/// (including the wallet-creation trigger that runs alongside it).
+/// across the whole Zetra ecosystem — it requires
+/// raw_user_meta_data->>'username' to be present, so every signUp call
+/// here passes `data: {'username': ...}`.
+///
+/// IMPORTANT #2: AppAuth treats the Supabase user ID as the canonical
+/// identifier for every Firestore document in the app (see AppAuth's own
+/// comments). So the `users/{id}` profile document here MUST be keyed by
+/// the Supabase UID, not the Firebase UID — otherwise every other screen
+/// that reads a profile via AppAuth.uid finds nothing.
 class FirebaseAuthService {
   final fb.FirebaseAuth _firebaseAuth = fb.FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
@@ -63,12 +67,14 @@ class FirebaseAuthService {
         throw Exception('Could not create matching Supabase account');
       }
 
-      await _firestore.collection('users').doc(fbCredential.user!.uid).set({
+      // Keyed by Supabase UID — the canonical identifier AppAuth and
+      // every other feature reads by.
+      await _firestore.collection('users').doc(supabaseUid).set({
         'username': cleanUsername,
         'displayName': resolvedDisplayName,
         'profilePicUrl': '',
         'authMethod': 'username_password',
-        'supabaseUid': supabaseUid,
+        'firebaseUid': fbCredential.user!.uid,
         'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
@@ -130,43 +136,45 @@ class FirebaseAuthService {
     final bridgePassword = fbUser.uid;
     final email = fbUser.email!;
 
-    // Figure out up front whether this is a brand-new NigerGram user and,
-    // if so, what username to use — we need this BEFORE the Supabase
-    // signUp call, since it has to go in as metadata for the trigger.
-    final userDoc = _firestore.collection('users').doc(fbUser.uid);
-    final existing = await userDoc.get();
-    final isNewUser = !existing.exists;
-
-    String? usernameForNewAccount;
-    if (isNewUser) {
-      usernameForNewAccount = await _uniqueUsernameFromEmail(email);
-    }
+    String? supabaseUid;
 
     try {
-      await _supabase.auth.signInWithPassword(email: email, password: bridgePassword);
+      // Returning user — shadow account already exists.
+      final signInResp = await _supabase.auth.signInWithPassword(email: email, password: bridgePassword);
+      supabaseUid = signInResp.user?.id;
     } catch (_) {
-      // No shadow account yet — first time this Google account has
-      // signed into NigerGram. Create it, with the username metadata
-      // the shared profile-creation trigger requires.
-      await _supabase.auth.signUp(
+      // First time this Google account has signed into NigerGram —
+      // create the shadow account, with the username metadata the
+      // shared profile-creation trigger requires.
+      final suggestedUsername = await _uniqueUsernameFromEmail(email);
+      final signUpResp = await _supabase.auth.signUp(
         email: email,
         password: bridgePassword,
         data: {
-          'username': usernameForNewAccount ?? email.split('@').first,
+          'username': suggestedUsername,
           'full_name': fbUser.displayName,
         },
       );
-    }
+      supabaseUid = signUpResp.user?.id;
 
-    if (isNewUser) {
-      await userDoc.set({
-        'username': usernameForNewAccount,
-        'displayName': fbUser.displayName ?? usernameForNewAccount,
+      if (supabaseUid == null) {
+        throw Exception('Could not create matching Supabase account');
+      }
+
+      // Keyed by Supabase UID — matches every other profile lookup in
+      // the app.
+      await _firestore.collection('users').doc(supabaseUid).set({
+        'username': suggestedUsername,
+        'displayName': fbUser.displayName ?? suggestedUsername,
         'profilePicUrl': fbUser.photoURL ?? '',
         'authMethod': 'google',
-        'supabaseUid': _supabase.auth.currentUser?.id,
+        'firebaseUid': fbUser.uid,
         'createdAt': FieldValue.serverTimestamp(),
       });
+    }
+
+    if (supabaseUid == null) {
+      throw Exception('Could not establish a Supabase session for this Google account');
     }
   }
 
