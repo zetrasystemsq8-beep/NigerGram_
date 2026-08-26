@@ -1,10 +1,7 @@
 // Buy Cent view
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:nigergram/core/utils/app_auth.dart';
 
 class BuyCentView extends StatefulWidget {
   const BuyCentView({super.key});
@@ -61,39 +58,19 @@ class _BuyCentViewState extends State<BuyCentView> {
       if (cents <= 0) throw 'Enter a valid cent amount';
 
       final result = await Supabase.instance.client.rpc(
-        'create_topup_request',
-        params: {
-          'p_cent_amount': cents,
-          'p_naira_amount': null,
-        },
+        'create_nigergram_cent_purchase',
+        params: {'p_cent_amount': cents},
       );
 
       final row = (result as List).first;
       setState(() {
-        _paymentCode = row['payment_code'] as String?;
-        _requestId = row['id'] as String?;
+        _requestId = row['id'].toString();
+        _paymentCode = row['reference'] as String?;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {
       setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _markAsPaid() async {
-    if (_requestId == null) return;
-    try {
-      final uid = AppAuth.uid;
-      if (uid.isEmpty) throw Exception('Not authenticated');
-
-      await Supabase.instance.client
-          .from('topup_requests')
-          .update({'status': 'paid'})
-          .eq('id', _requestId!);
-
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked as paid. Admin will review.')));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to mark as paid: $e')));
     }
   }
 
@@ -146,18 +123,12 @@ class _BuyCentViewState extends State<BuyCentView> {
                         const SizedBox(height: 8),
                         SelectableText('Payment code: $_paymentCode', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                         const SizedBox(height: 12),
-                        const Text('Send the exact amount to the account above and include the payment code in the transfer description.', style: TextStyle(color: Colors.white70)),
-                        const SizedBox(height: 8),
-                        ElevatedButton(
-                          onPressed: _markAsPaid,
-                          child: const Text("I've Paid (mark for review)"),
-                        ),
+                        const Text('Send the exact amount to the account above and include the payment code in the transfer description. An admin will confirm your payment shortly.', style: TextStyle(color: Colors.white70)),
                       ],
                     ),
                   ),
                 ),
               ] else ...[
-                // If paymentCode not created yet, show preview of account details so user knows where to pay
                 const Text('Payment details', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Card(
