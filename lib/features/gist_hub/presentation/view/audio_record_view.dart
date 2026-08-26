@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/features/gist_hub/data/services/audio_service.dart';
@@ -30,7 +31,7 @@ class AudioRecordView extends StatefulWidget {
   State<AudioRecordView> createState() => _AudioRecordViewState();
 }
 
-enum _RecordStage { record, review, details }
+enum _RecordStage { record, review, trim, details }
 
 class _AudioRecordViewState extends State<AudioRecordView> {
   final AudioRecorder _recorder = AudioRecorder();
@@ -49,12 +50,24 @@ class _AudioRecordViewState extends State<AudioRecordView> {
   AudioCategory _selectedCategory = AudioCategory.educational;
   AudioPermission _selectedPermission = AudioPermission.private;
 
+  // --- Trim state ---
+  PlayerController? _waveController;
+  bool _waveReady = false;
+  double _trimStartFraction = 0.0;
+  double _trimEndFraction = 1.0;
+  StreamSubscription<Duration>? _trimPositionSub;
+  bool _isTrimPlaying = false;
+
+  static const int _minTrimGapMs = 1000;
+
   @override
   void dispose() {
     _recordTimer?.cancel();
     _recorder.dispose();
     _previewPlayer.dispose();
     _titleController.dispose();
+    _trimPositionSub?.cancel();
+    _waveController?.dispose();
     super.dispose();
   }
 
@@ -131,6 +144,84 @@ class _AudioRecordViewState extends State<AudioRecordView> {
     });
   }
 
+  // --- Trim stage setup ---
+
+  Future<void> _enterTrimStage() async {
+    setState(() {
+      _stage = _RecordStage.trim;
+      _waveReady = false;
+      _trimStartFraction = 0.0;
+      _trimEndFraction = 1.0;
+    });
+
+    final controller = PlayerController();
+    try {
+      await controller.preparePlayer(
+        path: _recordedPath!,
+        shouldExtractWaveform: true,
+        noOfSamples: 100,
+      );
+      if (!mounted) return;
+      setState(() {
+        _waveController = controller;
+        _waveReady = true;
+      });
+    } catch (e) {
+      // If waveform extraction fails on this platform/version, fall
+      // back to a plain trim UI without a visual waveform — the drag
+      // handles still work, just over a flat bar instead of a wave.
+      if (!mounted) return;
+      setState(() {
+        _waveController = null;
+        _waveReady = true;
+      });
+    }
+  }
+
+  int get _trimStartMs => (_trimStartFraction * _recordedSeconds * 1000).round();
+  int get _trimEndMs => (_trimEndFraction * _recordedSeconds * 1000).round();
+
+  void _onDragStartHandle(double dx, double width) {
+    final fraction = (dx / width).clamp(0.0, _trimEndFraction - (_minTrimGapMs / (_recordedSeconds * 1000).clamp(1, double.infinity)));
+    setState(() => _trimStartFraction = fraction.clamp(0.0, 1.0));
+  }
+
+  void _onDragEndHandle(double dx, double width) {
+    final minGapFraction = _recordedSeconds > 0 ? _minTrimGapMs / (_recordedSeconds * 1000) : 0.0;
+    final fraction = (dx / width).clamp(_trimStartFraction + minGapFraction, 1.0);
+    setState(() => _trimEndFraction = fraction.clamp(0.0, 1.0));
+  }
+
+  Future<void> _playTrimmedPreview() async {
+    if (_isTrimPlaying) {
+      await _previewPlayer.pause();
+      _trimPositionSub?.cancel();
+      setState(() => _isTrimPlaying = false);
+      return;
+    }
+
+    await _previewPlayer.play(DeviceFileSource(_recordedPath!));
+    await _previewPlayer.seek(Duration(milliseconds: _trimStartMs));
+    setState(() => _isTrimPlaying = true);
+
+    _trimPositionSub?.cancel();
+    _trimPositionSub = _previewPlayer.onPositionChanged.listen((pos) {
+      if (pos.inMilliseconds >= _trimEndMs) {
+        _previewPlayer.pause();
+        if (mounted) setState(() => _isTrimPlaying = false);
+      }
+    });
+  }
+
+  void _confirmTrim() {
+    _trimPositionSub?.cancel();
+    _previewPlayer.stop();
+    setState(() {
+      _isTrimPlaying = false;
+      _stage = _RecordStage.details;
+    });
+  }
+
   Future<void> _publish() async {
     if (_recordedPath == null) return;
     if (_titleController.text.trim().isEmpty) {
@@ -149,6 +240,8 @@ class _AudioRecordViewState extends State<AudioRecordView> {
         category: _selectedCategory,
         permission: _selectedPermission,
         durationSeconds: _recordedSeconds,
+        trimStartMs: _trimStartMs,
+        trimEndMs: _trimEndMs,
       );
 
       if (!mounted) return;
@@ -169,6 +262,11 @@ class _AudioRecordViewState extends State<AudioRecordView> {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
+  String _formatMs(int ms) {
+    final totalSeconds = (ms / 1000).round();
+    return _formatDuration(totalSeconds);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -181,6 +279,7 @@ class _AudioRecordViewState extends State<AudioRecordView> {
         child: switch (_stage) {
           _RecordStage.record => _buildRecordStage(),
           _RecordStage.review => _buildReviewStage(),
+          _RecordStage.trim => _buildTrimStage(),
           _RecordStage.details => _buildDetailsStage(),
         },
       ),
@@ -271,16 +370,163 @@ class _AudioRecordViewState extends State<AudioRecordView> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => setState(() => _stage = _RecordStage.details),
+                  onPressed: () async {
+                    await _previewPlayer.stop();
+                    if (mounted) setState(() => _isPlaying = false);
+                    await _enterTrimStage();
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: NGColors.accent,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: const Text('Continue', style: TextStyle(color: Colors.white)),
+                  child: const Text('Trim & Continue', style: TextStyle(color: Colors.white)),
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrimStage() {
+    if (!_waveReady) {
+      return const Center(child: CircularProgressIndicator(color: NGColors.accent));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Trim your audio', style: TextStyle(color: NGColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 18)),
+          const SizedBox(height: 6),
+          Text(
+            'Drag the handles to select what plays. Nothing outside this range is deleted.',
+            style: TextStyle(color: NGColors.textMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 24),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              return SizedBox(
+                height: 90,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: NGColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: _waveController != null
+                            ? AudioFileWaveforms(
+                                size: Size(width, 90),
+                                playerController: _waveController!,
+                                enableSeekGesture: false,
+                                waveformType: WaveformType.long,
+                                playerWaveStyle: PlayerWaveStyle(
+                                  fixedWaveColor: NGColors.textMuted.withOpacity(0.4),
+                                  liveWaveColor: NGColors.accent,
+                                  spacing: 4,
+                                ),
+                              )
+                            : Center(
+                                child: Icon(Icons.graphic_eq_rounded, color: NGColors.textMuted, size: 40),
+                              ),
+                      ),
+                    ),
+                    // Dimmed regions outside the selected trim range
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: _trimStartFraction * width,
+                      child: Container(color: NGColors.background.withOpacity(0.7)),
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: (1 - _trimEndFraction) * width,
+                      child: Container(color: NGColors.background.withOpacity(0.7)),
+                    ),
+                    // Start handle
+                    Positioned(
+                      left: (_trimStartFraction * width) - 10,
+                      top: 0,
+                      bottom: 0,
+                      child: GestureDetector(
+                        onHorizontalDragUpdate: (details) => _onDragStartHandle(details.localPosition.dx + (_trimStartFraction * width) - 10, width),
+                        child: Container(
+                          width: 20,
+                          decoration: BoxDecoration(
+                            color: NGColors.accent,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(Icons.drag_indicator_rounded, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    // End handle
+                    Positioned(
+                      left: (_trimEndFraction * width) - 10,
+                      top: 0,
+                      bottom: 0,
+                      child: GestureDetector(
+                        onHorizontalDragUpdate: (details) => _onDragEndHandle(details.localPosition.dx + (_trimEndFraction * width) - 10, width),
+                        child: Container(
+                          width: 20,
+                          decoration: BoxDecoration(
+                            color: NGColors.accent,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(Icons.drag_indicator_rounded, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(_formatMs(_trimStartMs), style: TextStyle(color: NGColors.textMuted, fontSize: 12)),
+              Text(
+                'Selected: ${_formatMs(_trimEndMs - _trimStartMs)}',
+                style: TextStyle(color: NGColors.accent, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              Text(_formatMs(_trimEndMs), style: TextStyle(color: NGColors.textMuted, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: IconButton(
+              iconSize: 52,
+              icon: Icon(
+                _isTrimPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+                color: NGColors.accent,
+              ),
+              onPressed: _playTrimmedPreview,
+            ),
+          ),
+          const Spacer(),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: _confirmTrim,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: NGColors.accent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('Confirm Trim', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
           ),
         ],
       ),
