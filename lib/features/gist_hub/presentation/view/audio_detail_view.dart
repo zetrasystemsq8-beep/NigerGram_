@@ -218,6 +218,13 @@ class _AudioDetailViewState extends State<AudioDetailView> {
             );
           }
 
+          if (_isPlaying && _position >= post.trimEnd) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _previewPlayer.pause();
+              if (mounted) setState(() => _isPlaying = false);
+            });
+          }
+
           final totalMs = _duration.inMilliseconds > 0 ? _duration.inMilliseconds : post.durationSeconds * 1000;
           final sliderMax = totalMs > 0 ? totalMs.toDouble() : 1.0;
           final sliderValue = _position.inMilliseconds.clamp(0, totalMs).toDouble();
@@ -266,7 +273,7 @@ class _AudioDetailViewState extends State<AudioDetailView> {
               Row(
                 children: [
                   GestureDetector(
-                    onTap: () => _togglePlayback(post.audioUrl),
+                    onTap: () => _togglePlayback(post),
                     child: Container(
                       width: 52,
                       height: 52,
