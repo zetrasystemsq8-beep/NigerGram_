@@ -87,10 +87,9 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw 'Not authenticated';
 
-      final result = await Supabase.instance.client.rpc(
-        'create_nigergram_cent_purchase',
-        params: {'p_cent_amount': _selectedRawCents},
-      );
+      final result = await Supabase.instance.client
+          .rpc('create_nigergram_cent_purchase', params: {'p_cent_amount': _selectedRawCents})
+          .timeout(const Duration(seconds: 12));
 
       final row = (result as List).first;
       if (!mounted) return;
@@ -111,7 +110,10 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: $e')),
+        duration: const Duration(seconds: 6),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
