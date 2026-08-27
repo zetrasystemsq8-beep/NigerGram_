@@ -111,8 +111,7 @@ class _BuyCentAmountViewState extends State<BuyCentAmountView> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $e')),
-        duration: const Duration(seconds: 6),
+        SnackBar(content: Text('Failed: $e'), duration: const Duration(seconds: 6)),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
