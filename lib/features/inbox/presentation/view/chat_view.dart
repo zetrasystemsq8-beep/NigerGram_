@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -27,10 +28,16 @@ class _ChatViewState extends State<ChatView> {
   final String _currentUserId = AppAuth.uid;
   final ScrollController _scrollController = ScrollController();
 
+  // Tracks whether we've currently marked ourselves as "typing" in this
+  // chat doc, so we don't spam Firestore with a write on every keystroke.
+  bool _isTypingFlagSet = false;
+  Timer? _typingStopTimer;
+
   @override
   void initState() {
     super.initState();
     _markAsRead();
+    _messageController.addListener(_onMessageTextChanged);
   }
 
   void _markAsRead() async {
@@ -41,11 +48,44 @@ class _ChatViewState extends State<ChatView> {
     } catch (_) {}
   }
 
+  void _onMessageTextChanged() {
+    final hasText = _messageController.text.trim().isNotEmpty;
+
+    if (hasText && !_isTypingFlagSet) {
+      _setTyping(true);
+    }
+
+    // Reset the "stop typing" countdown on every keystroke. If the user
+    // pauses for 3 seconds without sending, we clear the flag so their
+    // name doesn't stay stuck on "typing..." in the other person's inbox.
+    _typingStopTimer?.cancel();
+    if (hasText) {
+      _typingStopTimer = Timer(const Duration(seconds: 3), () => _setTyping(false));
+    } else if (_isTypingFlagSet) {
+      _setTyping(false);
+    }
+  }
+
+  Future<void> _setTyping(bool isTyping) async {
+    if (_isTypingFlagSet == isTyping) return;
+    _isTypingFlagSet = isTyping;
+    try {
+      await FirebaseFirestore.instance.collection('chats').doc(widget.chatId).update({
+        'typing.${_currentUserId}': isTyping,
+      });
+    } catch (_) {
+      // Non-critical — if this write fails the worst case is a stale
+      // typing indicator, not a broken chat, so we swallow it.
+    }
+  }
+
   void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
     _messageController.clear();
+    _typingStopTimer?.cancel();
+    _setTyping(false);
 
     try {
       final messageRef = FirebaseFirestore.instance
@@ -99,6 +139,22 @@ class _ChatViewState extends State<ChatView> {
     if (diff.inHours > 0) return '${diff.inHours}h ago';
     if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
     return 'Just now';
+  }
+
+  @override
+  void dispose() {
+    _typingStopTimer?.cancel();
+    // Best-effort clear on the way out — fire-and-forget since the
+    // widget is already gone and we can't await inside dispose().
+    if (_isTypingFlagSet) {
+      FirebaseFirestore.instance.collection('chats').doc(widget.chatId).update({
+        'typing.${_currentUserId}': false,
+      }).catchError((_) {});
+    }
+    _messageController.removeListener(_onMessageTextChanged);
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
