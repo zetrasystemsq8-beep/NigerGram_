@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nigergram/core/di/dependency_injector.dart';
 import 'package:nigergram/core/init/app_widget.dart';
+import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/core/utils/debug/firebase_debugger.dart';
 import 'package:nigergram/firebase_options.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -100,16 +101,65 @@ class _NigerGramUpdateWrapper extends StatefulWidget {
   State<_NigerGramUpdateWrapper> createState() => _NigerGramUpdateWrapperState();
 }
 
-class _NigerGramUpdateWrapperState extends State<_NigerGramUpdateWrapper> {
+class _NigerGramUpdateWrapperState extends State<_NigerGramUpdateWrapper>
+    with WidgetsBindingObserver {
   String? _apkUrl;
   bool _forceUpdate = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkVersion();
+      // App just came to the foreground for the first time this launch.
+      _setOnlineStatus(true);
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Fire-and-forget — dispose() can't be awaited, and by the time this
+    // runs the widget tree is already gone.
+    _setOnlineStatus(false);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _setOnlineStatus(true);
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        _setOnlineStatus(false);
+        break;
+    }
+  }
+
+  /// Writes presence to users/{uid}. Safe to call before login — it's a
+  /// no-op until AppAuth has a signed-in user. If your login flow doesn't
+  /// route back through this wrapper, call this again right after sign-in
+  /// so a user isn't stuck showing "offline" post-login.
+  Future<void> _setOnlineStatus(bool isOnline) async {
+    final uid = AppAuth.uid;
+    if (uid.isEmpty) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).set(
+        {
+          'isOnline': isOnline,
+          'lastSeen': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (e) {
+      debugPrint('⚠️ [PRESENCE] Failed to update online status: $e');
+    }
   }
 
   Future<void> _checkVersion() async {
