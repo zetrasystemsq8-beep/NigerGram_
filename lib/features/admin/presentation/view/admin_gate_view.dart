@@ -48,8 +48,9 @@ class _AdminGateViewState extends State<AdminGateView> {
         setState(() => _error = 'Incorrect passcode');
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = 'Not authorized');
+  if (!mounted) return;
+  setState(() => _error = '$e');
+    
     } finally {
       if (mounted) setState(() => _isChecking = false);
     }
