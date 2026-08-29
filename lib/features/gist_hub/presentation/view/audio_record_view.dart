@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:just_audio/just_audio.dart' as ja;
 import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:nigergram/core/design_system/colors.dart';
@@ -24,6 +24,8 @@ const List<Map<String, dynamic>> _permissionOptions = [
   {'value': AudioPermission.public, 'label': '🌍 Public', 'sub': 'Any NigerGram creator can reuse it'},
 ];
 
+const List<VoiceEffect> _voiceEffectOptions = [VoiceEffect.normal, VoiceEffect.deep, VoiceEffect.high];
+
 class AudioRecordView extends StatefulWidget {
   const AudioRecordView({super.key});
 
@@ -35,7 +37,7 @@ enum _RecordStage { record, review, trim, details }
 
 class _AudioRecordViewState extends State<AudioRecordView> {
   final AudioRecorder _recorder = AudioRecorder();
-  final AudioPlayer _previewPlayer = AudioPlayer();
+  final ja.AudioPlayer _player = ja.AudioPlayer();
   final AudioService _service = AudioService();
   final TextEditingController _titleController = TextEditingController();
 
@@ -46,27 +48,49 @@ class _AudioRecordViewState extends State<AudioRecordView> {
   String? _recordedPath;
   int _recordedSeconds = 0;
   Timer? _recordTimer;
+  StreamSubscription<ja.PlayerState>? _playerStateSub;
 
   AudioCategory _selectedCategory = AudioCategory.educational;
   AudioPermission _selectedPermission = AudioPermission.private;
+  VoiceEffect _selectedVoiceEffect = VoiceEffect.normal;
 
   // --- Trim state ---
   PlayerController? _waveController;
   bool _waveReady = false;
   double _trimStartFraction = 0.0;
   double _trimEndFraction = 1.0;
-  StreamSubscription<Duration>? _trimPositionSub;
   bool _isTrimPlaying = false;
+  bool _isDetailsPreviewPlaying = false;
 
   static const int _minTrimGapMs = 1000;
+
+  @override
+  void initState() {
+    super.initState();
+    // Single shared completion listener — since only one stage is ever
+    // visible/playing at a time, one bool-reset on completion covers
+    // whichever stage most recently started playback.
+    _playerStateSub = _player.playerStateStream.listen((state) {
+      if (state.processingState == ja.ProcessingState.completed) {
+        if (!mounted) return;
+        setState(() {
+          _isPlaying = false;
+          _isTrimPlaying = false;
+          _isDetailsPreviewPlaying = false;
+        });
+        _player.pause();
+        _player.seek(Duration.zero);
+      }
+    });
+  }
 
   @override
   void dispose() {
     _recordTimer?.cancel();
     _recorder.dispose();
-    _previewPlayer.dispose();
+    _playerStateSub?.cancel();
+    _player.dispose();
     _titleController.dispose();
-    _trimPositionSub?.cancel();
     _waveController?.dispose();
     super.dispose();
   }
@@ -124,14 +148,15 @@ class _AudioRecordViewState extends State<AudioRecordView> {
     if (_recordedPath == null) return;
 
     if (_isPlaying) {
-      await _previewPlayer.pause();
+      await _player.pause();
       setState(() => _isPlaying = false);
     } else {
-      await _previewPlayer.play(DeviceFileSource(_recordedPath!));
+      await _player.setFilePath(_recordedPath!);
+      await _player.setPitch(1.0);
+      await _player.setSpeed(1.0);
+      await _player.seek(Duration.zero);
       setState(() => _isPlaying = true);
-      _previewPlayer.onPlayerComplete.first.then((_) {
-        if (mounted) setState(() => _isPlaying = false);
-      });
+      _player.play();
     }
   }
 
@@ -143,8 +168,6 @@ class _AudioRecordViewState extends State<AudioRecordView> {
       _isPlaying = false;
     });
   }
-
-  // --- Trim stage setup ---
 
   Future<void> _enterTrimStage() async {
     setState(() {
@@ -167,9 +190,9 @@ class _AudioRecordViewState extends State<AudioRecordView> {
         _waveReady = true;
       });
     } catch (e) {
-      // If waveform extraction fails on this platform/version, fall
-      // back to a plain trim UI without a visual waveform — the drag
-      // handles still work, just over a flat bar instead of a wave.
+      // Waveform extraction failing (e.g. API mismatch on the installed
+      // audio_waveforms version) never blocks trimming — the drag
+      // handles still work over a flat placeholder bar.
       if (!mounted) return;
       setState(() {
         _waveController = null;
@@ -182,7 +205,8 @@ class _AudioRecordViewState extends State<AudioRecordView> {
   int get _trimEndMs => (_trimEndFraction * _recordedSeconds * 1000).round();
 
   void _onDragStartHandle(double dx, double width) {
-    final fraction = (dx / width).clamp(0.0, _trimEndFraction - (_minTrimGapMs / (_recordedSeconds * 1000).clamp(1, double.infinity)));
+    final minGapFraction = _recordedSeconds > 0 ? _minTrimGapMs / (_recordedSeconds * 1000) : 0.0;
+    final fraction = (dx / width).clamp(0.0, _trimEndFraction - minGapFraction);
     setState(() => _trimStartFraction = fraction.clamp(0.0, 1.0));
   }
 
@@ -194,32 +218,48 @@ class _AudioRecordViewState extends State<AudioRecordView> {
 
   Future<void> _playTrimmedPreview() async {
     if (_isTrimPlaying) {
-      await _previewPlayer.pause();
-      _trimPositionSub?.cancel();
+      await _player.pause();
       setState(() => _isTrimPlaying = false);
       return;
     }
 
-    await _previewPlayer.play(DeviceFileSource(_recordedPath!));
-    await _previewPlayer.seek(Duration(milliseconds: _trimStartMs));
+    final source = ja.ClippingAudioSource(
+      child: ja.AudioSource.uri(Uri.file(_recordedPath!)),
+      start: Duration(milliseconds: _trimStartMs),
+      end: Duration(milliseconds: _trimEndMs),
+    );
+    await _player.setAudioSource(source);
+    await _player.setPitch(1.0);
+    await _player.setSpeed(1.0);
     setState(() => _isTrimPlaying = true);
-
-    _trimPositionSub?.cancel();
-    _trimPositionSub = _previewPlayer.onPositionChanged.listen((pos) {
-      if (pos.inMilliseconds >= _trimEndMs) {
-        _previewPlayer.pause();
-        if (mounted) setState(() => _isTrimPlaying = false);
-      }
-    });
+    _player.play();
   }
 
   void _confirmTrim() {
-    _trimPositionSub?.cancel();
-    _previewPlayer.stop();
+    _player.stop();
     setState(() {
       _isTrimPlaying = false;
       _stage = _RecordStage.details;
     });
+  }
+
+  Future<void> _playEffectPreview() async {
+    if (_isDetailsPreviewPlaying) {
+      await _player.pause();
+      setState(() => _isDetailsPreviewPlaying = false);
+      return;
+    }
+
+    final source = ja.ClippingAudioSource(
+      child: ja.AudioSource.uri(Uri.file(_recordedPath!)),
+      start: Duration(milliseconds: _trimStartMs),
+      end: Duration(milliseconds: _trimEndMs),
+    );
+    await _player.setAudioSource(source);
+    await _player.setPitch(voiceEffectPitch(_selectedVoiceEffect));
+    await _player.setSpeed(1.0);
+    setState(() => _isDetailsPreviewPlaying = true);
+    _player.play();
   }
 
   Future<void> _publish() async {
@@ -242,6 +282,7 @@ class _AudioRecordViewState extends State<AudioRecordView> {
         durationSeconds: _recordedSeconds,
         trimStartMs: _trimStartMs,
         trimEndMs: _trimEndMs,
+        voiceEffect: _selectedVoiceEffect,
       );
 
       if (!mounted) return;
@@ -262,10 +303,7 @@ class _AudioRecordViewState extends State<AudioRecordView> {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
-  String _formatMs(int ms) {
-    final totalSeconds = (ms / 1000).round();
-    return _formatDuration(totalSeconds);
-  }
+  String _formatMs(int ms) => _formatDuration((ms / 1000).round());
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +409,7 @@ class _AudioRecordViewState extends State<AudioRecordView> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () async {
-                    await _previewPlayer.stop();
+                    await _player.stop();
                     if (mounted) setState(() => _isPlaying = false);
                     await _enterTrimStage();
                   },
@@ -438,7 +476,6 @@ class _AudioRecordViewState extends State<AudioRecordView> {
                               ),
                       ),
                     ),
-                    // Dimmed regions outside the selected trim range
                     Positioned(
                       left: 0,
                       top: 0,
@@ -453,7 +490,6 @@ class _AudioRecordViewState extends State<AudioRecordView> {
                       width: (1 - _trimEndFraction) * width,
                       child: Container(color: NGColors.background.withOpacity(0.7)),
                     ),
-                    // Start handle
                     Positioned(
                       left: (_trimStartFraction * width) - 10,
                       top: 0,
@@ -470,7 +506,6 @@ class _AudioRecordViewState extends State<AudioRecordView> {
                         ),
                       ),
                     ),
-                    // End handle
                     Positioned(
                       left: (_trimEndFraction * width) - 10,
                       top: 0,
@@ -566,6 +601,42 @@ class _AudioRecordViewState extends State<AudioRecordView> {
                 selectedColor: NGColors.accent,
                 labelStyle: TextStyle(color: selected ? Colors.white : NGColors.textPrimary),
                 onSelected: (_) => setState(() => _selectedCategory = opt['value'] as AudioCategory),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: Text('Voice Effect', style: TextStyle(color: NGColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
+              ),
+              IconButton(
+                icon: Icon(
+                  _isDetailsPreviewPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+                  color: NGColors.accent,
+                  size: 30,
+                ),
+                onPressed: _playEffectPreview,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Applied live at playback — your original recording is never altered.',
+            style: TextStyle(color: NGColors.textMuted, fontSize: 11),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _voiceEffectOptions.map((effect) {
+              final selected = effect == _selectedVoiceEffect;
+              return ChoiceChip(
+                label: Text(voiceEffectLabel(effect)),
+                selected: selected,
+                selectedColor: NGColors.accent,
+                labelStyle: TextStyle(color: selected ? Colors.white : NGColors.textPrimary),
+                onSelected: (_) => setState(() => _selectedVoiceEffect = effect),
               );
             }).toList(),
           ),
