@@ -1,9 +1,9 @@
 // lib/features/gist_hub/presentation/view/audio_detail_view.dart
 import 'dart:async';
 import 'dart:io';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart' as ja;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:nigergram/core/design_system/colors.dart';
@@ -15,9 +15,6 @@ import 'package:nigergram/features/upload/presentation/view/upload_page.dart';
 
 const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
-/// Each audio's own page — Zetra logo cover art, title, creator
-/// attribution, use count, full playback controls (seek + speed),
-/// Use/Save/Share/Download actions, and videos that used this audio.
 class AudioDetailView extends StatefulWidget {
   const AudioDetailView({required this.audioId, super.key});
 
@@ -31,18 +28,19 @@ class _AudioDetailViewState extends State<AudioDetailView> {
   static const String _logoAsset = 'assets/sounds/ic_lancher.png';
 
   final AudioService _service = AudioService();
-  final AudioPlayer _previewPlayer = AudioPlayer();
+  final ja.AudioPlayer _player = ja.AudioPlayer();
   bool _isPlaying = false;
   bool _isDownloading = false;
+  String? _loadedAudioId;
 
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
   double _speed = 1.0;
   bool _isSeeking = false;
 
-  StreamSubscription<Duration>? _durationSub;
+  StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<Duration>? _positionSub;
-  StreamSubscription<void>? _completeSub;
+  StreamSubscription<ja.PlayerState>? _stateSub;
 
   late final Stream<AudioPostEntity?> _postStream;
   late final Stream<List<Map<String, dynamic>>> _usedInStream;
@@ -53,18 +51,22 @@ class _AudioDetailViewState extends State<AudioDetailView> {
     _postStream = _service.getAudioPostStream(widget.audioId);
     _usedInStream = _service.getVideosUsingAudioStream(widget.audioId);
 
-    _durationSub = _previewPlayer.onDurationChanged.listen((d) {
-      if (mounted) setState(() => _duration = d);
+    _durationSub = _player.durationStream.listen((d) {
+      if (mounted && d != null) setState(() => _duration = d);
     });
-    _positionSub = _previewPlayer.onPositionChanged.listen((p) async {
-      if (!mounted || _isSeeking) return;
-      setState(() => _position = p);
+    _positionSub = _player.positionStream.listen((p) {
+      if (mounted && !_isSeeking) setState(() => _position = p);
     });
-    _completeSub = _previewPlayer.onPlayerComplete.listen((_) {
-      if (mounted) setState(() {
-        _isPlaying = false;
-        _position = Duration.zero;
-      });
+    _stateSub = _player.playerStateStream.listen((state) {
+      if (state.processingState == ja.ProcessingState.completed) {
+        if (!mounted) return;
+        setState(() {
+          _isPlaying = false;
+          _position = Duration.zero;
+        });
+        _player.seek(Duration.zero);
+        _player.pause();
+      }
     });
   }
 
@@ -72,34 +74,49 @@ class _AudioDetailViewState extends State<AudioDetailView> {
   void dispose() {
     _durationSub?.cancel();
     _positionSub?.cancel();
-    _completeSub?.cancel();
-    _previewPlayer.dispose();
+    _stateSub?.cancel();
+    _player.dispose();
     super.dispose();
   }
 
+  /// Loads the ClippingAudioSource (trim range baked into the source
+  /// itself, so position/duration are already relative to the trimmed
+  /// clip — 0 means "start of the trim", not "start of the raw file")
+  /// and applies the post's voice-effect pitch. Only reloads if this is
+  /// a different audio post than what's currently loaded.
+  Future<void> _ensureSourceLoaded(AudioPostEntity post) async {
+    if (_loadedAudioId == post.id) return;
+
+    final source = ja.ClippingAudioSource(
+      child: ja.AudioSource.uri(Uri.parse(post.audioUrl)),
+      start: post.trimStart,
+      end: post.trimEnd,
+    );
+    await _player.setAudioSource(source);
+    await _player.setPitch(voiceEffectPitch(post.voiceEffect));
+    await _player.setSpeed(_speed);
+    _loadedAudioId = post.id;
+  }
+
   Future<void> _togglePlayback(AudioPostEntity post) async {
+    await _ensureSourceLoaded(post);
     if (_isPlaying) {
-      await _previewPlayer.pause();
+      await _player.pause();
       setState(() => _isPlaying = false);
     } else {
-      final atStart = _position <= post.trimStart || _position >= post.trimEnd;
-      await _previewPlayer.play(UrlSource(post.audioUrl));
-      if (atStart) {
-        await _previewPlayer.seek(post.trimStart);
-      }
-      await _previewPlayer.setPlaybackRate(_speed);
       setState(() => _isPlaying = true);
+      _player.play();
     }
   }
 
   Future<void> _seekTo(Duration target) async {
-    await _previewPlayer.seek(target);
+    await _player.seek(target);
     setState(() => _position = target);
   }
 
   Future<void> _changeSpeed(double speed) async {
     setState(() => _speed = speed);
-    await _previewPlayer.setPlaybackRate(speed);
+    await _player.setSpeed(speed);
   }
 
   Future<void> _useAudio(AudioPostEntity post) async {
@@ -218,14 +235,7 @@ class _AudioDetailViewState extends State<AudioDetailView> {
             );
           }
 
-          if (_isPlaying && _position >= post.trimEnd) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _previewPlayer.pause();
-              if (mounted) setState(() => _isPlaying = false);
-            });
-          }
-
-          final totalMs = _duration.inMilliseconds > 0 ? _duration.inMilliseconds : post.durationSeconds * 1000;
+          final totalMs = _duration.inMilliseconds > 0 ? _duration.inMilliseconds : post.trimmedDuration.inMilliseconds;
           final sliderMax = totalMs > 0 ? totalMs.toDouble() : 1.0;
           final sliderValue = _position.inMilliseconds.clamp(0, totalMs).toDouble();
           final color = audioCategoryColor(post.category);
@@ -263,13 +273,12 @@ class _AudioDetailViewState extends State<AudioDetailView> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Used in ${post.useCount} videos',
+                'Used in ${post.useCount} videos · ${voiceEffectLabel(post.voiceEffect)}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: NGColors.textMuted, fontSize: 12),
               ),
               const SizedBox(height: 20),
 
-              // Playback controls: play/pause + seek bar
               Row(
                 children: [
                   GestureDetector(
@@ -321,7 +330,6 @@ class _AudioDetailViewState extends State<AudioDetailView> {
               ),
               const SizedBox(height: 12),
 
-              // Speed control
               Center(
                 child: Wrap(
                   spacing: 8,
