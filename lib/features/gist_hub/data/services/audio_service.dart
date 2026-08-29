@@ -64,6 +64,7 @@ class AudioService {
     required int durationSeconds,
     int trimStartMs = 0,
     int? trimEndMs,
+    VoiceEffect voiceEffect = VoiceEffect.normal,
   }) async {
     final userId = AppAuth.uid;
     if (userId.isEmpty) throw Exception('Not logged in');
@@ -104,11 +105,11 @@ class AudioService {
       'useCount': 0,
       'trendingScore': 0,
       'createdAt': FieldValue.serverTimestamp(),
-      // Non-destructive trim — the underlying file is always the full
-      // original recording; every playback surface starts at
-      // trimStartMs and stops at trimEndMs.
       'trimStartMs': trimStartMs,
       'trimEndMs': trimEndMs ?? durationSeconds * 1000,
+      // Non-destructive voice effect — the file always stores the raw
+      // recording; playback engines apply this pitch live via setPitch().
+      'voiceEffect': voiceEffectToString(voiceEffect),
     });
 
     final snap = await docRef.get();
