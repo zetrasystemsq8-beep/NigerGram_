@@ -5,6 +5,8 @@ enum AudioPermission { private, approvedUsers, public }
 
 enum AudioCategory { educational, idea, motivation, story, original }
 
+enum VoiceEffect { normal, deep, high }
+
 AudioPermission audioPermissionFromString(String? value) {
   switch (value) {
     case 'approved_users':
@@ -87,6 +89,52 @@ String audioCategoryEmoji(AudioCategory category) {
   }
 }
 
+VoiceEffect voiceEffectFromString(String? value) {
+  switch (value) {
+    case 'deep':
+      return VoiceEffect.deep;
+    case 'high':
+      return VoiceEffect.high;
+    default:
+      return VoiceEffect.normal;
+  }
+}
+
+String voiceEffectToString(VoiceEffect effect) {
+  switch (effect) {
+    case VoiceEffect.deep:
+      return 'deep';
+    case VoiceEffect.high:
+      return 'high';
+    case VoiceEffect.normal:
+      return 'normal';
+  }
+}
+
+/// Non-destructive pitch multiplier — applied live at playback time via
+/// just_audio's setPitch(), never baked into the actual audio file.
+double voiceEffectPitch(VoiceEffect effect) {
+  switch (effect) {
+    case VoiceEffect.deep:
+      return 0.8;
+    case VoiceEffect.high:
+      return 1.3;
+    case VoiceEffect.normal:
+      return 1.0;
+  }
+}
+
+String voiceEffectLabel(VoiceEffect effect) {
+  switch (effect) {
+    case VoiceEffect.deep:
+      return '🔉 Deep';
+    case VoiceEffect.high:
+      return '🔊 High';
+    case VoiceEffect.normal:
+      return '🎤 Normal';
+  }
+}
+
 class AudioPostEntity {
   final String id;
   final String creatorId;
@@ -103,13 +151,9 @@ class AudioPostEntity {
   final int trendingScore;
   final DateTime? createdAt;
 
-  // Non-destructive trim points — the underlying audio file always
-  // contains the full original recording; every playback surface
-  // (preview, detail page, published post) is expected to start
-  // exactly at trimStartMs and stop exactly at trimEndMs, so it plays
-  // back as if the file itself had been physically cut.
   final int trimStartMs;
   final int trimEndMs;
+  final VoiceEffect voiceEffect;
 
   const AudioPostEntity({
     required this.id,
@@ -128,6 +172,7 @@ class AudioPostEntity {
     required this.createdAt,
     this.trimStartMs = 0,
     int? trimEndMs,
+    this.voiceEffect = VoiceEffect.normal,
   }) : trimEndMs = trimEndMs ?? durationSeconds * 1000;
 
   factory AudioPostEntity.fromMap(Map<String, dynamic> map, String id) {
@@ -151,6 +196,7 @@ class AudioPostEntity {
           : null,
       trimStartMs: (map['trimStartMs'] as num?)?.toInt() ?? 0,
       trimEndMs: (map['trimEndMs'] as num?)?.toInt() ?? durationSeconds * 1000,
+      voiceEffect: voiceEffectFromString(map['voiceEffect']?.toString()),
     );
   }
 
@@ -158,7 +204,6 @@ class AudioPostEntity {
   Duration get trimEnd => Duration(milliseconds: trimEndMs);
   Duration get trimmedDuration => trimEnd - trimStart;
 
-  /// Whether [userId] is allowed to reuse this audio in their own post.
   bool canBeUsedBy(String userId) {
     if (creatorId == userId) return true;
     switch (permission) {
