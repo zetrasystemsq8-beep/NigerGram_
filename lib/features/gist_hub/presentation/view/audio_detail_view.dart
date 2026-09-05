@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:nigergram/core/design_system/colors.dart';
 import 'package:nigergram/core/utils/app_auth.dart';
 import 'package:nigergram/features/gist_hub/data/services/audio_service.dart';
+import 'package:nigergram/features/gist_hub/data/services/audio_video_share_service.dart';
 import 'package:nigergram/features/gist_hub/domain/entities/audio_post_entity.dart';
 import 'package:nigergram/features/gist_hub/presentation/widgets/report_audio_sheet.dart';
 import 'package:nigergram/features/upload/presentation/view/upload_page.dart';
@@ -29,8 +30,10 @@ class _AudioDetailViewState extends State<AudioDetailView> {
 
   final AudioService _service = AudioService();
   final ja.AudioPlayer _player = ja.AudioPlayer();
+  final AudioVideoShareService _videoShareService = AudioVideoShareService();
   bool _isPlaying = false;
   bool _isDownloading = false;
+  bool _isGeneratingVideo = false;
   String? _loadedAudioId;
 
   Duration _duration = Duration.zero;
@@ -155,6 +158,25 @@ class _AudioDetailViewState extends State<AudioDetailView> {
       'Check out this audio on NigerGram: "${post.title}" by @${post.creatorUsername}',
       subject: post.title,
     );
+  }
+
+  Future<void> _shareAsVideo(AudioPostEntity post) async {
+    setState(() => _isGeneratingVideo = true);
+    try {
+      final videoPath = await _videoShareService.generateShareVideo(post);
+      if (!mounted) return;
+      await Share.shareXFiles(
+        [XFile(videoPath)],
+        text: '🎙️ "${post.title}" by @${post.creatorUsername} — via NigerGram',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isGeneratingVideo = false);
+    }
   }
 
   Future<void> _downloadAudio(AudioPostEntity post) async {
@@ -388,8 +410,39 @@ class _AudioDetailViewState extends State<AudioDetailView> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => _shareAudio(post),
-                      icon: Icon(Icons.share_rounded, size: 16, color: NGColors.textPrimary),
+                      onPressed: _isGeneratingVideo
+                          ? null
+                          : () => showModalBottomSheet(
+                                context: context,
+                                backgroundColor: NGColors.surface,
+                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                                builder: (_) => SafeArea(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ListTile(
+                                        leading: Icon(Icons.text_snippet_outlined, color: NGColors.textPrimary),
+                                        title: Text('Share as text', style: TextStyle(color: NGColors.textPrimary)),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _shareAudio(post);
+                                        },
+                                      ),
+                                      ListTile(
+                                        leading: Icon(Icons.videocam_outlined, color: NGColors.textPrimary),
+                                        title: Text('Share as video (with logo)', style: TextStyle(color: NGColors.textPrimary)),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _shareAsVideo(post);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                      icon: _isGeneratingVideo
+                          ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: NGColors.textPrimary))
+                          : Icon(Icons.share_rounded, size: 16, color: NGColors.textPrimary),
                       label: Text('Share', style: TextStyle(color: NGColors.textPrimary, fontSize: 12)),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
