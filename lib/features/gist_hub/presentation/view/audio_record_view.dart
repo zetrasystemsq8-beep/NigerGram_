@@ -54,7 +54,6 @@ class _AudioRecordViewState extends State<AudioRecordView> {
   AudioPermission _selectedPermission = AudioPermission.private;
   VoiceEffect _selectedVoiceEffect = VoiceEffect.normal;
 
-  // --- Trim state ---
   PlayerController? _waveController;
   bool _waveReady = false;
   double _trimStartFraction = 0.0;
@@ -67,9 +66,6 @@ class _AudioRecordViewState extends State<AudioRecordView> {
   @override
   void initState() {
     super.initState();
-    // Single shared completion listener — since only one stage is ever
-    // visible/playing at a time, one bool-reset on completion covers
-    // whichever stage most recently started playback.
     _playerStateSub = _player.playerStateStream.listen((state) {
       if (state.processingState == ja.ProcessingState.completed) {
         if (!mounted) return;
@@ -106,10 +102,13 @@ class _AudioRecordViewState extends State<AudioRecordView> {
     }
 
     final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    // .wav (raw PCM) instead of .m4a — needed so the audio can later be
+    // sliced/fed directly into the video encoder without an AAC decode
+    // step that isn't safely available right now.
+    final path = '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.wav';
 
     await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100),
+      const RecordConfig(encoder: AudioEncoder.wav, sampleRate: 44100, numChannels: 1),
       path: path,
     );
 
@@ -190,9 +189,6 @@ class _AudioRecordViewState extends State<AudioRecordView> {
         _waveReady = true;
       });
     } catch (e) {
-      // Waveform extraction failing (e.g. API mismatch on the installed
-      // audio_waveforms version) never blocks trimming — the drag
-      // handles still work over a flat placeholder bar.
       if (!mounted) return;
       setState(() {
         _waveController = null;
