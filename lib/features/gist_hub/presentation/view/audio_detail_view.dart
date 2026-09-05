@@ -191,9 +191,16 @@ class _AudioDetailViewState extends State<AudioDetailView> {
       final bytes = response.data;
       if (bytes == null) throw Exception('No data received');
 
+      // Match the extension to what's actually in post.audioUrl — new
+      // posts are .wav, older posts are still .m4a. Using the wrong
+      // extension makes the shared file unreadable by whatever app
+      // receives it.
+      final isWav = post.audioUrl.toLowerCase().contains('.wav');
+      final ext = isWav ? 'wav' : 'm4a';
+
       final dir = await getTemporaryDirectory();
       final safeTitle = post.title.replaceAll(RegExp(r'[^\w\s-]'), '').trim();
-      final fileName = '${safeTitle.isEmpty ? 'nigergram_audio' : safeTitle}.m4a';
+      final fileName = '${safeTitle.isEmpty ? 'nigergram_audio' : safeTitle}.$ext';
       final file = File('${dir.path}/$fileName');
       await file.writeAsBytes(bytes);
 
