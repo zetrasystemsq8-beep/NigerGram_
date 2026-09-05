@@ -45,6 +45,7 @@ dependencies:
 
   # NEW: Advanced Video Editing
   video_editor: ^3.0.0              # Professional video editing timeline
+  flutter_quick_video_encoder: ^1.4.0   # Native h264 encoder, no FFmpeg
   
   # NEW: Audio Recording & Processing
   record: ^5.0.0                    # High-quality audio recording
