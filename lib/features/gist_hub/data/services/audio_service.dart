@@ -81,12 +81,12 @@ class AudioService {
       creatorProfilePic = d['profilePicUrl']?.toString() ?? '';
     }
 
-    final filePath = 'recordings/${userId}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final filePath = 'recordings/${userId}_${DateTime.now().millisecondsSinceEpoch}.wav';
     final bytes = await audioFile.readAsBytes();
     await _supabase.storage.from('audio').uploadBinary(
           filePath,
           bytes,
-          fileOptions: const FileOptions(contentType: 'audio/m4a', upsert: true),
+          fileOptions: const FileOptions(contentType: 'audio/wav', upsert: true),
         );
     final audioUrl = _supabase.storage.from('audio').getPublicUrl(filePath);
 
