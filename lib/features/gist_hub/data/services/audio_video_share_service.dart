@@ -165,6 +165,7 @@ class AudioVideoShareService {
       height: _videoSize,
       fps: _fps,
       videoBitrate: 2000000,
+      profileLevel: ProfileLevel.any, // required by newer package versions
       audioChannels: wav.numChannels,
       audioBitrate: 96000,
       sampleRate: wav.sampleRate,
