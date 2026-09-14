@@ -1,6 +1,7 @@
 // lib/features/gist_hub/presentation/view/audio_detail_view.dart
 import 'dart:async';
 import 'dart:io';
+import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart' as ja;
@@ -27,10 +28,18 @@ class AudioDetailView extends StatefulWidget {
 
 class _AudioDetailViewState extends State<AudioDetailView> {
   static const String _logoAsset = 'assets/sounds/ic_lancher.png';
+  static const String _brandingAsset = 'sounds/zetra_spoken.wav';
 
   final AudioService _service = AudioService();
-  final ja.AudioPlayer _player = ja.AudioPlayer();
   final AudioVideoShareService _videoShareService = AudioVideoShareService();
+  final ja.AudioPlayer _player = ja.AudioPlayer();
+
+  // Separate, dedicated player just for the "🎙️ NigerGram" branding
+  // sting — kept independent of the main just_audio player so it never
+  // interferes with position/duration/speed state used by the actual
+  // playback controls above.
+  final ap.AudioPlayer _brandingPlayer = ap.AudioPlayer();
+
   bool _isPlaying = false;
   bool _isDownloading = false;
   bool _isGeneratingVideo = false;
@@ -69,8 +78,23 @@ class _AudioDetailViewState extends State<AudioDetailView> {
         });
         _player.seek(Duration.zero);
         _player.pause();
+
+        // The audio played all the way through on its own — that's the
+        // signal to play the NigerGram branding sting, same as every
+        // video's outro. A user pausing partway or seeking away never
+        // triggers this, only a genuine full listen.
+        _playBrandingSting();
       }
     });
+  }
+
+  Future<void> _playBrandingSting() async {
+    try {
+      await _brandingPlayer.stop();
+      await _brandingPlayer.play(ap.AssetSource(_brandingAsset));
+    } catch (_) {
+      // Never let the branding sting failing block normal playback.
+    }
   }
 
   @override
@@ -79,14 +103,10 @@ class _AudioDetailViewState extends State<AudioDetailView> {
     _positionSub?.cancel();
     _stateSub?.cancel();
     _player.dispose();
+    _brandingPlayer.dispose();
     super.dispose();
   }
 
-  /// Loads the ClippingAudioSource (trim range baked into the source
-  /// itself, so position/duration are already relative to the trimmed
-  /// clip — 0 means "start of the trim", not "start of the raw file")
-  /// and applies the post's voice-effect pitch. Only reloads if this is
-  /// a different audio post than what's currently loaded.
   Future<void> _ensureSourceLoaded(AudioPostEntity post) async {
     if (_loadedAudioId == post.id) return;
 
@@ -107,6 +127,9 @@ class _AudioDetailViewState extends State<AudioDetailView> {
       await _player.pause();
       setState(() => _isPlaying = false);
     } else {
+      // Stop any branding sting still playing from a previous listen
+      // before starting playback again.
+      await _brandingPlayer.stop();
       setState(() => _isPlaying = true);
       _player.play();
     }
@@ -191,16 +214,9 @@ class _AudioDetailViewState extends State<AudioDetailView> {
       final bytes = response.data;
       if (bytes == null) throw Exception('No data received');
 
-      // Match the extension to what's actually in post.audioUrl — new
-      // posts are .wav, older posts are still .m4a. Using the wrong
-      // extension makes the shared file unreadable by whatever app
-      // receives it.
-      final isWav = post.audioUrl.toLowerCase().contains('.wav');
-      final ext = isWav ? 'wav' : 'm4a';
-
       final dir = await getTemporaryDirectory();
       final safeTitle = post.title.replaceAll(RegExp(r'[^\w\s-]'), '').trim();
-      final fileName = '${safeTitle.isEmpty ? 'nigergram_audio' : safeTitle}.$ext';
+      final fileName = '${safeTitle.isEmpty ? 'nigergram_audio' : safeTitle}.wav';
       final file = File('${dir.path}/$fileName');
       await file.writeAsBytes(bytes);
 
