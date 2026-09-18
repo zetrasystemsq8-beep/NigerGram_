@@ -1,3 +1,6 @@
+Zetra | Tech & Automation — building software, AI, automation and future mobility technology.
+
+
 # NigerGram
 
 NigerGram is a mobile-first short video and social application builted with Flutter. It focuses on fast video feeds, in-app uploading, profiles, and socialinteractions — designed for the Nigerian market but built to scale globally.
